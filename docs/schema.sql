@@ -26,6 +26,7 @@ CREATE TABLE users (
   device_fingerprint TEXT,
   is_verified        BOOLEAN DEFAULT FALSE,
   is_banned          BOOLEAN DEFAULT FALSE,
+  is_admin           BOOLEAN DEFAULT FALSE,
   created_at         TIMESTAMPTZ DEFAULT NOW()
 );
 
