@@ -86,14 +86,18 @@ app.use((err, req, res, _next) => {
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 async function bootstrap() {
-  await connectDB();
-  await connectRedis();
+  logger.info({}, 'Connecting to PostgreSQL…');
+  await connectDB();          // fatal – app cannot run without a database
+
+  logger.info({}, 'Connecting to Redis…');
+  await connectRedis();       // non-fatal – falls back to in-memory rate limiting
+
   app.listen(PORT, () => {
-    logger.info({ port: PORT }, `Plivio API running on port ${PORT}`);
+    logger.info({ port: PORT }, `Plivio API running → http://localhost:${PORT}`);
   });
 }
 
 bootstrap().catch((err) => {
-  logger.error({ err }, 'Failed to start server');
+  logger.error({ err: err.message, code: err.code }, 'Failed to start server');
   process.exit(1);
 });
