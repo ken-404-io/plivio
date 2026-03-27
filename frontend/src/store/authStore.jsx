@@ -29,9 +29,9 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Restore session on mount
+  // Initialise CSRF cookie then restore session on mount
   useEffect(() => {
-    fetchMe();
+    api.get('/auth/csrf').finally(() => fetchMe());
   }, [fetchMe]);
 
   // Listen for token-expiry events fired by the axios interceptor

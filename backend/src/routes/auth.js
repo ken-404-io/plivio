@@ -14,6 +14,11 @@ import {
 
 const router = Router();
 
+// Public endpoint — ensures the CSRF cookie is set before the first mutation
+router.get('/csrf', (req, res) => {
+  res.json({ success: true, csrf: req.csrfToken });
+});
+
 router.post('/register',
   validateBody({
     username: { required: true, type: 'username' },
