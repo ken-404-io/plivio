@@ -1,13 +1,16 @@
 {
-  "name": "backend",
+  "name": "plivio-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Plivio GPT Platform – REST API",
+  "type": "module",
+  "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "lint": "node --check src/**/*.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "Halvex Digital Inc.",
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
