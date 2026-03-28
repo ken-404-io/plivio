@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "description": "Plivio GPT Platform – REST API",
   "type": "module",
-  "main": "src/index.js",
+  "main": "src/index.ts",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "lint": "node --check src/**/*.js"
+    "start": "tsx src/index.ts",
+    "dev": "nodemon --exec tsx src/index.ts --ext ts",
+    "lint": "tsc --noEmit"
   },
   "keywords": [],
   "author": "Halvex Digital Inc.",
@@ -28,6 +28,17 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "@types/bcrypt": "^5.0.2",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.15.3",
+    "@types/pg": "^8.20.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/speakeasy": "^2.0.10",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.19.4",
+    "typescript": "^5.7.3"
   }
 }

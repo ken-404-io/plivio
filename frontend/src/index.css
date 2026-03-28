@@ -1,5 +1,6 @@
-/* ─── Design Tokens ─────────────────────────────────────────────────────────── */
-:root {
+/* ─── Design Tokens – Dark (default) ────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
   --accent:        #aa3bff;
   --accent-dark:   #8b2de0;
   --accent-light:  rgba(170, 59, 255, 0.12);
@@ -28,18 +29,51 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
 
+  color-scheme: dark;
+}
+
+/* ─── Design Tokens – Light ─────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --accent:        #7c3aed;
+  --accent-dark:   #6d28d9;
+  --accent-light:  rgba(124, 58, 237, 0.1);
+  --accent-border: rgba(124, 58, 237, 0.35);
+
+  --bg:            #f5f4fa;
+  --bg-surface:    #ffffff;
+  --bg-elevated:   #ede9f8;
+
+  --text:          #4b4869;
+  --text-heading:  #1a1730;
+  --text-muted:    #8b87a8;
+
+  --border:        #dcd8f0;
+  --border-light:  #e8e5f5;
+
+  --success:       #16a34a;
+  --warning:       #d97706;
+  --error:         #dc2626;
+  --info:          #2563eb;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+
+  color-scheme: light;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100svh;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.5;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
-  color-scheme: dark;
 }
 
-/* ─── Reset ─────────────────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { min-height: 100svh; }
 #root { min-height: 100svh; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -271,7 +305,7 @@ img { display: block; max-width: 100%; }
   border-top: 1px solid var(--border-light);
   color: var(--text);
 }
-.table tr:hover td { background: rgba(255,255,255,0.02); }
+.table tr:hover td { background: rgba(0,0,0,0.02); }
 .text-center { text-align: center; }
 
 /* ─── Task grid ──────────────────────────────────────────────────────────────── */
@@ -320,7 +354,7 @@ img { display: block; max-width: 100%; }
 }
 .plan-card--featured {
   border-color: var(--accent-border);
-  background: linear-gradient(135deg, var(--bg-surface) 0%, rgba(170,59,255,0.06) 100%);
+  background: linear-gradient(135deg, var(--bg-surface) 0%, var(--accent-light) 100%);
 }
 
 .plan-badge-top {

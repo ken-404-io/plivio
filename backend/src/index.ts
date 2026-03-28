@@ -1,0 +1,92 @@
+import 'dotenv/config';
+import express, { type Request, type Response, type NextFunction } from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+
+import { connectDB } from './config/db.ts';
+import { connectRedis } from './config/redis.ts';
+import { logger } from './utils/logger.ts';
+import { AppError } from './utils/errors.ts';
+import { rateLimiter } from './middleware/rateLimiter.ts';
+import { csrfMiddleware } from './middleware/csrf.ts';
+
+import authRoutes         from './routes/auth.ts';
+import taskRoutes         from './routes/tasks.ts';
+import userRoutes         from './routes/users.ts';
+import withdrawalRoutes   from './routes/withdrawals.ts';
+import subscriptionRoutes from './routes/subscriptions.ts';
+import adminRoutes        from './routes/admin.ts';
+
+const app  = express();
+const PORT = Number(process.env.PORT) || 3000;
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc:  ["'self'"],
+      styleSrc:   ["'self'", "'unsafe-inline'"],
+      imgSrc:     ["'self'", 'data:'],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
+app.use(cors({
+  origin:         process.env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials:    true,
+  methods:        ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+}));
+
+app.use(express.json({ limit: '16kb' }));
+app.use(express.urlencoded({ extended: false, limit: '16kb' }));
+app.use(cookieParser());
+app.use(rateLimiter());
+app.use(csrfMiddleware);
+
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', ts: new Date().toISOString() });
+});
+
+app.use('/api/auth',          authRoutes);
+app.use('/api/tasks',         taskRoutes);
+app.use('/api/users',         userRoutes);
+app.use('/api/withdrawals',   withdrawalRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/admin',         adminRoutes);
+
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ success: false, error: 'Endpoint not found' });
+});
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+  const appErr = err as AppError;
+  const status  = appErr.statusCode || 500;
+  const message = appErr.statusCode ? appErr.message : 'Internal server error';
+
+  if (!appErr.statusCode) {
+    logger.error({ err: err.message, path: req.path, method: req.method }, 'Unhandled error');
+  }
+
+  res.status(status).json({ success: false, error: message });
+});
+
+async function bootstrap() {
+  logger.info({}, 'Connecting to PostgreSQL…');
+  await connectDB();
+
+  logger.info({}, 'Connecting to Redis…');
+  await connectRedis();
+
+  app.listen(PORT, () => {
+    logger.info({ port: PORT }, `Plivio API running → http://localhost:${PORT}`);
+  });
+}
+
+bootstrap().catch((err: Error) => {
+  logger.error({ err: err.message, code: (err as NodeJS.ErrnoException).code }, 'Failed to start server');
+  process.exit(1);
+});
