@@ -20,6 +20,19 @@ export interface User {
   sub_expires_at?: string;
 }
 
+export interface SurveyQuestion {
+  id: string;
+  text: string;
+  min_length: number;
+}
+
+export interface VerificationConfig {
+  type: TaskType | string;
+  duration_seconds?: number;
+  questions?: SurveyQuestion[];
+  auto?: boolean;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -27,7 +40,9 @@ export interface Task {
   reward_amount: string | number;
   min_plan: PlanType;
   completed_today: boolean;
+  in_progress_today?: boolean;
   is_active?: boolean;
+  verification_config?: VerificationConfig;
 }
 
 export interface TaskListResponse {
@@ -36,6 +51,19 @@ export interface TaskListResponse {
   today_earnings: number;
   daily_limit: number | null;
   plan: PlanType;
+}
+
+export interface StartTaskResponse {
+  success: boolean;
+  completion_id: string;
+  verification_config: VerificationConfig;
+  challenge?: { question: string };
+}
+
+export interface SubmitTaskResponse {
+  success: boolean;
+  reward_earned: string | number;
+  message: string;
 }
 
 export interface Earning {
