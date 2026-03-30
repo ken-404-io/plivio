@@ -100,9 +100,6 @@ img { display: block; max-width: 100%; }
 }
 
 @media (max-width: 768px) {
-  /* Hide desktop sidebar */
-  .sidebar { display: none; }
-
   /* Give main content breathing room above the bottom bar */
   .main-content {
     padding: 20px 16px;
@@ -912,6 +909,9 @@ img { display: block; max-width: 100%; }
 
 /* ─── Mobile adjustments ──────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
+  /* Sidebar is replaced by the bottom tab bar on mobile */
+  .sidebar { display: none; }
+
   .profile-hero { gap: 14px; }
   .profile-avatar { width: 52px; height: 52px; font-size: 20px; }
   .profile-username { font-size: 17px; }
