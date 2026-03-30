@@ -8,11 +8,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard',   icon: '▦' },
-  { to: '/tasks',     label: 'Tasks',        icon: '✓' },
-  { to: '/earnings',  label: 'Earnings',     icon: '₱' },
-  { to: '/withdraw',  label: 'Withdraw',     icon: '↑' },
-  { to: '/plans',     label: 'Plans',        icon: '★' },
+  { to: '/dashboard', label: 'Dashboard', icon: '▦' },
+  { to: '/tasks',     label: 'Tasks',     icon: '✓' },
+  { to: '/earnings',  label: 'Earnings',  icon: '₱' },
+  { to: '/withdraw',  label: 'Withdraw',  icon: '↑' },
+  { to: '/plans',     label: 'Plans',     icon: '★' },
+  { to: '/profile',   label: 'Profile',   icon: '◉' },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [

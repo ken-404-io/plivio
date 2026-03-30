@@ -14,6 +14,7 @@ export interface User {
   referral_code: string;
   is_verified: boolean;
   is_admin: boolean;
+  has_2fa: boolean;
   created_at: string;
   active_sub_plan?: PlanType;
   sub_expires_at?: string;
