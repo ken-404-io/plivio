@@ -4,7 +4,7 @@ import type { Task, StartTaskResponse, SubmitTaskResponse, SurveyQuestion } from
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type ModalPhase = 'starting' | 'active' | 'submitting' | 'done' | 'error';
+type ModalPhase = 'starting' | 'active' | 'auto-submitting' | 'submitting' | 'error';
 
 interface Props {
   task: Task;
@@ -19,32 +19,36 @@ function useCountdown(seconds: number, active: boolean) {
 
   useEffect(() => {
     if (!active || remaining <= 0) return;
-    const id = setInterval(() => setRemaining((s) => s - 1), 1000);
+    const id = setInterval(() => setRemaining((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(id);
   }, [active, remaining]);
 
   return remaining;
 }
 
-// ─── Task-specific content panels ───────────────────────────────────────────
+// ─── Video / Ad panel ───────────────────────────────────────────────────────
 
 function VideoAdPanel({
   task,
   duration,
-  onReady,
+  onTimerDone,
 }: {
   task: Task;
   duration: number;
-  onReady: () => void;
+  onTimerDone: () => void;
 }) {
   const remaining = useCountdown(duration, true);
   const isVideo   = task.type === 'video';
+  const notified  = useRef(false);
 
   useEffect(() => {
-    if (remaining <= 0) onReady();
-  }, [remaining, onReady]);
+    if (remaining <= 0 && !notified.current) {
+      notified.current = true;
+      onTimerDone();
+    }
+  }, [remaining, onTimerDone]);
 
-  const pct = Math.max(0, Math.round(((duration - remaining) / duration) * 100));
+  const pct = Math.round(((duration - remaining) / duration) * 100);
 
   return (
     <div className="task-modal-content">
@@ -67,20 +71,22 @@ function VideoAdPanel({
           <div className="task-modal-timer-fill" style={{ width: `${pct}%` }} />
         </div>
         <span className="task-modal-timer-label">
-          {remaining > 0
-            ? `${remaining}s remaining`
-            : 'Ready to submit!'}
+          {remaining > 0 ? `${remaining}s remaining` : 'Completed!'}
         </span>
       </div>
 
-      <p className="task-modal-hint">
-        {isVideo
-          ? 'Watch the full video to earn your reward.'
-          : 'Stay on this page until the timer completes.'}
-      </p>
+      {remaining > 0 && (
+        <p className="task-modal-hint">
+          {isVideo
+            ? 'Watch the full video — do not close this window.'
+            : 'Keep this window open until the ad finishes.'}
+        </p>
+      )}
     </div>
   );
 }
+
+// ─── Captcha panel ──────────────────────────────────────────────────────────
 
 function CaptchaPanel({
   question,
@@ -113,6 +119,8 @@ function CaptchaPanel({
     </div>
   );
 }
+
+// ─── Survey panel ───────────────────────────────────────────────────────────
 
 function SurveyPanel({
   questions,
@@ -154,10 +162,9 @@ function SurveyPanel({
 // ─── Main modal ─────────────────────────────────────────────────────────────
 
 export default function TaskModal({ task, onClose, onComplete }: Props) {
-  const [phase,         setPhase]         = useState<ModalPhase>('starting');
-  const [completionId,  setCompletionId]  = useState('');
-  const [errorMsg,      setErrorMsg]      = useState('');
-  const [timerReady,    setTimerReady]    = useState(false);
+  const [phase,          setPhase]          = useState<ModalPhase>('starting');
+  const [completionId,   setCompletionId]   = useState('');
+  const [errorMsg,       setErrorMsg]       = useState('');
 
   // Captcha state
   const [captchaQuestion, setCaptchaQuestion] = useState('');
@@ -166,10 +173,13 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
   // Survey state
   const [surveyAnswers, setSurveyAnswers] = useState<Record<string, string>>({});
 
-  const started = useRef(false);
+  const started          = useRef(false);
+  const completionIdRef  = useRef('');         // stable ref for cleanup
+  const timerDoneRef     = useRef(false);      // prevent double-fire
 
   const config   = task.verification_config ?? { type: task.type };
   const duration = config.duration_seconds ?? (task.type === 'video' ? 30 : 10);
+  const isVideoAd = task.type === 'video' || task.type === 'ad_click';
 
   // ── Start the task immediately on mount ─────────────────────────────────
   useEffect(() => {
@@ -180,6 +190,7 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
       try {
         const { data } = await api.post<StartTaskResponse>(`/tasks/start/${task.id}`);
         setCompletionId(data.completion_id);
+        completionIdRef.current = data.completion_id;
 
         if (task.type === 'captcha' && data.challenge) {
           setCaptchaQuestion(data.challenge.question);
@@ -194,21 +205,19 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
     })();
   }, [task]);
 
-  // ── Submit proof ─────────────────────────────────────────────────────────
-  async function handleSubmit() {
-    setPhase('submitting');
+  // ── Auto-submit when video/ad timer finishes ─────────────────────────────
+  function handleTimerDone() {
+    if (timerDoneRef.current) return;
+    timerDoneRef.current = true;
+    setPhase('auto-submitting');
+    void submitProof({});
+  }
 
-    let proof: Record<string, unknown> = {};
-
-    if (task.type === 'captcha') {
-      proof = { answer: captchaAnswer.trim() };
-    } else if (task.type === 'survey') {
-      proof = { answers: surveyAnswers };
-    }
-
+  // ── Submit proof (called manually for captcha/survey, auto for video/ad) ─
+  async function submitProof(proof: Record<string, unknown>) {
     try {
       const { data } = await api.post<SubmitTaskResponse>(`/tasks/submit/${task.id}`, {
-        completion_id: completionId,
+        completion_id: completionIdRef.current || completionId,
         proof,
       });
       onComplete(data.message);
@@ -219,21 +228,35 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
     }
   }
 
-  // ── Can the user submit? ─────────────────────────────────────────────────
+  function handleManualSubmit() {
+    setPhase('submitting');
+
+    let proof: Record<string, unknown> = {};
+    if (task.type === 'captcha') proof = { answer: captchaAnswer.trim() };
+    if (task.type === 'survey')  proof = { answers: surveyAnswers };
+
+    void submitProof(proof);
+  }
+
+  // ── Cancel if video/ad was exited before timer finished ──────────────────
+  async function handleClose() {
+    if (isVideoAd && phase === 'active' && completionIdRef.current) {
+      try { await api.post(`/tasks/cancel/${task.id}`); } catch { /* ignore */ }
+    }
+    onClose();
+  }
+
+  // ── Can the user manually submit? ────────────────────────────────────────
   function isSubmittable(): boolean {
-    if (task.type === 'video' || task.type === 'ad_click') return timerReady;
-
     if (task.type === 'captcha') return captchaAnswer.trim().length > 0;
-
     if (task.type === 'survey') {
       const questions = config.questions ?? [];
       return questions.every((q) => (surveyAnswers[q.id] ?? '').trim().length >= q.min_length);
     }
-
     return false;
   }
 
-  // ── Prevent background scroll while open ────────────────────────────────
+  // ── Lock body scroll while open ──────────────────────────────────────────
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
@@ -241,7 +264,7 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="task-modal-overlay" onClick={onClose}>
+    <div className="task-modal-overlay" onClick={handleClose}>
       <div className="task-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
@@ -250,7 +273,7 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
             <span className="badge">{task.type.replace('_', ' ')}</span>
             <h2 className="task-modal-title">{task.title}</h2>
           </div>
-          <button className="task-modal-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="task-modal-close" onClick={handleClose} aria-label="Close">✕</button>
         </div>
 
         <div className="task-modal-reward">
@@ -267,14 +290,13 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
 
         {phase === 'active' && (
           <>
-            {(task.type === 'video' || task.type === 'ad_click') && (
+            {isVideoAd && (
               <VideoAdPanel
                 task={task}
                 duration={duration}
-                onReady={() => setTimerReady(true)}
+                onTimerDone={handleTimerDone}
               />
             )}
-
             {task.type === 'captcha' && (
               <CaptchaPanel
                 question={captchaQuestion}
@@ -282,7 +304,6 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
                 onChange={setCaptchaAnswer}
               />
             )}
-
             {task.type === 'survey' && (
               <SurveyPanel
                 questions={config.questions ?? []}
@@ -293,10 +314,14 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
           </>
         )}
 
-        {phase === 'submitting' && (
+        {(phase === 'auto-submitting' || phase === 'submitting') && (
           <div className="task-modal-loading">
             <div className="spinner" />
-            <p>Verifying your submission…</p>
+            <p>
+              {phase === 'auto-submitting'
+                ? 'Ad completed — crediting your reward…'
+                : 'Verifying your submission…'}
+            </p>
           </div>
         )}
 
@@ -306,28 +331,50 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="task-modal-footer">
-          <button className="btn btn-ghost" onClick={onClose} disabled={phase === 'submitting'}>
-            Cancel
-          </button>
-
-          {phase === 'active' && (
+        {/* Footer — only shown for manual-submit tasks */}
+        {!isVideoAd && (
+          <div className="task-modal-footer">
             <button
-              className="btn btn-primary"
-              onClick={() => { void handleSubmit(); }}
-              disabled={!isSubmittable()}
+              className="btn btn-ghost"
+              onClick={handleClose}
+              disabled={phase === 'submitting'}
             >
-              Submit for Verification
+              Cancel
             </button>
-          )}
 
-          {phase === 'error' && (
-            <button className="btn btn-primary" onClick={onClose}>
-              Close
-            </button>
-          )}
-        </div>
+            {phase === 'active' && (
+              <button
+                className="btn btn-primary"
+                onClick={handleManualSubmit}
+                disabled={!isSubmittable()}
+              >
+                Submit for Verification
+              </button>
+            )}
+
+            {phase === 'error' && (
+              <button className="btn btn-primary" onClick={handleClose}>
+                Close
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Footer for video/ad — only show cancel before timer done, close on error */}
+        {isVideoAd && (
+          <div className="task-modal-footer">
+            {phase === 'active' && (
+              <button className="btn btn-ghost" onClick={handleClose}>
+                Cancel (reward voided)
+              </button>
+            )}
+            {phase === 'error' && (
+              <button className="btn btn-primary" onClick={handleClose}>
+                Close
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

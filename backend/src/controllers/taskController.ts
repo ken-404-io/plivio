@@ -360,3 +360,24 @@ export async function submitTask(req: Request, res: Response, next: NextFunction
     client.release();
   }
 }
+
+// ─── Cancel a task (user closed before completing) ─────────────────────────
+
+export async function cancelTask(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    const taskId = req.params.id;
+
+    // Mark any pending completion for this task today as rejected
+    await pool.query(
+      `UPDATE task_completions
+       SET status = 'rejected', completed_at = NOW()
+       WHERE user_id = $1 AND task_id = $2
+         AND status = 'pending'
+         AND started_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
+      [userId, taskId]
+    );
+
+    res.json({ success: true });
+  } catch (err) { next(err); }
+}
