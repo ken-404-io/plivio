@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
+import { useToast } from '../../components/common/Toast.tsx';
 import type { Subscription, PlansResponse, PlanInfo } from '../../types/index.ts';
 
 export default function Plans() {
-  const { user, fetchMe }   = useAuth();
-  const [plans, setPlans]   = useState<Record<string, PlanInfo>>({});
-  const [sub, setSub]       = useState<Subscription | null>(null);
-  const [loading, setLoading]    = useState(true);
+  const { user, fetchMe } = useAuth();
+  const toast             = useToast();
+
+  const [plans,       setPlans]       = useState<Record<string, PlanInfo>>({});
+  const [sub,         setSub]         = useState<Subscription | null>(null);
+  const [loading,     setLoading]     = useState(true);
   const [subscribing, setSubscribing] = useState('');
-  const [message, setMessage]    = useState({ type: '', text: '' });
 
   useEffect(() => {
     Promise.all([
@@ -26,16 +28,15 @@ export default function Plans() {
 
   async function handleSubscribe(planKey: string) {
     setSubscribing(planKey);
-    setMessage({ type: '', text: '' });
     try {
       await api.post('/subscriptions', { plan: planKey, duration_days: 30 });
-      setMessage({ type: 'success', text: `Subscribed to ${plans[planKey]?.name} plan for 30 days!` });
+      toast.success(`Subscribed to ${plans[planKey]?.name} plan for 30 days!`);
       await fetchMe();
       const { data } = await api.get<{ subscription: Subscription | null }>('/subscriptions/current');
       setSub(data.subscription);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Subscription failed.' });
+      toast.error(msg ?? 'Subscription failed.');
     } finally {
       setSubscribing('');
     }
@@ -54,10 +55,6 @@ export default function Plans() {
           </p>
         </div>
       </header>
-
-      {message.text && (
-        <div className={`alert alert--${message.type}`} role="alert">{message.text}</div>
-      )}
 
       <div className="plans-grid">
         {Object.entries(plans).map(([key, plan]) => {
@@ -102,7 +99,7 @@ export default function Plans() {
                 ) : (
                   <button
                     className="btn btn-primary btn-full"
-                    onClick={() => handleSubscribe(key)}
+                    onClick={() => { void handleSubscribe(key); }}
                     disabled={!!subscribing}
                   >
                     {subscribing === key ? 'Activating…' : `Get ${plan.name}`}

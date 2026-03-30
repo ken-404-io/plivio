@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api.ts';
+import { useToast } from '../../components/common/Toast.tsx';
 import type { AdminUser, AdminTask, AdminWithdrawal, AdminStats } from '../../types/index.ts';
 
 const TABS = ['overview', 'users', 'tasks', 'withdrawals'] as const;
@@ -13,13 +14,14 @@ interface TaskForm {
 }
 
 export default function AdminDashboard() {
-  const [tab, setTab]           = useState<Tab>('overview');
-  const [stats, setStats]       = useState<AdminStats | null>(null);
-  const [users, setUsers]       = useState<AdminUser[]>([]);
-  const [tasks, setTasks]       = useState<AdminTask[]>([]);
+  const toast = useToast();
+
+  const [tab,         setTab]         = useState<Tab>('overview');
+  const [stats,       setStats]       = useState<AdminStats | null>(null);
+  const [users,       setUsers]       = useState<AdminUser[]>([]);
+  const [tasks,       setTasks]       = useState<AdminTask[]>([]);
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [message, setMessage]   = useState({ type: '', text: '' });
+  const [loading,     setLoading]     = useState(true);
 
   const [taskForm, setTaskForm] = useState<TaskForm>({
     title: '', type: 'captcha', reward_amount: '', min_plan: 'free',
@@ -39,35 +41,33 @@ export default function AdminDashboard() {
         setTasks(tasksRes.data.tasks);
         setWithdrawals(wdRes.data.withdrawals);
       } catch {
-        setMessage({ type: 'error', text: 'Failed to load admin data.' });
+        toast.error('Failed to load admin data.');
       } finally {
         setLoading(false);
       }
     }
-    load();
-  }, []);
+    void load();
+  }, [toast]);
 
   async function toggleBan(userId: string, isBanned: boolean) {
     try {
       await api.put(`/admin/users/${userId}`, { is_banned: String(!isBanned) });
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, is_banned: !isBanned } : u))
-      );
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: !isBanned } : u));
+      toast.success(`User ${isBanned ? 'unbanned' : 'banned'}.`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Action failed.' });
+      toast.error(msg ?? 'Action failed.');
     }
   }
 
   async function toggleTask(taskId: string, isActive: boolean) {
     try {
       await api.put(`/admin/tasks/${taskId}`, { is_active: !isActive });
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, is_active: !isActive } : t))
-      );
+      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, is_active: !isActive } : t));
+      toast.success(`Task ${isActive ? 'deactivated' : 'activated'}.`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Action failed.' });
+      toast.error(msg ?? 'Action failed.');
     }
   }
 
@@ -77,10 +77,10 @@ export default function AdminDashboard() {
       const { data } = await api.post<{ task: AdminTask }>('/admin/tasks', taskForm);
       setTasks((prev) => [data.task, ...prev]);
       setTaskForm({ title: '', type: 'captcha', reward_amount: '', min_plan: 'free' });
-      setMessage({ type: 'success', text: 'Task created.' });
+      toast.success('Task created.');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Failed to create task.' });
+      toast.error(msg ?? 'Failed to create task.');
     }
   }
 
@@ -88,10 +88,10 @@ export default function AdminDashboard() {
     try {
       await api.put(`/admin/withdrawals/${id}`, { action });
       setWithdrawals((prev) => prev.filter((w) => w.id !== id));
-      setMessage({ type: 'success', text: `Withdrawal ${action}d.` });
+      toast.success(`Withdrawal ${action}d.`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Action failed.' });
+      toast.error(msg ?? 'Action failed.');
     }
   }
 
@@ -102,10 +102,6 @@ export default function AdminDashboard() {
       <header className="page-header">
         <h1 className="page-title">Admin Panel</h1>
       </header>
-
-      {message.text && (
-        <div className={`alert alert--${message.type}`} role="alert">{message.text}</div>
-      )}
 
       <div className="tabs">
         {TABS.map((t) => (
@@ -162,7 +158,7 @@ export default function AdminDashboard() {
                   <td>
                     <button
                       className={`btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={() => toggleBan(u.id, u.is_banned)}
+                      onClick={() => { void toggleBan(u.id, u.is_banned); }}
                     >
                       {u.is_banned ? 'Unban' : 'Ban'}
                     </button>
@@ -178,7 +174,7 @@ export default function AdminDashboard() {
         <>
           <section className="card mb-4">
             <h2 className="card-title">Create task</h2>
-            <form onSubmit={createTask} className="form-row">
+            <form onSubmit={(e) => { void createTask(e); }} className="form-row">
               <input
                 className="form-input"
                 placeholder="Task title"
@@ -240,7 +236,7 @@ export default function AdminDashboard() {
                     <td>
                       <button
                         className="btn btn-sm btn-ghost"
-                        onClick={() => toggleTask(t.id, t.is_active)}
+                        onClick={() => { void toggleTask(t.id, t.is_active); }}
                       >
                         {t.is_active ? 'Deactivate' : 'Activate'}
                       </button>
@@ -271,13 +267,13 @@ export default function AdminDashboard() {
                   <td className="action-cell">
                     <button
                       className="btn btn-primary btn-sm"
-                      onClick={() => processWithdrawal(w.id, 'approve')}
+                      onClick={() => { void processWithdrawal(w.id, 'approve'); }}
                     >
                       Approve
                     </button>
                     <button
                       className="btn btn-ghost btn-sm"
-                      onClick={() => processWithdrawal(w.id, 'reject')}
+                      onClick={() => { void processWithdrawal(w.id, 'reject'); }}
                     >
                       Reject
                     </button>

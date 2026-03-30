@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './store/authStore.tsx';
+import { AuthProvider }  from './store/authStore.tsx';
+import { ToastProvider } from './components/common/Toast.tsx';
 
 import ProtectedRoute from './components/common/ProtectedRoute.tsx';
 import Layout         from './components/layout/Layout.tsx';
@@ -14,11 +15,13 @@ import Earnings       from './pages/earnings/Earnings.tsx';
 import Withdraw       from './pages/withdraw/Withdraw.tsx';
 import Plans          from './pages/plans/Plans.tsx';
 import Profile        from './pages/profile/Profile.tsx';
+import Referrals      from './pages/referrals/Referrals.tsx';
 import AdminDashboard from './pages/admin/AdminDashboard.tsx';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <ToastProvider>
       <AuthProvider>
         <Routes>
           {/* Public landing page */}
@@ -37,6 +40,7 @@ export default function App() {
               <Route path="/earnings"   element={<Earnings />} />
               <Route path="/withdraw"   element={<Withdraw />} />
               <Route path="/plans"      element={<Plans />} />
+              <Route path="/referrals"  element={<Referrals />} />
               <Route path="/profile"    element={<Profile />} />
             </Route>
           </Route>
@@ -51,6 +55,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

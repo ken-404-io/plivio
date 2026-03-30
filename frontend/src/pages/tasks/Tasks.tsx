@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import api from '../../services/api.ts';
+import { useToast } from '../../components/common/Toast.tsx';
 import type { TaskListResponse } from '../../types/index.ts';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -11,34 +12,34 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default function Tasks() {
-  const [taskData, setTaskData]     = useState<TaskListResponse | null>(null);
-  const [loading, setLoading]       = useState(true);
+  const toast = useToast();
+
+  const [taskData,   setTaskData]   = useState<TaskListResponse | null>(null);
+  const [loading,    setLoading]    = useState(true);
   const [completing, setCompleting] = useState<string | null>(null);
-  const [message, setMessage]       = useState({ type: '', text: '' });
 
   const load = useCallback(async () => {
     try {
       const { data } = await api.get<TaskListResponse>('/tasks');
       setTaskData(data);
     } catch {
-      setMessage({ type: 'error', text: 'Failed to load tasks.' });
+      toast.error('Failed to load tasks.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   async function handleComplete(taskId: string) {
     setCompleting(taskId);
-    setMessage({ type: '', text: '' });
     try {
       const { data } = await api.post<{ message: string }>(`/tasks/${taskId}/complete`);
-      setMessage({ type: 'success', text: data.message });
+      toast.success(data.message);
       await load();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Failed to complete task.' });
+      toast.error(msg ?? 'Failed to complete task.');
     } finally {
       setCompleting(null);
     }
@@ -48,7 +49,7 @@ export default function Tasks() {
 
   const available = taskData?.tasks?.filter((t) => !t.completed_today) ?? [];
   const completed = taskData?.tasks?.filter((t) => t.completed_today)  ?? [];
-  const atLimit   = taskData?.daily_limit !== null && taskData?.daily_limit !== undefined &&
+  const atLimit   = taskData?.daily_limit != null &&
                     taskData.today_earnings >= taskData.daily_limit;
 
   return (
@@ -63,15 +64,10 @@ export default function Tasks() {
         </div>
       </header>
 
-      {message.text && (
-        <div className={`alert alert--${message.type}`} role="alert">
-          {message.text}
-        </div>
-      )}
-
       {atLimit && (
         <div className="alert alert--warning">
-          Daily earning limit reached. Come back tomorrow or upgrade your plan.
+          Daily earning limit reached. Come back tomorrow or{' '}
+          <a href="/plans" className="link">upgrade your plan</a>.
         </div>
       )}
 
@@ -94,7 +90,7 @@ export default function Tasks() {
                 <span className="task-reward">+₱{Number(task.reward_amount).toFixed(2)}</span>
                 <button
                   className="btn btn-primary btn-sm"
-                  onClick={() => handleComplete(task.id)}
+                  onClick={() => { void handleComplete(task.id); }}
                   disabled={completing === task.id || atLimit}
                 >
                   {completing === task.id ? 'Processing…' : 'Complete'}
