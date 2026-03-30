@@ -40,8 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Initialise CSRF cookie then restore session on mount
   useEffect(() => {
-    fetchMe();
+    api.get('/auth/csrf').finally(() => fetchMe());
   }, [fetchMe]);
 
   useEffect(() => {
