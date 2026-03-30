@@ -50,6 +50,12 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
+// TEMP DEBUG – remove after fixing
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  console.log(`[REQ] ${req.method} ${req.url}`);
+  next();
+});
+
 app.use('/api/auth',          authRoutes);
 app.use('/api/tasks',         taskRoutes);
 app.use('/api/users',         userRoutes);
