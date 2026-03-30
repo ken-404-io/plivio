@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
 import type { AxiosError } from 'axios';
 
 export default function Register() {
-  const { register } = useAuth();
-  const navigate     = useNavigate();
+  const { register }   = useAuth();
+  const navigate       = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [form, setForm]       = useState({ username: '', email: '', password: '', referral_code: '' });
+  // Pre-fill referral code from URL: /register?ref=ABCD1234
+  const [form, setForm] = useState({
+    username: '', email: '', password: '',
+    referral_code: searchParams.get('ref') ?? '',
+  });
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
