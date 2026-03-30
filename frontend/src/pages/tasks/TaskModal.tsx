@@ -178,7 +178,7 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
 
     void (async () => {
       try {
-        const { data } = await api.post<StartTaskResponse>(`/tasks/${task.id}/start`);
+        const { data } = await api.post<StartTaskResponse>(`/tasks/start/${task.id}`);
         setCompletionId(data.completion_id);
 
         if (task.type === 'captcha' && data.challenge) {
@@ -207,7 +207,7 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
     }
 
     try {
-      const { data } = await api.post<SubmitTaskResponse>(`/tasks/${task.id}/submit`, {
+      const { data } = await api.post<SubmitTaskResponse>(`/tasks/submit/${task.id}`, {
         completion_id: completionId,
         proof,
       });
