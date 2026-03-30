@@ -1,0 +1,442 @@
+import { useState, type FormEvent, type ChangeEvent } from 'react';
+import { useAuth } from '../../store/authStore.tsx';
+import api from '../../services/api.ts';
+
+type Tab = 'account' | 'security';
+
+// ─── 2FA Section ─────────────────────────────────────────────────────────────
+// The 2FA flow has three phases:
+//   idle     → user sees current status and action button
+//   scanning → QR code shown after setup; user must enter code to confirm
+//   disabling → user enters TOTP code to turn 2FA off
+
+type TwoFaPhase = 'idle' | 'scanning' | 'disabling';
+
+interface TwoFaSectionProps {
+  has2fa: boolean;
+  onToggled: () => void;
+}
+
+function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
+  const [phase,   setPhase]   = useState<TwoFaPhase>('idle');
+  const [qrUrl,   setQrUrl]   = useState('');
+  const [secret,  setSecret]  = useState('');
+  const [token,   setToken]   = useState('');
+  const [busy,    setBusy]    = useState(false);
+  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+
+  function clearMessage() {
+    setMessage({ type: '', text: '' });
+  }
+
+  async function handleSetup() {
+    setBusy(true);
+    clearMessage();
+    try {
+      const { data } = await api.post<{ qr: string; secret: string }>('/auth/2fa/setup');
+      setQrUrl(data.qr);
+      setSecret(data.secret);
+      setPhase('scanning');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      setMessage({ type: 'error', text: msg ?? 'Could not start 2FA setup.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleEnable(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    clearMessage();
+    try {
+      await api.post('/auth/2fa/enable', { token });
+      setMessage({ type: 'success', text: '2FA is now active on your account.' });
+      setPhase('idle');
+      setToken('');
+      onToggled();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      setMessage({ type: 'error', text: msg ?? 'Invalid verification code.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDisable(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    clearMessage();
+    try {
+      await api.post('/auth/2fa/disable', { token });
+      setMessage({ type: 'success', text: '2FA has been removed from your account.' });
+      setPhase('idle');
+      setToken('');
+      onToggled();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      setMessage({ type: 'error', text: msg ?? 'Invalid code.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="security-item">
+      <div className="security-item-header">
+        <div>
+          <h3 className="security-item-title">Two-Factor Authentication</h3>
+          <p className="security-item-desc">
+            Add a second layer of security using an authenticator app.
+          </p>
+        </div>
+        <span className={`badge ${has2fa ? 'badge--success' : ''}`}>
+          {has2fa ? 'Enabled' : 'Disabled'}
+        </span>
+      </div>
+
+      {message.text && (
+        <div className={`alert alert--${message.type}`} role="alert">{message.text}</div>
+      )}
+
+      {/* Idle — show action button */}
+      {phase === 'idle' && !has2fa && (
+        <button className="btn btn-primary btn-sm" onClick={handleSetup} disabled={busy}>
+          {busy ? 'Setting up…' : 'Enable 2FA'}
+        </button>
+      )}
+
+      {phase === 'idle' && has2fa && (
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => { setPhase('disabling'); clearMessage(); }}
+        >
+          Disable 2FA
+        </button>
+      )}
+
+      {/* Scanning — show QR + confirm form */}
+      {phase === 'scanning' && (
+        <div className="twofa-setup">
+          <p className="security-item-desc">
+            Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.),
+            then enter the 6-digit code to confirm.
+          </p>
+          <div className="qr-wrapper">
+            <img src={qrUrl} alt="2FA QR code" className="qr-image" />
+          </div>
+          <details className="secret-reveal">
+            <summary>Can't scan? Enter key manually</summary>
+            <code className="secret-key">{secret}</code>
+          </details>
+          <form onSubmit={(e) => { void handleEnable(e); }} className="twofa-confirm-form">
+            <input
+              type="text"
+              inputMode="numeric"
+              className="form-input form-input--otp"
+              placeholder="000000"
+              value={token}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              maxLength={6}
+              required
+            />
+            <div className="twofa-confirm-actions">
+              <button type="submit" className="btn btn-primary" disabled={busy || token.length !== 6}>
+                {busy ? 'Verifying…' : 'Confirm & Enable'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => { setPhase('idle'); setToken(''); clearMessage(); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Disabling — confirm with TOTP code */}
+      {phase === 'disabling' && (
+        <form onSubmit={(e) => { void handleDisable(e); }} className="twofa-confirm-form">
+          <p className="security-item-desc">
+            Enter your current authenticator code to confirm removal.
+          </p>
+          <input
+            type="text"
+            inputMode="numeric"
+            className="form-input form-input--otp"
+            placeholder="000000"
+            value={token}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            maxLength={6}
+            required
+          />
+          <div className="twofa-confirm-actions">
+            <button type="submit" className="btn btn-ghost" disabled={busy || token.length !== 6}>
+              {busy ? 'Disabling…' : 'Confirm Disable'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => { setPhase('idle'); setToken(''); clearMessage(); }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ─── Change Password Section ──────────────────────────────────────────────────
+
+function ChangePasswordSection() {
+  const [form, setForm] = useState({
+    current_password:  '',
+    new_password:      '',
+    confirm_password:  '',
+  });
+  const [busy,    setBusy]    = useState(false);
+  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+
+  function handleChange(e: ChangeEvent<HTMLInputElement>) {
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setMessage({ type: '', text: '' });
+
+    if (form.new_password !== form.confirm_password) {
+      setMessage({ type: 'error', text: 'New passwords do not match.' });
+      return;
+    }
+    if (form.new_password.length < 8) {
+      setMessage({ type: 'error', text: 'New password must be at least 8 characters.' });
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await api.put('/users/me/password', {
+        current_password: form.current_password,
+        new_password:     form.new_password,
+      });
+      setMessage({ type: 'success', text: 'Password updated successfully.' });
+      setForm({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      setMessage({ type: 'error', text: msg ?? 'Could not update password.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="security-item">
+      <div className="security-item-header">
+        <div>
+          <h3 className="security-item-title">Change Password</h3>
+          <p className="security-item-desc">
+            Use a strong password that you don't use anywhere else.
+          </p>
+        </div>
+      </div>
+
+      {message.text && (
+        <div className={`alert alert--${message.type}`} role="alert">{message.text}</div>
+      )}
+
+      <form onSubmit={(e) => { void handleSubmit(e); }} className="password-form" noValidate>
+        <div className="form-group">
+          <label className="form-label" htmlFor="current_password">Current password</label>
+          <input
+            id="current_password"
+            name="current_password"
+            type="password"
+            className="form-input"
+            value={form.current_password}
+            onChange={handleChange}
+            autoComplete="current-password"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="new_password">New password</label>
+          <input
+            id="new_password"
+            name="new_password"
+            type="password"
+            className="form-input"
+            value={form.new_password}
+            onChange={handleChange}
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="confirm_password">Confirm new password</label>
+          <input
+            id="confirm_password"
+            name="confirm_password"
+            type="password"
+            className="form-input"
+            value={form.confirm_password}
+            onChange={handleChange}
+            autoComplete="new-password"
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={busy || !form.current_password || !form.new_password || !form.confirm_password}
+        >
+          {busy ? 'Updating…' : 'Update password'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ─── Profile Page ─────────────────────────────────────────────────────────────
+
+export default function Profile() {
+  const { user, fetchMe }   = useAuth();
+  const [tab, setTab]       = useState<Tab>('account');
+  const [copied, setCopied] = useState(false);
+
+  const joinDate = user?.created_at
+    ? new Date(user.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+    : '—';
+
+  function copyReferralCode() {
+    if (!user?.referral_code) return;
+    void navigator.clipboard.writeText(user.referral_code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Profile</h1>
+          <p className="page-subtitle">Manage your account details and security settings</p>
+        </div>
+      </header>
+
+      {/* Hero card */}
+      <div className="profile-hero card">
+        <div className="profile-avatar" aria-hidden="true">
+          {user?.username?.charAt(0).toUpperCase() ?? '?'}
+        </div>
+        <div className="profile-hero-info">
+          <p className="profile-username">{user?.username}</p>
+          <p className="profile-email text-muted">{user?.email}</p>
+          <div className="profile-hero-meta">
+            <span className={`plan-badge plan-badge--${user?.plan ?? 'free'}`}>
+              {user?.plan?.toUpperCase() ?? 'FREE'}
+            </span>
+            {user?.is_verified && (
+              <span className="badge badge--success">Verified</span>
+            )}
+            <span className="text-muted profile-join-date">Joined {joinDate}</span>
+          </div>
+        </div>
+        <div className="profile-balance-pill">
+          <span className="profile-balance-label">Balance</span>
+          <span className="profile-balance-value">₱{Number(user?.balance ?? 0).toFixed(2)}</span>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="tabs">
+        <button
+          className={`tab-btn${tab === 'account' ? ' tab-btn--active' : ''}`}
+          onClick={() => setTab('account')}
+        >
+          Account
+        </button>
+        <button
+          className={`tab-btn${tab === 'security' ? ' tab-btn--active' : ''}`}
+          onClick={() => setTab('security')}
+        >
+          Security
+        </button>
+      </div>
+
+      {/* Account tab */}
+      {tab === 'account' && (
+        <div className="profile-sections">
+          <div className="card">
+            <h2 className="card-title">Account details</h2>
+            <dl className="detail-list">
+              <div className="detail-row">
+                <dt className="detail-label">Username</dt>
+                <dd className="detail-value">{user?.username}</dd>
+              </div>
+              <div className="detail-row">
+                <dt className="detail-label">Email</dt>
+                <dd className="detail-value">{user?.email}</dd>
+              </div>
+              <div className="detail-row">
+                <dt className="detail-label">Current plan</dt>
+                <dd className="detail-value">
+                  <span className={`plan-badge plan-badge--${user?.plan ?? 'free'}`}>
+                    {user?.plan?.toUpperCase() ?? 'FREE'}
+                  </span>
+                  {user?.sub_expires_at && (
+                    <span className="text-muted" style={{ marginLeft: 8, fontSize: 13 }}>
+                      · expires {new Date(user.sub_expires_at).toLocaleDateString('en-PH')}
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div className="detail-row">
+                <dt className="detail-label">Member since</dt>
+                <dd className="detail-value">{joinDate}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="card">
+            <h2 className="card-title">Referral code</h2>
+            <p className="text-muted" style={{ fontSize: 14, marginBottom: 16 }}>
+              Share this code to earn a bonus when friends sign up.
+            </p>
+            <div className="referral-field">
+              <span className="referral-code">{user?.referral_code ?? '—'}</span>
+              <button
+                className={`btn btn-sm ${copied ? 'btn-outline' : 'btn-ghost'}`}
+                onClick={copyReferralCode}
+                disabled={!user?.referral_code}
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Security tab */}
+      {tab === 'security' && (
+        <div className="profile-sections">
+          <ChangePasswordSection />
+          <TwoFaSection
+            has2fa={user?.has_2fa ?? false}
+            onToggled={() => { void fetchMe(); }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
