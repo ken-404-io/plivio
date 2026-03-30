@@ -14,6 +14,10 @@ import {
 
 const router = Router();
 
+// Public endpoint to initialise the CSRF cookie before any mutating request.
+// The frontend calls this on mount so the double-submit cookie is always set.
+router.get('/csrf', (_req, res) => { res.json({ ok: true }); });
+
 router.post('/register',
   validateBody({
     username: { required: true, type: 'username' },
