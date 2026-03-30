@@ -7,7 +7,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/',              listTasks);
-router.post('/:id/start',   startTask);
-router.post('/:id/submit',  submitTask);
+router.post('/start/:id',   startTask);
+router.post('/submit/:id',  submitTask);
 
 export default router;
