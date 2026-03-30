@@ -94,6 +94,72 @@ img { display: block; max-width: 100%; }
   overflow-y: auto;
 }
 
+/* ─── Bottom navigation (mobile only) ───────────────────────────────────────── */
+.bottom-nav {
+  display: none; /* shown via media query below */
+}
+
+@media (max-width: 768px) {
+  /* Hide desktop sidebar */
+  .sidebar { display: none; }
+
+  /* Give main content breathing room above the bottom bar */
+  .main-content {
+    padding: 20px 16px;
+    /* Extra bottom padding: bar height (64px) + safe-area inset for iOS notch */
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Bottom nav bar */
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 10px 4px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+    min-width: 0;
+  }
+  .bottom-nav-item:hover { color: var(--text-heading); text-decoration: none; }
+  .bottom-nav-item--active { color: var(--accent); }
+
+  .bottom-nav-icon {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .bottom-nav-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .bottom-nav-item--active .bottom-nav-icon,
+  .bottom-nav-item--active .bottom-nav-label {
+    color: var(--accent);
+  }
+}
+
 /* ─── Sidebar ────────────────────────────────────────────────────────────────── */
 .sidebar {
   width: var(--sidebar-w);
@@ -846,8 +912,6 @@ img { display: block; max-width: 100%; }
 
 /* ─── Mobile adjustments ──────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .main-content { padding: 20px 16px; }
-
   .profile-hero { gap: 14px; }
   .profile-avatar { width: 52px; height: 52px; font-size: 20px; }
   .profile-username { font-size: 17px; }
