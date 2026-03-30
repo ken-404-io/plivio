@@ -121,7 +121,11 @@ export default function Tasks() {
 
         {/* Available tasks */}
         {available.length === 0 && !atLimit && inProgress.length === 0 ? (
-          <div className="empty-state">All tasks completed for today. Great work!</div>
+          <div className="empty-state">
+            {(taskData?.tasks?.length ?? 0) === 0
+              ? 'No tasks available right now. Check back soon.'
+              : 'All tasks completed for today. Great work!'}
+          </div>
         ) : (
           <div className="task-grid">
             {available.map((task) => {
