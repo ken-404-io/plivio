@@ -1,37 +1,29 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
+import { useToast } from '../../components/common/Toast.tsx';
 
 type Tab = 'account' | 'security';
-
-// ─── 2FA Section ─────────────────────────────────────────────────────────────
-// The 2FA flow has three phases:
-//   idle     → user sees current status and action button
-//   scanning → QR code shown after setup; user must enter code to confirm
-//   disabling → user enters TOTP code to turn 2FA off
-
 type TwoFaPhase = 'idle' | 'scanning' | 'disabling';
 
+// ─── 2FA Section ─────────────────────────────────────────────────────────────
+
 interface TwoFaSectionProps {
-  has2fa: boolean;
+  has2fa:    boolean;
   onToggled: () => void;
 }
 
 function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
-  const [phase,   setPhase]   = useState<TwoFaPhase>('idle');
-  const [qrUrl,   setQrUrl]   = useState('');
-  const [secret,  setSecret]  = useState('');
-  const [token,   setToken]   = useState('');
-  const [busy,    setBusy]    = useState(false);
-  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+  const toast = useToast();
 
-  function clearMessage() {
-    setMessage({ type: '', text: '' });
-  }
+  const [phase,  setPhase]  = useState<TwoFaPhase>('idle');
+  const [qrUrl,  setQrUrl]  = useState('');
+  const [secret, setSecret] = useState('');
+  const [token,  setToken]  = useState('');
+  const [busy,   setBusy]   = useState(false);
 
   async function handleSetup() {
     setBusy(true);
-    clearMessage();
     try {
       const { data } = await api.post<{ qr: string; secret: string }>('/auth/2fa/setup');
       setQrUrl(data.qr);
@@ -39,7 +31,7 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
       setPhase('scanning');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Could not start 2FA setup.' });
+      toast.error(msg ?? 'Could not start 2FA setup.');
     } finally {
       setBusy(false);
     }
@@ -48,16 +40,15 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
   async function handleEnable(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    clearMessage();
     try {
       await api.post('/auth/2fa/enable', { token });
-      setMessage({ type: 'success', text: '2FA is now active on your account.' });
+      toast.success('2FA is now active on your account.');
       setPhase('idle');
       setToken('');
       onToggled();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Invalid verification code.' });
+      toast.error(msg ?? 'Invalid verification code.');
     } finally {
       setBusy(false);
     }
@@ -66,16 +57,15 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
   async function handleDisable(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    clearMessage();
     try {
       await api.post('/auth/2fa/disable', { token });
-      setMessage({ type: 'success', text: '2FA has been removed from your account.' });
+      toast.success('2FA has been removed from your account.');
       setPhase('idle');
       setToken('');
       onToggled();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Invalid code.' });
+      toast.error(msg ?? 'Invalid code.');
     } finally {
       setBusy(false);
     }
@@ -95,27 +85,18 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
         </span>
       </div>
 
-      {message.text && (
-        <div className={`alert alert--${message.type}`} role="alert">{message.text}</div>
-      )}
-
-      {/* Idle — show action button */}
       {phase === 'idle' && !has2fa && (
-        <button className="btn btn-primary btn-sm" onClick={handleSetup} disabled={busy}>
+        <button className="btn btn-primary btn-sm" onClick={() => { void handleSetup(); }} disabled={busy}>
           {busy ? 'Setting up…' : 'Enable 2FA'}
         </button>
       )}
 
       {phase === 'idle' && has2fa && (
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => { setPhase('disabling'); clearMessage(); }}
-        >
+        <button className="btn btn-ghost btn-sm" onClick={() => setPhase('disabling')}>
           Disable 2FA
         </button>
       )}
 
-      {/* Scanning — show QR + confirm form */}
       {phase === 'scanning' && (
         <div className="twofa-setup">
           <p className="security-item-desc">
@@ -136,7 +117,9 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
               className="form-input form-input--otp"
               placeholder="000000"
               value={token}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setToken(e.target.value.replace(/\D/g, '').slice(0, 6))
+              }
               maxLength={6}
               required
             />
@@ -147,7 +130,7 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => { setPhase('idle'); setToken(''); clearMessage(); }}
+                onClick={() => { setPhase('idle'); setToken(''); }}
               >
                 Cancel
               </button>
@@ -156,7 +139,6 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
         </div>
       )}
 
-      {/* Disabling — confirm with TOTP code */}
       {phase === 'disabling' && (
         <form onSubmit={(e) => { void handleDisable(e); }} className="twofa-confirm-form">
           <p className="security-item-desc">
@@ -168,7 +150,9 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
             className="form-input form-input--otp"
             placeholder="000000"
             value={token}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setToken(e.target.value.replace(/\D/g, '').slice(0, 6))
+            }
             maxLength={6}
             required
           />
@@ -179,7 +163,7 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
             <button
               type="button"
               className="btn btn-outline"
-              onClick={() => { setPhase('idle'); setToken(''); clearMessage(); }}
+              onClick={() => { setPhase('idle'); setToken(''); }}
             >
               Cancel
             </button>
@@ -193,13 +177,14 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
 // ─── Change Password Section ──────────────────────────────────────────────────
 
 function ChangePasswordSection() {
+  const toast = useToast();
+
   const [form, setForm] = useState({
-    current_password:  '',
-    new_password:      '',
-    confirm_password:  '',
+    current_password: '',
+    new_password:     '',
+    confirm_password: '',
   });
-  const [busy,    setBusy]    = useState(false);
-  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+  const [busy, setBusy] = useState(false);
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
@@ -208,14 +193,13 @@ function ChangePasswordSection() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setMessage({ type: '', text: '' });
 
     if (form.new_password !== form.confirm_password) {
-      setMessage({ type: 'error', text: 'New passwords do not match.' });
+      toast.error('New passwords do not match.');
       return;
     }
     if (form.new_password.length < 8) {
-      setMessage({ type: 'error', text: 'New password must be at least 8 characters.' });
+      toast.error('New password must be at least 8 characters.');
       return;
     }
 
@@ -225,11 +209,11 @@ function ChangePasswordSection() {
         current_password: form.current_password,
         new_password:     form.new_password,
       });
-      setMessage({ type: 'success', text: 'Password updated successfully.' });
+      toast.success('Password updated successfully.');
       setForm({ current_password: '', new_password: '', confirm_password: '' });
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Could not update password.' });
+      toast.error(msg ?? 'Could not update password.');
     } finally {
       setBusy(false);
     }
@@ -246,10 +230,6 @@ function ChangePasswordSection() {
         </div>
       </div>
 
-      {message.text && (
-        <div className={`alert alert--${message.type}`} role="alert">{message.text}</div>
-      )}
-
       <form onSubmit={(e) => { void handleSubmit(e); }} className="password-form" noValidate>
         <div className="form-group">
           <label className="form-label" htmlFor="current_password">Current password</label>
@@ -264,7 +244,6 @@ function ChangePasswordSection() {
             required
           />
         </div>
-
         <div className="form-group">
           <label className="form-label" htmlFor="new_password">New password</label>
           <input
@@ -279,7 +258,6 @@ function ChangePasswordSection() {
             required
           />
         </div>
-
         <div className="form-group">
           <label className="form-label" htmlFor="confirm_password">Confirm new password</label>
           <input
@@ -293,7 +271,6 @@ function ChangePasswordSection() {
             required
           />
         </div>
-
         <button
           type="submit"
           className="btn btn-primary"
@@ -309,12 +286,15 @@ function ChangePasswordSection() {
 // ─── Profile Page ─────────────────────────────────────────────────────────────
 
 export default function Profile() {
-  const { user, fetchMe }   = useAuth();
-  const [tab, setTab]       = useState<Tab>('account');
+  const { user, fetchMe } = useAuth();
+
+  const [tab,    setTab]    = useState<Tab>('account');
   const [copied, setCopied] = useState(false);
 
   const joinDate = user?.created_at
-    ? new Date(user.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+    ? new Date(user.created_at).toLocaleDateString('en-PH', {
+        year: 'numeric', month: 'long', day: 'numeric',
+      })
     : '—';
 
   function copyReferralCode() {
@@ -334,7 +314,6 @@ export default function Profile() {
         </div>
       </header>
 
-      {/* Hero card */}
       <div className="profile-hero card">
         <div className="profile-avatar" aria-hidden="true">
           {user?.username?.charAt(0).toUpperCase() ?? '?'}
@@ -358,7 +337,6 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="tabs">
         <button
           className={`tab-btn${tab === 'account' ? ' tab-btn--active' : ''}`}
@@ -374,7 +352,6 @@ export default function Profile() {
         </button>
       </div>
 
-      {/* Account tab */}
       {tab === 'account' && (
         <div className="profile-sections">
           <div className="card">
@@ -427,7 +404,6 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Security tab */}
       {tab === 'security' && (
         <div className="profile-sections">
           <ChangePasswordSection />

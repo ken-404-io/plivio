@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
+import { useToast } from '../../components/common/Toast.tsx';
 import type { Withdrawal } from '../../types/index.ts';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -11,11 +12,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function Withdraw() {
-  const { user, fetchMe }       = useAuth();
-  const [form, setForm]         = useState({ amount: '', method: 'gcash' });
-  const [history, setHistory]   = useState<Withdrawal[]>([]);
+  const { user, fetchMe } = useAuth();
+  const toast             = useToast();
+
+  const [form,       setForm]       = useState({ amount: '', method: 'gcash' });
+  const [history,    setHistory]    = useState<Withdrawal[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage]   = useState({ type: '', text: '' });
 
   async function loadHistory() {
     try {
@@ -24,28 +26,25 @@ export default function Withdraw() {
     } catch { /* silent */ }
   }
 
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => { void loadHistory(); }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setMessage({ type: '', text: '' });
     const amount = Number(form.amount);
 
-    if (amount < 50)   { setMessage({ type: 'error', text: 'Minimum withdrawal is ₱50' }); return; }
-    if (amount > 5000) { setMessage({ type: 'error', text: 'Maximum withdrawal is ₱5,000 per request' }); return; }
-    if (amount > Number(user?.balance ?? 0)) {
-      setMessage({ type: 'error', text: 'Insufficient balance' }); return;
-    }
+    if (amount < 50)   { toast.error('Minimum withdrawal is ₱50'); return; }
+    if (amount > 5000) { toast.error('Maximum withdrawal is ₱5,000 per request'); return; }
+    if (amount > Number(user?.balance ?? 0)) { toast.error('Insufficient balance'); return; }
 
     setSubmitting(true);
     try {
       await api.post('/withdrawals', { amount, method: form.method });
-      setMessage({ type: 'success', text: 'Withdrawal request submitted. Processing within 24 hours.' });
+      toast.success('Withdrawal request submitted. Processing within 24 hours.');
       setForm({ amount: '', method: 'gcash' });
       await Promise.all([loadHistory(), fetchMe()]);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMessage({ type: 'error', text: msg ?? 'Request failed.' });
+      toast.error(msg ?? 'Request failed.');
     } finally {
       setSubmitting(false);
     }
@@ -65,12 +64,7 @@ export default function Withdraw() {
       <div className="two-col">
         <section className="card">
           <h2 className="card-title">New request</h2>
-
-          {message.text && (
-            <div className={`alert alert--${message.type}`} role="alert">{message.text}</div>
-          )}
-
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
             <div className="form-group">
               <label className="form-label" htmlFor="method">Method</label>
               <select
@@ -85,9 +79,7 @@ export default function Withdraw() {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="amount">
-                Amount (₱50 – ₱5,000)
-              </label>
+              <label className="form-label" htmlFor="amount">Amount (₱50 – ₱5,000)</label>
               <input
                 id="amount"
                 type="number"
