@@ -18,6 +18,11 @@ import {
   forgotPassword,
   resetPassword,
 } from '../controllers/emailAuthController.ts';
+import {
+  googleRedirect,   googleCallback,
+  facebookRedirect, facebookCallback,
+  githubRedirect,   githubCallback,
+} from '../controllers/oauthController.ts';
 
 const router = Router();
 
@@ -83,5 +88,16 @@ router.post('/reset-password',
   }),
   resetPassword,
 );
+
+// ── OAuth social login ─────────────────────────────────────────────────────
+// Rate-limited to prevent abuse (e.g. someone hammering the redirect endpoints)
+router.get('/google',            rateLimiter({ max: 20, windowMs: 60_000, keyPrefix: 'oa-g'  }), googleRedirect);
+router.get('/google/callback',   googleCallback);
+
+router.get('/facebook',          rateLimiter({ max: 20, windowMs: 60_000, keyPrefix: 'oa-fb' }), facebookRedirect);
+router.get('/facebook/callback', facebookCallback);
+
+router.get('/github',            rateLimiter({ max: 20, windowMs: 60_000, keyPrefix: 'oa-gh' }), githubRedirect);
+router.get('/github/callback',   githubCallback);
 
 export default router;

@@ -254,7 +254,92 @@ img { display: block; max-width: 100%; }
 .auth-header { text-align: center; }
 .auth-subtitle { color: var(--text-muted); font-size: 14px; margin-top: 6px; }
 .auth-desc     { font-size: 14px; color: var(--text-muted); text-align: center; }
-.auth-footer   { text-align: center; font-size: 14px; }
+.auth-footer   { text-align: center; font-size: 14px; margin: 0; }
+
+/* ─── Password input with show/hide toggle ──────────────────────────────────── */
+.input-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-password-wrap .form-input {
+  width: 100%;
+  padding-right: 44px; /* room for the toggle button */
+}
+
+.input-password-toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  transition: color 0.15s;
+}
+
+.input-password-toggle:hover { color: var(--text); }
+.input-password-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ─── Auth divider ──────────────────────────────────────────────────────────── */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ─── Social login buttons ──────────────────────────────────────────────────── */
+.social-login-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-heading);
+}
+
+.btn-social:hover  { background: var(--bg); border-color: var(--accent-border); }
+.btn-social:active { opacity: 0.85; }
+
+/* Provider accent colours on hover */
+.btn-social--google:hover   { border-color: #4285F4; }
+.btn-social--facebook:hover { border-color: #1877F2; }
+.btn-social--github:hover   { border-color: #6e5494; }
 
 /* ─── Page ───────────────────────────────────────────────────────────────────── */
 .page { display: flex; flex-direction: column; gap: 28px; max-width: 1100px; }
