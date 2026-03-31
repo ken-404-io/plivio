@@ -7,6 +7,7 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "nodemon --exec tsx src/index.ts --ext ts",
+    "build": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },
   "keywords": [],
