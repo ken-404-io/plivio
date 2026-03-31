@@ -1,12 +1,42 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api.ts';
-import type { EarningsResponse } from '../../types/index.ts';
+import type { EarningsResponse, Earning } from '../../types/index.ts';
 
 const STATUS_LABEL: Record<string, string> = {
   pending:  'Pending',
   approved: 'Approved',
   rejected: 'Rejected',
 };
+
+const TYPE_ICON: Record<string, string> = {
+  captcha:  '🔐',
+  video:    '▶️',
+  ad_click: '👆',
+  survey:   '📝',
+  referral: '👥',
+};
+
+function EarningCard({ row }: { row: Earning }) {
+  return (
+    <div className="earning-row">
+      <div className="earning-row-icon">{TYPE_ICON[row.type] ?? '⚡'}</div>
+      <div className="earning-row-body">
+        <p className="earning-row-title">{row.title}</p>
+        <div className="earning-row-meta">
+          <span className={`status-dot status-dot--${row.status}`}>
+            {STATUS_LABEL[row.status] ?? row.status}
+          </span>
+          <span className="earning-row-date">
+            {new Date(row.completed_at).toLocaleDateString('en-PH', {
+              month: 'short', day: 'numeric', year: 'numeric',
+            })}
+          </span>
+        </div>
+      </div>
+      <span className="earning-row-amount">+₱{Number(row.reward_earned).toFixed(2)}</span>
+    </div>
+  );
+}
 
 export default function Earnings() {
   const [data, setData]       = useState<EarningsResponse>({ success: true, data: [], meta: { page: 1, limit: 20, total: 0 } });
@@ -22,48 +52,30 @@ export default function Earnings() {
   }, [page]);
 
   const totalPages = Math.ceil((data.meta.total ?? 0) / 20);
+  const total      = data.meta.total ?? 0;
 
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Earnings History</h1>
+        <div>
+          <h1 className="page-title">Earnings History</h1>
+          {total > 0 && (
+            <p className="page-subtitle">{total} transaction{total !== 1 ? 's' : ''} total</p>
+          )}
+        </div>
       </header>
 
       {loading ? (
         <div className="page-loading"><div className="spinner" /></div>
       ) : data.data.length === 0 ? (
-        <div className="empty-state">No earnings recorded yet.</div>
+        <div className="empty-state">
+          <p>No earnings recorded yet.</p>
+          <p className="text-muted" style={{ marginTop: 6, fontSize: 13 }}>Complete tasks to start earning.</p>
+        </div>
       ) : (
         <>
-          <div className="table-wrapper">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Task</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Amount</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.data.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.title}</td>
-                    <td><span className="badge">{row.type}</span></td>
-                    <td>
-                      <span className={`status-dot status-dot--${row.status}`}>
-                        {STATUS_LABEL[row.status] ?? row.status}
-                      </span>
-                    </td>
-                    <td className="text-accent">+₱{Number(row.reward_earned).toFixed(2)}</td>
-                    <td className="text-muted">
-                      {new Date(row.completed_at).toLocaleString('en-PH')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="earnings-list">
+            {data.data.map((row) => <EarningCard key={row.id} row={row} />)}
           </div>
 
           {totalPages > 1 && (
