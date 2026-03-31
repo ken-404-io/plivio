@@ -174,6 +174,12 @@ export default function Register() {
           Already have an account?{' '}
           <Link to="/login" className="link">Sign in</Link>
         </p>
+
+        <p className="auth-terms">
+          By creating an account you agree to our{' '}
+          <Link to="/terms" className="link">Terms of Service</Link> and{' '}
+          <Link to="/privacy" className="link">Privacy Policy</Link>.
+        </p>
       </div>
     </div>
   );

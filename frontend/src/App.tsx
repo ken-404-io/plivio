@@ -12,6 +12,9 @@ import TwoFactor        from './pages/auth/TwoFactor.tsx';
 import ForgotPassword   from './pages/auth/ForgotPassword.tsx';
 import ResetPassword    from './pages/auth/ResetPassword.tsx';
 import VerifyEmail      from './pages/auth/VerifyEmail.tsx';
+import TermsOfService   from './pages/TermsOfService.tsx';
+import PrivacyPolicy    from './pages/PrivacyPolicy.tsx';
+import Contact          from './pages/Contact.tsx';
 import Dashboard      from './pages/dashboard/Dashboard.tsx';
 import Tasks          from './pages/tasks/Tasks.tsx';
 import Earnings       from './pages/earnings/Earnings.tsx';
@@ -19,6 +22,7 @@ import Withdraw       from './pages/withdraw/Withdraw.tsx';
 import Plans          from './pages/plans/Plans.tsx';
 import Profile        from './pages/profile/Profile.tsx';
 import Referrals      from './pages/referrals/Referrals.tsx';
+import Kyc            from './pages/kyc/Kyc.tsx';
 import AdminDashboard from './pages/admin/AdminDashboard.tsx';
 
 export default function App() {
@@ -27,8 +31,11 @@ export default function App() {
       <ToastProvider>
       <AuthProvider>
         <Routes>
-          {/* Public landing page */}
-          <Route path="/" element={<LandingPage />} />
+          {/* Public landing + static pages */}
+          <Route path="/"        element={<LandingPage />} />
+          <Route path="/terms"   element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/contact" element={<Contact />} />
 
           {/* Public auth routes */}
           <Route path="/login"            element={<Login />} />
@@ -48,6 +55,7 @@ export default function App() {
               <Route path="/plans"      element={<Plans />} />
               <Route path="/referrals"  element={<Referrals />} />
               <Route path="/profile"    element={<Profile />} />
+              <Route path="/kyc"        element={<Kyc />} />
             </Route>
           </Route>
 

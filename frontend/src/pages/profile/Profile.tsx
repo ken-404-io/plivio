@@ -1,10 +1,12 @@
-import { useState, type FormEvent, type ChangeEvent } from 'react';
+import { useState, useRef, type FormEvent, type ChangeEvent } from 'react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 
-type Tab = 'account' | 'security';
+type Tab = 'account' | 'security' | 'email';
 type TwoFaPhase = 'idle' | 'scanning' | 'disabling';
+
+const API_BASE = import.meta.env.VITE_API_URL as string ?? 'http://localhost:3000';
 
 // ─── 2FA Section ─────────────────────────────────────────────────────────────
 
@@ -283,6 +285,170 @@ function ChangePasswordSection() {
   );
 }
 
+// ─── Avatar Upload ─────────────────────────────────────────────────────────────
+
+function AvatarUpload({ avatarUrl, username, onUploaded }: {
+  avatarUrl: string | null;
+  username: string;
+  onUploaded: () => void;
+}) {
+  const toast     = useToast();
+  const inputRef  = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const src = avatarUrl ? `${API_BASE}${avatarUrl}` : null;
+
+  async function handleFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Avatar must be JPEG, PNG or WEBP.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Avatar must be under 2 MB.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    setBusy(true);
+    try {
+      await api.post('/users/me/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Avatar updated.');
+      onUploaded();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      toast.error(msg ?? 'Upload failed.');
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  return (
+    <div className="avatar-upload-section">
+      <div
+        className="avatar-upload-btn"
+        onClick={() => !busy && inputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        aria-label="Change profile photo"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
+      >
+        {src ? (
+          <img src={src} alt="Your avatar" className="avatar-img" />
+        ) : (
+          <div className="avatar-placeholder">
+            {username.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="avatar-overlay">
+          {busy ? <div className="spinner spinner--sm" /> : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
+                stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+      </div>
+      <div>
+        <p className="text-muted" style={{ fontSize: 13 }}>
+          Click the photo to change your avatar.<br />
+          JPEG, PNG or WEBP · max 2 MB
+        </p>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="kyc-file-input"
+        onChange={(e) => { void handleFile(e); }}
+      />
+    </div>
+  );
+}
+
+// ─── Email Change Section ─────────────────────────────────────────────────────
+
+function EmailChangeSection() {
+  const toast = useToast();
+  const [newEmail, setNewEmail] = useState('');
+  const [busy,     setBusy]     = useState(false);
+  const [sent,     setSent]     = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!newEmail.includes('@')) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post('/users/me/change-email', { new_email: newEmail });
+      setSent(true);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      toast.error(msg ?? 'Could not send email change request.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="security-item">
+        <div className="alert alert--success">
+          A confirmation link has been sent to <strong>{newEmail}</strong>.
+          Click the link to confirm your new email address. It expires in 1 hour.
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={() => { setSent(false); setNewEmail(''); }}>
+          Change a different email
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="security-item">
+      <div className="security-item-header">
+        <div>
+          <h3 className="security-item-title">Change Email Address</h3>
+          <p className="security-item-desc">
+            A confirmation link will be sent to your new address to verify the change.
+          </p>
+        </div>
+      </div>
+      <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
+        <div className="form-group">
+          <label className="form-label" htmlFor="new_email">New email address</label>
+          <input
+            id="new_email"
+            type="email"
+            className="form-input"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            maxLength={254}
+            required
+            autoComplete="email"
+          />
+        </div>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={busy || !newEmail}
+        >
+          {busy ? 'Sending…' : 'Send confirmation link'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 // ─── Profile Page ─────────────────────────────────────────────────────────────
 
 export default function Profile() {
@@ -315,9 +481,11 @@ export default function Profile() {
       </header>
 
       <div className="profile-hero card">
-        <div className="profile-avatar" aria-hidden="true">
-          {user?.username?.charAt(0).toUpperCase() ?? '?'}
-        </div>
+        <AvatarUpload
+          avatarUrl={user?.avatar_url ?? null}
+          username={user?.username ?? '?'}
+          onUploaded={() => { void fetchMe(); }}
+        />
         <div className="profile-hero-info">
           <p className="profile-username">{user?.username}</p>
           <p className="profile-email text-muted">{user?.email}</p>
@@ -327,6 +495,9 @@ export default function Profile() {
             </span>
             {user?.is_verified && (
               <span className="badge badge--success">Verified</span>
+            )}
+            {user?.kyc_status === 'approved' && (
+              <span className="badge badge--success">KYC Approved</span>
             )}
             <span className="text-muted profile-join-date">Joined {joinDate}</span>
           </div>
@@ -350,6 +521,12 @@ export default function Profile() {
         >
           Security
         </button>
+        <button
+          className={`tab-btn${tab === 'email' ? ' tab-btn--active' : ''}`}
+          onClick={() => setTab('email')}
+        >
+          Email
+        </button>
       </div>
 
       {tab === 'account' && (
@@ -363,7 +540,27 @@ export default function Profile() {
               </div>
               <div className="detail-row">
                 <dt className="detail-label">Email</dt>
-                <dd className="detail-value">{user?.email}</dd>
+                <dd className="detail-value">
+                  {user?.email}
+                  {user?.is_email_verified
+                    ? <span className="badge badge--success ml-2">Verified</span>
+                    : <span className="badge ml-2">Unverified</span>
+                  }
+                </dd>
+              </div>
+              <div className="detail-row">
+                <dt className="detail-label">KYC status</dt>
+                <dd className="detail-value">
+                  <span className={`badge ${
+                    user?.kyc_status === 'approved' ? 'badge--success' :
+                    user?.kyc_status === 'pending'  ? 'badge--warning' :
+                    user?.kyc_status === 'rejected' ? 'badge--error'   : ''
+                  }`}>
+                    {user?.kyc_status === 'approved' ? 'Approved' :
+                     user?.kyc_status === 'pending'  ? 'Pending review' :
+                     user?.kyc_status === 'rejected' ? 'Rejected' : 'Not submitted'}
+                  </span>
+                </dd>
               </div>
               <div className="detail-row">
                 <dt className="detail-label">Current plan</dt>
@@ -411,6 +608,12 @@ export default function Profile() {
             has2fa={user?.has_2fa ?? false}
             onToggled={() => { void fetchMe(); }}
           />
+        </div>
+      )}
+
+      {tab === 'email' && (
+        <div className="profile-sections">
+          <EmailChangeSection />
         </div>
       )}
     </div>

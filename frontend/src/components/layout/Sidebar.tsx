@@ -12,8 +12,9 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/tasks',     label: 'Tasks',     icon: '✓' },
   { to: '/earnings',  label: 'Earnings',  icon: '₱' },
   { to: '/withdraw',  label: 'Withdraw',  icon: '↑' },
-  { to: '/plans',     label: 'Plans',      icon: '★' },
+  { to: '/plans',     label: 'Plans',     icon: '★' },
   { to: '/referrals', label: 'Referrals', icon: '↗' },
+  { to: '/kyc',       label: 'Verify ID', icon: '🪪' },
   { to: '/profile',   label: 'Profile',   icon: '◉' },
 ];
 

@@ -16,9 +16,35 @@ export interface User {
   is_email_verified: boolean;
   is_admin: boolean;
   has_2fa: boolean;
+  kyc_status: 'none' | 'pending' | 'approved' | 'rejected';
+  avatar_url: string | null;
   created_at: string;
   active_sub_plan?: PlanType;
   sub_expires_at?: string;
+}
+
+export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected';
+
+export interface KycSubmission {
+  id: string;
+  user_id: string;
+  username: string;
+  email: string;
+  id_type: string;
+  status: KycStatus;
+  rejection_reason: string | null;
+  submitted_at: string;
+  reviewed_at: string | null;
+}
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
 }
 
 export interface SurveyQuestion {
@@ -171,6 +197,18 @@ export interface AdminStats {
   pending_withdrawals: number;
   pending_withdrawal_total: number;
   total_approved_earnings: number;
+}
+
+export interface AdminKycSubmission {
+  id: string;
+  user_id: string;
+  username: string;
+  email: string;
+  id_type: string;
+  status: KycStatus;
+  rejection_reason: string | null;
+  submitted_at: string;
+  reviewed_at: string | null;
 }
 
 export interface RegisterPayload {

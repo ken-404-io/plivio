@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { NotFoundError, ValidationError } from '../utils/errors.ts';
 import { sendWithdrawalStatusEmail } from '../services/email.ts';
+import { createNotification } from '../utils/notify.ts';
+import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
 interface AdNetworkInput {
   name: string;
@@ -182,14 +184,20 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
 
     await client.query('COMMIT');
 
-    // Send email notification (outside transaction — non-fatal)
+    // Send email + in-app notification (outside transaction — non-fatal)
     if (userRows.length > 0) {
       const u = userRows[0] as { email: string; username: string };
-      void sendWithdrawalStatusEmail(
-        u.email,
-        u.username,
-        Number(withdrawal.amount),
-        newStatus as 'paid' | 'rejected',
+      void sendWithdrawalStatusEmail(u.email, u.username, Number(withdrawal.amount), newStatus as 'paid' | 'rejected');
+
+      const isPaid = newStatus === 'paid';
+      void createNotification(
+        withdrawal.user_id as string,
+        isPaid ? 'withdrawal_paid' : 'withdrawal_rejected',
+        isPaid ? 'Withdrawal Approved' : 'Withdrawal Rejected',
+        isPaid
+          ? `Your withdrawal of ₱${Number(withdrawal.amount).toFixed(2)} has been approved and is on its way.`
+          : `Your withdrawal of ₱${Number(withdrawal.amount).toFixed(2)} was rejected. Your balance has been refunded.`,
+        '/withdraw',
       );
     }
 

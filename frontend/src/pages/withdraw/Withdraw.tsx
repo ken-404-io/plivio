@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
@@ -50,6 +51,9 @@ export default function Withdraw() {
     }
   }
 
+  const kycStatus = user?.kyc_status ?? 'none';
+  const kycBlocked = kycStatus !== 'approved';
+
   return (
     <div className="page">
       <header className="page-header">
@@ -60,6 +64,24 @@ export default function Withdraw() {
           </p>
         </div>
       </header>
+
+      {kycBlocked && (
+        <div className={`alert kyc-gate-alert ${kycStatus === 'pending' ? 'alert--info' : 'alert--warning'}`}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M12 8v4m0 4h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <div>
+            {kycStatus === 'pending' ? (
+              <><strong>KYC under review.</strong> Withdrawals will be enabled once your identity is verified.</>
+            ) : kycStatus === 'rejected' ? (
+              <><strong>KYC rejected.</strong> Please resubmit your documents. <Link to="/kyc">Update KYC →</Link></>
+            ) : (
+              <><strong>Identity verification required.</strong> You must complete KYC before withdrawing. <Link to="/kyc">Verify now →</Link></>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="two-col">
         <section className="card">
@@ -97,10 +119,15 @@ export default function Withdraw() {
             <button
               type="submit"
               className="btn btn-primary btn-full"
-              disabled={submitting || !form.amount}
+              disabled={submitting || !form.amount || kycBlocked}
             >
               {submitting ? 'Submitting…' : 'Request withdrawal'}
             </button>
+            {kycBlocked && (
+              <p className="text-muted" style={{ fontSize: 13, marginTop: 8 }}>
+                Complete KYC verification to enable withdrawals.
+              </p>
+            )}
           </form>
         </section>
 

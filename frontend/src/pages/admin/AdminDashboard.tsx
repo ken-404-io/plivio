@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
-import type { AdminUser, AdminTask, AdminWithdrawal, AdminStats, AdNetwork } from '../../types/index.ts';
+import type { AdminUser, AdminTask, AdminWithdrawal, AdminStats, AdNetwork, AdminKycSubmission } from '../../types/index.ts';
 
-const TABS = ['overview', 'users', 'tasks', 'ads', 'withdrawals'] as const;
+const TABS = ['overview', 'users', 'tasks', 'ads', 'withdrawals', 'kyc'] as const;
 type Tab = typeof TABS[number];
 
 const PRESET_NETWORKS = ['Adsterra', 'Monetag', 'PropellerAds', 'Custom'] as const;
@@ -33,6 +33,7 @@ export default function AdminDashboard() {
   const [users,       setUsers]       = useState<AdminUser[]>([]);
   const [tasks,       setTasks]       = useState<AdminTask[]>([]);
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
+  const [kycList,     setKycList]     = useState<AdminKycSubmission[]>([]);
   const [loading,     setLoading]     = useState(true);
 
   const [taskForm, setTaskForm] = useState<TaskForm>({
@@ -42,16 +43,18 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [statsRes, usersRes, tasksRes, wdRes] = await Promise.all([
+        const [statsRes, usersRes, tasksRes, wdRes, kycRes] = await Promise.all([
           api.get<{ stats: AdminStats }>('/admin/stats'),
           api.get<{ data: AdminUser[] }>('/admin/users'),
           api.get<{ tasks: AdminTask[] }>('/admin/tasks'),
           api.get<{ withdrawals: AdminWithdrawal[] }>('/admin/withdrawals'),
+          api.get<{ submissions: AdminKycSubmission[] }>('/admin/kyc'),
         ]);
         setStats(statsRes.data.stats);
         setUsers(usersRes.data.data);
         setTasks(tasksRes.data.tasks);
         setWithdrawals(wdRes.data.withdrawals);
+        setKycList(kycRes.data.submissions);
       } catch {
         toast.error('Failed to load admin data.');
       } finally {
@@ -150,6 +153,17 @@ export default function AdminDashboard() {
       await api.put(`/admin/withdrawals/${id}`, { action });
       setWithdrawals((prev) => prev.filter((w) => w.id !== id));
       toast.success(`Withdrawal ${action}d.`);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      toast.error(msg ?? 'Action failed.');
+    }
+  }
+
+  async function reviewKyc(id: string, action: 'approve' | 'reject', reason?: string) {
+    try {
+      await api.put(`/admin/kyc/${id}`, { action, reason });
+      setKycList((prev) => prev.filter((k) => k.id !== id));
+      toast.success(`KYC ${action}d.`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       toast.error(msg ?? 'Action failed.');
@@ -401,6 +415,54 @@ export default function AdminDashboard() {
                 );
               })
           )}
+        </div>
+      )}
+
+      {tab === 'kyc' && (
+        <div className="table-wrapper">
+          <table className="table">
+            <thead>
+              <tr><th>User</th><th>ID Type</th><th>Submitted</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {kycList.length === 0 ? (
+                <tr><td colSpan={5} className="text-center text-muted">No pending KYC submissions</td></tr>
+              ) : kycList.map((k) => (
+                <tr key={k.id}>
+                  <td>
+                    <div>{k.username}</div>
+                    <div className="text-muted" style={{ fontSize: 12 }}>{k.email}</div>
+                  </td>
+                  <td>{k.id_type.replace('_', ' ')}</td>
+                  <td className="text-muted">{new Date(k.submitted_at).toLocaleDateString('en-PH')}</td>
+                  <td>
+                    <span className={`badge ${
+                      k.status === 'approved' ? 'badge--success' :
+                      k.status === 'rejected' ? 'badge--error' :
+                      k.status === 'pending'  ? 'badge--warning' : ''
+                    }`}>{k.status}</span>
+                  </td>
+                  <td className="action-cell">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => { void reviewKyc(k.id, 'approve'); }}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        const reason = window.prompt('Rejection reason (shown to user):');
+                        if (reason !== null) void reviewKyc(k.id, 'reject', reason);
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
