@@ -5,10 +5,13 @@ import { ToastProvider } from './components/common/Toast.tsx';
 import ProtectedRoute from './components/common/ProtectedRoute.tsx';
 import Layout         from './components/layout/Layout.tsx';
 
-import LandingPage    from './pages/LandingPage.tsx';
-import Login          from './pages/auth/Login.tsx';
-import Register       from './pages/auth/Register.tsx';
-import TwoFactor      from './pages/auth/TwoFactor.tsx';
+import LandingPage      from './pages/LandingPage.tsx';
+import Login            from './pages/auth/Login.tsx';
+import Register         from './pages/auth/Register.tsx';
+import TwoFactor        from './pages/auth/TwoFactor.tsx';
+import ForgotPassword   from './pages/auth/ForgotPassword.tsx';
+import ResetPassword    from './pages/auth/ResetPassword.tsx';
+import VerifyEmail      from './pages/auth/VerifyEmail.tsx';
 import Dashboard      from './pages/dashboard/Dashboard.tsx';
 import Tasks          from './pages/tasks/Tasks.tsx';
 import Earnings       from './pages/earnings/Earnings.tsx';
@@ -28,9 +31,12 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
 
           {/* Public auth routes */}
-          <Route path="/login"    element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/2fa"      element={<TwoFactor />} />
+          <Route path="/login"            element={<Login />} />
+          <Route path="/register"         element={<Register />} />
+          <Route path="/2fa"              element={<TwoFactor />} />
+          <Route path="/forgot-password"  element={<ForgotPassword />} />
+          <Route path="/reset-password"   element={<ResetPassword />} />
+          <Route path="/verify-email"     element={<VerifyEmail />} />
 
           {/* Protected app routes */}
           <Route element={<ProtectedRoute />}>

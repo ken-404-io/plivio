@@ -81,6 +81,9 @@ export default function Login() {
           </button>
         </form>
 
+        <p className="auth-footer" style={{ marginBottom: '8px' }}>
+          <Link to="/forgot-password" className="link">Forgot your password?</Link>
+        </p>
         <p className="auth-footer">
           Don&apos;t have an account?{' '}
           <Link to="/register" className="link">Create one</Link>

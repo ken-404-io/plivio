@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { NotFoundError, ValidationError } from '../utils/errors.ts';
+import { sendWithdrawalStatusEmail } from '../services/email.ts';
 
 interface AdNetworkInput {
   name: string;
@@ -173,7 +174,25 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
       await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [withdrawal.amount, withdrawal.user_id]);
     }
 
+    // Fetch user email for notification (before commit so we have all data)
+    const { rows: userRows } = await client.query(
+      'SELECT email, username FROM users WHERE id = $1',
+      [withdrawal.user_id],
+    );
+
     await client.query('COMMIT');
+
+    // Send email notification (outside transaction — non-fatal)
+    if (userRows.length > 0) {
+      const u = userRows[0] as { email: string; username: string };
+      void sendWithdrawalStatusEmail(
+        u.email,
+        u.username,
+        Number(withdrawal.amount),
+        newStatus as 'paid' | 'rejected',
+      );
+    }
+
     res.json({ success: true, status: newStatus });
   } catch (err) {
     await client.query('ROLLBACK');
