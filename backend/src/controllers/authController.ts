@@ -34,7 +34,7 @@ function deviceFingerprint(req: Request): string {
   return Buffer.from(`${req.ip}|${ua}|${lang}|${enc}`).toString('base64').slice(0, 64);
 }
 
-function issueTokenCookies(res: Response, payload: Partial<JwtPayload>): void {
+export function issueTokenCookies(res: Response, payload: Partial<JwtPayload>): void {
   const accessToken  = generateAccessToken(payload);
   const refreshToken = generateRefreshToken({ id: payload.id! });
   res.cookie('access_token',  accessToken,  cookieOptions.access);
