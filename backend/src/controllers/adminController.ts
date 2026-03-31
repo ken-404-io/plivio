@@ -64,7 +64,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
 
 export async function updateUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { id }                  = req.params;
+    const { id }                  = req.params as Record<string, string>;
     const { is_banned, is_verified } = req.body as Record<string, string | undefined>;
 
     const setClauses: string[] = [];
@@ -106,7 +106,7 @@ export async function createTask(req: Request, res: Response, next: NextFunction
 
 export async function updateTask(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { id } = req.params;
+    const { id } = req.params as Record<string, string>;
     const { title, reward_amount, is_active, min_plan } = req.body as Record<string, unknown>;
 
     const setClauses: string[] = [];
@@ -132,7 +132,7 @@ export async function updateTask(req: Request, res: Response, next: NextFunction
 
 export async function deleteTask(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { id } = req.params;
+    const { id } = req.params as Record<string, string>;
     const { rows } = await pool.query('UPDATE tasks SET is_active = FALSE WHERE id = $1 RETURNING id', [id]);
     if (rows.length === 0) throw new NotFoundError('Task not found');
     res.json({ success: true, message: 'Task deactivated' });
@@ -156,7 +156,7 @@ export async function listPendingWithdrawals(req: Request, res: Response, next: 
 export async function processWithdrawal(req: Request, res: Response, next: NextFunction): Promise<void> {
   const client = await pool.connect();
   try {
-    const { id }     = req.params;
+    const { id }     = req.params as Record<string, string>;
     const { action } = req.body as { action: 'approve' | 'reject' };
 
     if (!['approve', 'reject'].includes(action)) throw new ValidationError('action must be approve or reject');
@@ -214,7 +214,7 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
 
 export async function updateAdNetworks(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { id }      = req.params;
+    const { id }      = req.params as Record<string, string>;
     const { networks } = req.body as { networks: AdNetworkInput[] };
 
     if (!Array.isArray(networks)) throw new ValidationError('networks must be an array');

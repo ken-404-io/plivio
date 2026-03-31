@@ -110,7 +110,7 @@ export async function serveKycDocument(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { field } = req.params;
+    const { field } = req.params as Record<string, string>;
     if (field !== 'id_front' && field !== 'id_selfie') {
       throw new ValidationError('Invalid field');
     }
@@ -181,7 +181,7 @@ export async function reviewKyc(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { id }     = req.params;
+    const { id }     = req.params as Record<string, string>;
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new ValidationError('Invalid id');
 
     const { action, rejection_reason } = req.body as {

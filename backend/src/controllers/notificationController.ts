@@ -46,7 +46,7 @@ export async function markRead(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { id } = req.params;
+    const { id } = req.params as Record<string, string>;
 
     // Validate UUID format to prevent injection
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new ValidationError('Invalid notification id');
