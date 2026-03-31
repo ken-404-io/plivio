@@ -165,7 +165,7 @@ export async function startTask(req: Request, res: Response, next: NextFunction)
   const client = await pool.connect();
   try {
     const userId = req.user!.id;
-    const taskId = req.params.id;
+    const taskId = req.params["id"] as string;
 
     await client.query('BEGIN');
 
@@ -274,7 +274,7 @@ export async function submitTask(req: Request, res: Response, next: NextFunction
   const client = await pool.connect();
   try {
     const userId       = req.user!.id;
-    const taskId       = req.params.id;
+    const taskId       = req.params["id"] as string;
     const { completion_id, proof = {} } = req.body as {
       completion_id: string;
       proof: Record<string, unknown>;
@@ -406,7 +406,7 @@ export async function submitTask(req: Request, res: Response, next: NextFunction
 export async function cancelTask(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.id;
-    const taskId = req.params.id;
+    const taskId = req.params["id"] as string;
 
     // Mark any pending completion for this task today as rejected
     await pool.query(
