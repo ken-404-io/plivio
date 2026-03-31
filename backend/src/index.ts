@@ -10,6 +10,7 @@ import { logger } from './utils/logger.ts';
 import { AppError } from './utils/errors.ts';
 import { rateLimiter } from './middleware/rateLimiter.ts';
 import { csrfMiddleware } from './middleware/csrf.ts';
+import { AVATARS_DIR } from './middleware/upload.ts';
 
 import authRoutes         from './routes/auth.ts';
 import taskRoutes         from './routes/tasks.ts';
@@ -17,6 +18,9 @@ import userRoutes         from './routes/users.ts';
 import withdrawalRoutes   from './routes/withdrawals.ts';
 import subscriptionRoutes from './routes/subscriptions.ts';
 import adminRoutes        from './routes/admin.ts';
+import notificationRoutes from './routes/notifications.ts';
+import kycRoutes          from './routes/kyc.ts';
+import contactRoutes      from './routes/contact.ts';
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -50,12 +54,21 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
+// Serve avatar images publicly (safe — files have random names, no directory listing)
+app.use(
+  '/uploads/avatars',
+  express.static(AVATARS_DIR, { index: false, dotfiles: 'deny', maxAge: '7d' }),
+);
+
 app.use('/api/auth',          authRoutes);
 app.use('/api/tasks',         taskRoutes);
 app.use('/api/users',         userRoutes);
 app.use('/api/withdrawals',   withdrawalRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin',         adminRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/kyc',           kycRoutes);
+app.use('/api/contact',       contactRoutes);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ success: false, error: 'Endpoint not found' });

@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { ForbiddenError, NotFoundError, ConflictError, ValidationError } from '../utils/errors.ts';
+import { createNotification } from '../utils/notify.ts';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -377,6 +378,15 @@ export async function submitTask(req: Request, res: Response, next: NextFunction
     );
 
     await client.query('COMMIT');
+
+    // Non-blocking notification — must not affect response
+    void createNotification(
+      userId,
+      'task_approved',
+      'Task Completed!',
+      `₱${Number(comp.reward_amount).toFixed(2)} has been added to your balance for "${comp.title}".`,
+      '/earnings',
+    );
 
     res.json({
       success:       true,

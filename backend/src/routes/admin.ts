@@ -14,6 +14,7 @@ import {
   listPendingWithdrawals,
   processWithdrawal,
 } from '../controllers/adminController.ts';
+import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
 const router = Router();
 
@@ -48,6 +49,15 @@ router.get('/withdrawals',      listPendingWithdrawals);
 router.put('/withdrawals/:id',
   validateBody({ action: { required: true, enum: ['approve', 'reject'] } }),
   processWithdrawal
+);
+
+router.get('/kyc',      listKycSubmissions);
+router.put('/kyc/:id',
+  validateBody({
+    action: { required: true, enum: ['approve', 'reject'] },
+    reason: {},
+  }),
+  reviewKyc
 );
 
 export default router;
