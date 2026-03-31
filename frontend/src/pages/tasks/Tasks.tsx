@@ -1,21 +1,29 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import TaskModal from './TaskModal.tsx';
 import type { Task, TaskListResponse } from '../../types/index.ts';
 
-const TYPE_LABEL: Record<string, string> = {
-  captcha:  'Captcha',
-  video:    'Watch Video',
-  ad_click: 'Ad Click',
-  survey:   'Survey',
-  referral: 'Referral',
+// ─── Task type meta (label + icon + colour class) ─────────────────────────────
+
+const TYPE_META: Record<string, { label: string; icon: string; cls: string }> = {
+  captcha:  { label: 'Captcha',    icon: '🔐', cls: 'type--captcha'  },
+  video:    { label: 'Watch Video', icon: '▶️', cls: 'type--video'    },
+  ad_click: { label: 'Ad Click',   icon: '👆', cls: 'type--adclick'  },
+  survey:   { label: 'Survey',     icon: '📝', cls: 'type--survey'   },
+  referral: { label: 'Referral',   icon: '👥', cls: 'type--referral' },
 };
+
+function typeMeta(type: string) {
+  return TYPE_META[type] ?? { label: type, icon: '⚡', cls: '' };
+}
+
+// ─── Duration / hint helper ───────────────────────────────────────────────────
 
 function taskHint(task: Task): string {
   const cfg = task.verification_config;
   if (!cfg) return '';
-
   if ((task.type === 'video' || task.type === 'ad_click') && cfg.duration_seconds) {
     return `${cfg.duration_seconds}s`;
   }
@@ -26,12 +34,70 @@ function taskHint(task: Task): string {
   return '';
 }
 
+// ─── Single task card ─────────────────────────────────────────────────────────
+
+interface TaskCardProps {
+  task:    Task;
+  variant: 'available' | 'progress' | 'done';
+  onStart: (task: Task) => void;
+  atLimit: boolean;
+}
+
+function TaskCard({ task, variant, onStart, atLimit }: TaskCardProps) {
+  const meta = typeMeta(task.type);
+  const hint = taskHint(task);
+
+  return (
+    <div className={`task-card2 task-card2--${variant}`}>
+      {/* Icon */}
+      <div className={`task-card2-icon ${meta.cls}`} aria-hidden="true">
+        {meta.icon}
+      </div>
+
+      {/* Body */}
+      <div className="task-card2-body">
+        <div className="task-card2-meta">
+          <span className={`task-type-badge ${meta.cls}`}>{meta.label}</span>
+          {hint && <span className="task-hint2">{hint}</span>}
+          {task.min_plan !== 'free' && (
+            <span className={`plan-badge plan-badge--${task.min_plan}`}>
+              {task.min_plan.toUpperCase()}
+            </span>
+          )}
+        </div>
+        <p className="task-card2-title">{task.title}</p>
+      </div>
+
+      {/* Right: reward + action */}
+      <div className="task-card2-right">
+        <span className="task-card2-reward">
+          +₱{Number(task.reward_amount).toFixed(2)}
+        </span>
+
+        {variant === 'done' ? (
+          <span className="task-card2-done-badge">✓ Done</span>
+        ) : (
+          <button
+            className={`btn btn-sm ${variant === 'progress' ? 'btn-warning' : 'btn-primary'}`}
+            onClick={() => onStart(task)}
+            disabled={variant === 'available' && atLimit}
+          >
+            {variant === 'progress' ? 'Resume' : 'Start'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tasks page ───────────────────────────────────────────────────────────────
+
 export default function Tasks() {
   const toast = useToast();
 
-  const [taskData,      setTaskData]      = useState<TaskListResponse | null>(null);
-  const [loading,       setLoading]       = useState(true);
-  const [activeTask,    setActiveTask]    = useState<Task | null>(null);
+  const [taskData,   setTaskData]   = useState<TaskListResponse | null>(null);
+  const [loading,    setLoading]    = useState(true);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -47,7 +113,6 @@ export default function Tasks() {
   useEffect(() => { void load(); }, [load]);
 
   function handleStart(task: Task) {
-    // Referral tasks aren't manually startable
     if (task.type === 'referral') {
       toast.info('Referral rewards are credited automatically when a friend registers with your code.');
       return;
@@ -63,121 +128,141 @@ export default function Tasks() {
 
   if (loading) return <div className="page-loading"><div className="spinner" /></div>;
 
-  const available    = taskData?.tasks?.filter((t) => !t.completed_today && !t.in_progress_today) ?? [];
-  const inProgress   = taskData?.tasks?.filter((t) => t.in_progress_today)                        ?? [];
-  const completed    = taskData?.tasks?.filter((t) => t.completed_today)                           ?? [];
-  const atLimit      = taskData?.daily_limit != null && taskData.today_earnings >= taskData.daily_limit;
+  const available  = taskData?.tasks?.filter((t) => !t.completed_today && !t.in_progress_today) ?? [];
+  const inProgress = taskData?.tasks?.filter((t) => t.in_progress_today)                        ?? [];
+  const completed  = taskData?.tasks?.filter((t) => t.completed_today)                           ?? [];
+  const atLimit    = taskData?.daily_limit != null && taskData.today_earnings >= taskData.daily_limit;
+
+  const todayEarned = Number(taskData?.today_earnings ?? 0);
+  const dailyLimit  = taskData?.daily_limit ?? null;
+  const pct         = dailyLimit ? Math.min(100, (todayEarned / dailyLimit) * 100) : 100;
 
   return (
     <>
       <div className="page">
+
+        {/* ── Header ── */}
         <header className="page-header">
           <div>
             <h1 className="page-title">Tasks</h1>
-            <p className="page-subtitle">
-              Today&apos;s earnings: ₱{Number(taskData?.today_earnings ?? 0).toFixed(2)}
-              {taskData?.daily_limit != null && ` / ₱${taskData.daily_limit}`}
-            </p>
+            <p className="page-subtitle">Complete tasks to earn real money</p>
           </div>
         </header>
 
-        {atLimit && (
-          <div className="alert alert--warning">
-            Daily earning limit reached. Come back tomorrow or{' '}
-            <a href="/plans" className="link">upgrade your plan</a>.
+        {/* ── Today's progress bar ── */}
+        <div className="tasks-progress-card">
+          <div className="tasks-progress-row">
+            <span className="tasks-progress-label">Today's earnings</span>
+            <span className="tasks-progress-value">
+              ₱{todayEarned.toFixed(2)}
+              {dailyLimit != null && <span className="tasks-progress-limit"> / ₱{dailyLimit}</span>}
+            </span>
           </div>
-        )}
+          <div className="tasks-progress-bar">
+            <div className="tasks-progress-fill" style={{ width: `${pct}%` }} />
+          </div>
+          {atLimit && (
+            <p className="tasks-progress-limit-msg">
+              Daily limit reached.{' '}
+              <Link to="/plans" className="link">Upgrade</Link> to earn more.
+            </p>
+          )}
+        </div>
 
-        {/* In-progress tasks (started but not yet submitted) */}
+        {/* ── Quick stats ── */}
+        <div className="tasks-stats-row">
+          <div className="tasks-stat">
+            <span className="tasks-stat-num">{available.length}</span>
+            <span className="tasks-stat-lbl">Available</span>
+          </div>
+          <div className="tasks-stat-divider" />
+          <div className="tasks-stat">
+            <span className="tasks-stat-num">{inProgress.length}</span>
+            <span className="tasks-stat-lbl">In Progress</span>
+          </div>
+          <div className="tasks-stat-divider" />
+          <div className="tasks-stat">
+            <span className="tasks-stat-num">{completed.length}</span>
+            <span className="tasks-stat-lbl">Completed</span>
+          </div>
+        </div>
+
+        {/* ── In-progress ── */}
         {inProgress.length > 0 && (
-          <section className="section">
-            <h2 className="section-title">In Progress</h2>
-            <div className="task-grid">
+          <section className="tasks-section">
+            <h2 className="tasks-section-title tasks-section-title--warning">
+              ⏳ In Progress
+            </h2>
+            <div className="task-list">
               {inProgress.map((task) => (
-                <div key={task.id} className="task-card task-card--progress">
-                  <div className="task-card-header">
-                    <span className="badge badge--warning">{TYPE_LABEL[task.type] ?? task.type}</span>
-                    {task.min_plan !== 'free' && (
-                      <span className={`plan-badge plan-badge--${task.min_plan}`}>
-                        {task.min_plan.toUpperCase()}+
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="task-title">{task.title}</h3>
-                  <div className="task-footer">
-                    <span className="task-reward">+₱{Number(task.reward_amount).toFixed(2)}</span>
-                    <button
-                      className="btn btn-warning btn-sm"
-                      onClick={() => handleStart(task)}
-                    >
-                      Resume
-                    </button>
-                  </div>
-                </div>
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  variant="progress"
+                  onStart={handleStart}
+                  atLimit={false}
+                />
               ))}
             </div>
           </section>
         )}
 
-        {/* Available tasks */}
-        {available.length === 0 && !atLimit && inProgress.length === 0 ? (
-          <div className="empty-state">
-            {(taskData?.tasks?.length ?? 0) === 0
-              ? 'No tasks available right now. Check back soon.'
-              : 'All tasks completed for today. Great work!'}
-          </div>
-        ) : (
-          <div className="task-grid">
-            {available.map((task) => {
-              const hint = taskHint(task);
-              return (
-                <div key={task.id} className="task-card">
-                  <div className="task-card-header">
-                    <span className="badge">{TYPE_LABEL[task.type] ?? task.type}</span>
-                    {hint && <span className="task-hint">{hint}</span>}
-                    {task.min_plan !== 'free' && (
-                      <span className={`plan-badge plan-badge--${task.min_plan}`}>
-                        {task.min_plan.toUpperCase()}+
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="task-title">{task.title}</h3>
-                  <div className="task-footer">
-                    <span className="task-reward">+₱{Number(task.reward_amount).toFixed(2)}</span>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleStart(task)}
-                      disabled={atLimit}
-                    >
-                      Start
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {/* ── Available ── */}
+        <section className="tasks-section">
+          <h2 className="tasks-section-title">Available Tasks</h2>
 
-        {/* Completed tasks */}
+          {available.length === 0 ? (
+            <div className="tasks-empty">
+              {(taskData?.tasks?.length ?? 0) === 0 ? (
+                <>
+                  <span className="tasks-empty-icon">📭</span>
+                  <p>No tasks available right now. Check back soon.</p>
+                </>
+              ) : (
+                <>
+                  <span className="tasks-empty-icon">🎉</span>
+                  <p>All tasks completed for today. Great work!</p>
+                  <p className="text-muted">Come back tomorrow for more tasks.</p>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="task-list">
+              {available.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  variant="available"
+                  onStart={handleStart}
+                  atLimit={atLimit}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── Completed ── */}
         {completed.length > 0 && (
-          <section className="section">
-            <h2 className="section-title">Completed today</h2>
-            <div className="task-grid task-grid--dim">
+          <section className="tasks-section">
+            <h2 className="tasks-section-title tasks-section-title--muted">
+              ✓ Completed Today
+            </h2>
+            <div className="task-list task-list--dim">
               {completed.map((task) => (
-                <div key={task.id} className="task-card task-card--done">
-                  <span className="badge">{TYPE_LABEL[task.type] ?? task.type}</span>
-                  <h3 className="task-title">{task.title}</h3>
-                  <span className="task-reward task-reward--muted">
-                    +₱{Number(task.reward_amount).toFixed(2)} ✓
-                  </span>
-                </div>
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  variant="done"
+                  onStart={handleStart}
+                  atLimit={false}
+                />
               ))}
             </div>
           </section>
         )}
+
       </div>
 
-      {/* Task modal — rendered outside page flow to overlay everything */}
       {activeTask && (
         <TaskModal
           task={activeTask}

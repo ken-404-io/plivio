@@ -7,12 +7,20 @@ import EmailVerificationBanner from '../../components/common/EmailVerificationBa
 
 const PLAN_LABEL: Record<string, string> = { free: 'Free', premium: 'Premium', elite: 'Elite' };
 
+const EARNING_TYPE_ICON: Record<string, string> = {
+  captcha:  '🔐',
+  video:    '▶️',
+  ad_click: '👆',
+  survey:   '📝',
+  referral: '👥',
+};
+
 export default function Dashboard() {
   const { user, fetchMe } = useAuth();
 
-  const [taskData, setTaskData]   = useState<TaskListResponse | null>(null);
-  const [earnings, setEarnings]   = useState<Earning[] | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [taskData, setTaskData] = useState<TaskListResponse | null>(null);
+  const [earnings, setEarnings] = useState<Earning[] | null>(null);
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -29,7 +37,7 @@ export default function Dashboard() {
         setLoading(false);
       }
     }
-    load();
+    void load();
     fetchMe();
   }, [fetchMe]);
 
@@ -37,9 +45,14 @@ export default function Dashboard() {
     return <div className="page-loading"><div className="spinner" /></div>;
   }
 
-  const pct = taskData?.daily_limit
-    ? Math.min(100, ((Number(taskData.today_earnings) / taskData.daily_limit) * 100)).toFixed(0)
+  const todayEarned = Number(taskData?.today_earnings ?? 0);
+  const dailyLimit  = taskData?.daily_limit ?? null;
+  const pct = dailyLimit
+    ? Math.min(100, (todayEarned / dailyLimit) * 100).toFixed(0)
     : 100;
+
+  const availableCount = taskData?.tasks?.filter((t) => !t.completed_today && !t.in_progress_today).length ?? 0;
+  const completedCount = taskData?.tasks?.filter((t) => t.completed_today).length ?? 0;
 
   return (
     <div className="page">
@@ -47,9 +60,10 @@ export default function Dashboard() {
         <EmailVerificationBanner email={user.email} />
       )}
 
+      {/* ── Greeting header ── */}
       <header className="page-header">
         <div>
-          <h1 className="page-title">Welcome back, {user?.username}</h1>
+          <h1 className="page-title">Hi, {user?.username} 👋</h1>
           <p className="page-subtitle">
             {PLAN_LABEL[user?.plan ?? 'free']} plan
             {user?.active_sub_plan && user.sub_expires_at && (
@@ -60,35 +74,74 @@ export default function Dashboard() {
           </p>
         </div>
         {user?.plan === 'free' && (
-          <Link to="/plans" className="btn btn-primary btn-sm">Upgrade Plan</Link>
+          <Link to="/plans" className="btn btn-primary btn-sm">Upgrade</Link>
         )}
       </header>
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <span className="stat-label">Balance</span>
-          <span className="stat-value">₱{Number(user?.balance ?? 0).toFixed(2)}</span>
+      {/* ── Balance + daily earnings ── */}
+      <div className="dash-hero-grid">
+        <div className="dash-hero-card dash-hero-card--balance">
+          <span className="dash-hero-label">Total Balance</span>
+          <span className="dash-hero-value">₱{Number(user?.balance ?? 0).toFixed(2)}</span>
+          <Link to="/withdraw" className="btn btn-sm btn-ghost dash-hero-cta">Withdraw →</Link>
         </div>
 
-        <div className="stat-card">
-          <span className="stat-label">Today&apos;s Earnings</span>
-          <span className="stat-value">
-            ₱{Number(taskData?.today_earnings ?? 0).toFixed(2)}
-            {taskData?.daily_limit && (
-              <span className="stat-limit"> / ₱{taskData.daily_limit}</span>
-            )}
+        <div className="dash-hero-card">
+          <span className="dash-hero-label">Today's Earnings</span>
+          <span className="dash-hero-value">
+            ₱{todayEarned.toFixed(2)}
+            {dailyLimit && <span className="dash-hero-limit"> / ₱{dailyLimit}</span>}
           </span>
           <div className="progress-bar">
             <div className="progress-fill" style={{ width: `${pct}%` }} />
           </div>
         </div>
-
-        <div className="stat-card">
-          <span className="stat-label">Available Tasks</span>
-          <span className="stat-value">{taskData?.tasks?.filter((t) => !t.completed_today).length ?? '–'}</span>
-        </div>
       </div>
 
+      {/* ── Task quick-stats ── */}
+      <div className="dash-task-bar">
+        <Link to="/tasks" className="dash-task-stat">
+          <span className="dash-task-stat-num dash-task-stat-num--accent">{availableCount}</span>
+          <span className="dash-task-stat-lbl">Tasks Ready</span>
+        </Link>
+        <div className="dash-task-stat-divider" />
+        <div className="dash-task-stat">
+          <span className="dash-task-stat-num">{completedCount}</span>
+          <span className="dash-task-stat-lbl">Done Today</span>
+        </div>
+        <div className="dash-task-stat-divider" />
+        <Link to="/referrals" className="dash-task-stat">
+          <span className="dash-task-stat-num">₱10</span>
+          <span className="dash-task-stat-lbl">Per Referral</span>
+        </Link>
+      </div>
+
+      {/* ── CTA banner if tasks available ── */}
+      {availableCount > 0 && (
+        <Link to="/tasks" className="dash-cta-banner">
+          <div className="dash-cta-banner-text">
+            <span className="dash-cta-banner-title">
+              {availableCount} task{availableCount !== 1 ? 's' : ''} waiting for you
+            </span>
+            <span className="dash-cta-banner-sub">Start earning now</span>
+          </div>
+          <span className="dash-cta-banner-arrow">→</span>
+        </Link>
+      )}
+
+      {/* ── KYC warning ── */}
+      {user?.kyc_status === 'none' && (
+        <Link to="/kyc" className="dash-kyc-banner">
+          <span className="dash-kyc-icon">🪪</span>
+          <div>
+            <p className="dash-kyc-title">Verify your identity to enable withdrawals</p>
+            <p className="dash-kyc-sub">Takes only 2 minutes — tap to start</p>
+          </div>
+          <span className="dash-kyc-arrow">→</span>
+        </Link>
+      )}
+
+      {/* ── Recent earnings ── */}
       <section className="section">
         <div className="section-header">
           <h2 className="section-title">Recent earnings</h2>
@@ -100,27 +153,21 @@ export default function Dashboard() {
             <p>No earnings yet. <Link to="/tasks" className="link">Complete tasks</Link> to start earning.</p>
           </div>
         ) : (
-          <div className="table-wrapper">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Task</th>
-                  <th>Type</th>
-                  <th>Amount</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {earnings?.map((e) => (
-                  <tr key={e.id}>
-                    <td>{e.title}</td>
-                    <td><span className="badge">{e.type}</span></td>
-                    <td className="text-accent">+₱{Number(e.reward_earned).toFixed(2)}</td>
-                    <td className="text-muted">{new Date(e.completed_at).toLocaleDateString('en-PH')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="earnings-list">
+            {earnings?.map((e) => (
+              <div key={e.id} className="earning-row">
+                <div className="earning-row-icon">
+                  {EARNING_TYPE_ICON[e.type] ?? '⚡'}
+                </div>
+                <div className="earning-row-body">
+                  <p className="earning-row-title">{e.title}</p>
+                  <p className="earning-row-date text-muted">
+                    {new Date(e.completed_at).toLocaleDateString('en-PH', { dateStyle: 'medium' })}
+                  </p>
+                </div>
+                <span className="earning-row-amount">+₱{Number(e.reward_earned).toFixed(2)}</span>
+              </div>
+            ))}
           </div>
         )}
       </section>
