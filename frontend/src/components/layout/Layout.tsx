@@ -15,8 +15,9 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
 
       {/* Page content */}
       <main className="main-content">
-        {/* Top bar with notification bell */}
+        {/* Top bar: brand on mobile (left) + notification bell (right) */}
         <div className="topbar">
+          <span className="topbar-brand">Plivio</span>
           <div className="topbar-right">
             <NotificationBell />
           </div>
