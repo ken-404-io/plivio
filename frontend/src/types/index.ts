@@ -13,6 +13,7 @@ export interface User {
   balance: string | number;
   referral_code: string;
   is_verified: boolean;
+  is_email_verified: boolean;
   is_admin: boolean;
   has_2fa: boolean;
   created_at: string;

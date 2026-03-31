@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import type { TaskListResponse, Earning } from '../../types/index.ts';
+import EmailVerificationBanner from '../../components/common/EmailVerificationBanner.tsx';
 
 const PLAN_LABEL: Record<string, string> = { free: 'Free', premium: 'Premium', elite: 'Elite' };
 
@@ -42,6 +43,10 @@ export default function Dashboard() {
 
   return (
     <div className="page">
+      {user && !user.is_email_verified && (
+        <EmailVerificationBanner email={user.email} />
+      )}
+
       <header className="page-header">
         <div>
           <h1 className="page-title">Welcome back, {user?.username}</h1>

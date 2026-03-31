@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
@@ -18,6 +19,7 @@ import {
   NotFoundError,
 } from '../utils/errors.ts';
 import type { JwtPayload } from '../types/express.js';
+import { sendVerificationEmail } from '../services/email.ts';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -69,6 +71,57 @@ export async function register(req: Request, res: Response, next: NextFunction):
     );
 
     const user = rows[0] as Record<string, unknown>;
+
+    // ── Referral bonus: credit referrer for each new sign-up ──────────────
+    if (referredById) {
+      try {
+        // Find the first active referral task to get the reward amount
+        const refTaskRes = await pool.query(
+          `SELECT id, reward_amount FROM tasks
+           WHERE type = 'referral' AND is_active = TRUE
+           ORDER BY reward_amount DESC LIMIT 1`,
+        );
+        if (refTaskRes.rowCount && refTaskRes.rowCount > 0) {
+          const refTask = refTaskRes.rows[0] as { id: string; reward_amount: string };
+          // Credit referrer balance + record a task completion for them
+          await pool.query('BEGIN');
+          try {
+            await pool.query(
+              `UPDATE users SET balance = balance + $1 WHERE id = $2`,
+              [refTask.reward_amount, referredById],
+            );
+            await pool.query(
+              `INSERT INTO task_completions
+                 (user_id, task_id, status, reward_earned, completed_at,
+                  proof, server_data)
+               VALUES ($1, $2, 'approved', $3, NOW(), '{}', '{}')`,
+              [referredById, refTask.id, refTask.reward_amount],
+            );
+            await pool.query('COMMIT');
+          } catch {
+            await pool.query('ROLLBACK');
+            // Non-fatal — registration still succeeds
+          }
+        }
+      } catch {
+        // Non-fatal — do not block registration if bonus logic fails
+      }
+    }
+
+    // ── Send email verification ───────────────────────────────────────────
+    try {
+      const rawToken  = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      await pool.query(
+        `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+         VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
+        [user.id as string, tokenHash],
+      );
+      await sendVerificationEmail(user.email as string, user.username as string, rawToken);
+    } catch {
+      // Non-fatal — account is created; user can resend from dashboard
+    }
+
     issueTokenCookies(res, { id: user.id as string, username: user.username as string, is_admin: user.is_admin as boolean });
     res.status(201).json({ success: true, user });
   } catch (err) { next(err); }

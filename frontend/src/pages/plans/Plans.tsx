@@ -29,18 +29,41 @@ export default function Plans() {
   async function handleSubscribe(planKey: string) {
     setSubscribing(planKey);
     try {
-      await api.post('/subscriptions', { plan: planKey, duration_days: 30 });
-      toast.success(`Subscribed to ${plans[planKey]?.name} plan for 30 days!`);
-      await fetchMe();
-      const { data } = await api.get<{ subscription: Subscription | null }>('/subscriptions/current');
-      setSub(data.subscription);
+      const { data } = await api.post<{ checkout_url: string | null; demo?: boolean }>(
+        '/subscriptions/checkout',
+        { plan: planKey, duration_days: 30 },
+      );
+
+      if (data.demo || !data.checkout_url) {
+        // PayMongo not configured — show informational message
+        toast.error('Payment gateway not configured yet. Please contact admin.');
+        return;
+      }
+
+      // Redirect user to PayMongo's hosted payment page
+      window.location.href = data.checkout_url;
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Subscription failed.');
+      toast.error(msg ?? 'Failed to create checkout. Please try again.');
     } finally {
       setSubscribing('');
     }
   }
+
+  // Show success/failure message after returning from PayMongo
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    if (payment === 'success') {
+      toast.success('Payment received! Your plan will activate shortly.');
+      window.history.replaceState({}, '', '/plans');
+      void fetchMe();
+    } else if (payment === 'failed') {
+      toast.error('Payment was not completed. You have not been charged.');
+      window.history.replaceState({}, '', '/plans');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) return <div className="page-loading"><div className="spinner" /></div>;
 

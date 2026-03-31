@@ -1107,6 +1107,67 @@ img { display: block; max-width: 100%; }
   background: var(--bg-surface);
 }
 
+/* ─── Email verification banner ─────────────────────────────────────────────── */
+.email-verify-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.email-verify-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  color: var(--warning);
+}
+
+.email-verify-text { flex: 1; min-width: 200px; }
+
+.email-verify-btn {
+  background: var(--warning) !important;
+  color: #fff !important;
+  border: none !important;
+  white-space: nowrap;
+}
+
+.email-verify-btn:hover:not(:disabled) {
+  background: #d97706 !important;
+}
+
+/* ─── Alert variants ─────────────────────────────────────────────────────────── */
+.alert--success {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: var(--text);
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.alert--success strong { color: var(--success); }
+
+/* ─── Verify email page ──────────────────────────────────────────────────────── */
+.verify-email-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0;
+}
+
+.spinner--lg {
+  width: 40px;
+  height: 40px;
+  border-width: 3px;
+}
+
 /* ─── Task modal – Ad frame ──────────────────────────────────────────────────── */
 .task-modal-ad-frame-wrap {
   position: relative;
