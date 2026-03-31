@@ -1355,6 +1355,403 @@ img { display: block; max-width: 100%; }
   font-size: 12px;
 }
 
+/* ─── Task page v2 — mobile-first ────────────────────────────────────────────── */
+
+/* Progress card */
+.tasks-progress-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.tasks-progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.tasks-progress-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.tasks-progress-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+.tasks-progress-limit { color: var(--text-muted); font-size: 14px; font-weight: 400; }
+.tasks-progress-bar {
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tasks-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #e040fb);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.tasks-progress-limit-msg {
+  font-size: 12px;
+  color: var(--warning);
+  margin-top: 8px;
+}
+
+/* Quick stats row */
+.tasks-stats-row {
+  display: flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 0;
+  margin-bottom: 20px;
+}
+.tasks-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.tasks-stat-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1;
+}
+.tasks-stat-lbl {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tasks-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+}
+
+/* Section headings */
+.tasks-section { margin-bottom: 28px; }
+.tasks-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.tasks-section-title--warning { color: var(--warning); }
+.tasks-section-title--muted   { color: var(--text-muted); opacity: 0.7; }
+
+/* Empty state */
+.tasks-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.tasks-empty-icon { font-size: 40px; line-height: 1; }
+
+/* ─── Task list (mobile-first, horizontal cards) ────────────────────────────── */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.task-list--dim { opacity: 0.55; }
+
+.task-card2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.task-card2:active { background: var(--bg-elevated); }
+.task-card2--available:hover { border-color: var(--accent-border); }
+.task-card2--progress {
+  border-color: rgba(245,158,11,0.4);
+  background: rgba(245,158,11,0.04);
+}
+.task-card2--done { opacity: 0.5; }
+
+/* Icon bubble */
+.task-card2-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+}
+.task-card2-icon.type--captcha  { background: rgba(59,130,246,0.12); }
+.task-card2-icon.type--video    { background: rgba(239,68,68,0.12);  }
+.task-card2-icon.type--adclick  { background: rgba(34,197,94,0.12);  }
+.task-card2-icon.type--survey   { background: rgba(245,158,11,0.12); }
+.task-card2-icon.type--referral { background: rgba(170,59,255,0.12); }
+
+/* Card body */
+.task-card2-body {
+  flex: 1;
+  min-width: 0;
+}
+.task-card2-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.task-type-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+.task-type-badge.type--captcha  { background: rgba(59,130,246,0.15);  color: #93c5fd; }
+.task-type-badge.type--video    { background: rgba(239,68,68,0.15);   color: #fca5a5; }
+.task-type-badge.type--adclick  { background: rgba(34,197,94,0.15);   color: #86efac; }
+.task-type-badge.type--survey   { background: rgba(245,158,11,0.15);  color: #fcd34d; }
+.task-type-badge.type--referral { background: rgba(170,59,255,0.15);  color: #d8b4fe; }
+
+.task-hint2 {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-card2-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Right column */
+.task-card2-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.task-card2-reward {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.task-card2-done-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success);
+}
+
+/* ─── Dashboard v2 ────────────────────────────────────────────────────────────── */
+
+/* Hero cards grid */
+.dash-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.dash-hero-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dash-hero-card--balance {
+  background: linear-gradient(135deg, var(--accent-dark), var(--accent));
+  border-color: transparent;
+}
+.dash-hero-card--balance .dash-hero-label { color: rgba(255,255,255,0.75); }
+.dash-hero-card--balance .dash-hero-value { color: #fff; }
+.dash-hero-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.dash-hero-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1.1;
+}
+.dash-hero-limit { font-size: 14px; font-weight: 400; color: var(--text-muted); }
+.dash-hero-cta {
+  margin-top: 6px;
+  align-self: flex-start;
+  color: rgba(255,255,255,0.9) !important;
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+/* Task quick-stats bar */
+.dash-task-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 0;
+  margin-bottom: 14px;
+  text-decoration: none;
+}
+.dash-task-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-decoration: none;
+  color: inherit;
+}
+.dash-task-stat-num {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1;
+}
+.dash-task-stat-num--accent { color: var(--accent); }
+.dash-task-stat-lbl {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.dash-task-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+}
+
+/* CTA banner */
+.dash-cta-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, var(--accent-dark), var(--accent));
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  text-decoration: none;
+  color: #fff;
+  transition: opacity 0.15s;
+}
+.dash-cta-banner:hover { opacity: 0.9; }
+.dash-cta-banner-text { flex: 1; }
+.dash-cta-banner-title {
+  font-size: 15px;
+  font-weight: 700;
+  display: block;
+}
+.dash-cta-banner-sub {
+  font-size: 12px;
+  opacity: 0.8;
+  display: block;
+  margin-top: 2px;
+}
+.dash-cta-banner-arrow { font-size: 20px; font-weight: 700; }
+
+/* KYC warning banner */
+.dash-kyc-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+.dash-kyc-banner:hover { background: rgba(245,158,11,0.14); }
+.dash-kyc-icon { font-size: 28px; flex-shrink: 0; }
+.dash-kyc-title { font-size: 14px; font-weight: 600; color: var(--warning); }
+.dash-kyc-sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.dash-kyc-arrow { margin-left: auto; color: var(--warning); font-size: 18px; font-weight: 700; }
+
+/* Recent earnings list (replaces table on mobile) */
+.earnings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.earning-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-surface);
+  transition: background 0.12s;
+}
+.earning-row:last-child { border-bottom: none; }
+.earning-row:hover { background: var(--bg-elevated); }
+.earning-row-icon {
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.earning-row-body { flex: 1; min-width: 0; }
+.earning-row-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.earning-row-date { font-size: 11px; margin-top: 2px; }
+.earning-row-amount {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ─── Topbar (notification bell row) ─────────────────────────────────────────── */
 .topbar {
   display: flex;
@@ -1814,4 +2211,18 @@ img { display: block; max-width: 100%; }
 
   /* Topbar */
   .topbar { padding: 8px 16px 0; }
+
+  /* Dashboard hero full-width on narrow screens */
+  .dash-hero-grid { grid-template-columns: 1fr; }
+  .dash-hero-value { font-size: 28px; }
+
+  /* Task cards: tighter padding on mobile */
+  .task-card2 { padding: 12px 14px; gap: 10px; }
+  .task-card2-icon { width: 38px; height: 38px; font-size: 18px; border-radius: 10px; }
+  .task-card2-title { font-size: 13px; }
+  .task-card2-reward { font-size: 15px; }
+
+  /* Tasks progress card */
+  .tasks-progress-card { padding: 14px 16px; }
+  .tasks-progress-value { font-size: 16px; }
 }
