@@ -31,10 +31,12 @@ function useCountdown(seconds: number, active: boolean) {
 function VideoAdPanel({
   task,
   duration,
+  embedCode,
   onTimerDone,
 }: {
   task: Task;
   duration: number;
+  embedCode?: string;
   onTimerDone: () => void;
 }) {
   const remaining = useCountdown(duration, true);
@@ -50,21 +52,39 @@ function VideoAdPanel({
 
   const pct = Math.round(((duration - remaining) / duration) * 100);
 
+  // Wrap advertiser embed code in a minimal HTML document for the iframe
+  const iframeSrc = embedCode
+    ? `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh}</style></head><body>${embedCode}</body></html>`
+    : null;
+
   return (
     <div className="task-modal-content">
-      <div className={`task-modal-media ${isVideo ? 'task-modal-media--video' : 'task-modal-media--ad'}`}>
-        {isVideo ? (
-          <>
-            <div className="task-modal-media-icon">▶</div>
-            <p className="task-modal-media-label">Video playing…</p>
-          </>
-        ) : (
-          <>
-            <div className="task-modal-media-icon">📢</div>
-            <p className="task-modal-media-label">Viewing advertisement…</p>
-          </>
-        )}
-      </div>
+      {iframeSrc ? (
+        <div className="task-modal-ad-frame-wrap">
+          <iframe
+            srcDoc={iframeSrc}
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            className="task-modal-ad-frame"
+            title="Advertisement"
+            scrolling="no"
+          />
+          <div className="task-modal-ad-overlay-badge">Ad</div>
+        </div>
+      ) : (
+        <div className={`task-modal-media ${isVideo ? 'task-modal-media--video' : 'task-modal-media--ad'}`}>
+          {isVideo ? (
+            <>
+              <div className="task-modal-media-icon">▶</div>
+              <p className="task-modal-media-label">Video playing…</p>
+            </>
+          ) : (
+            <>
+              <div className="task-modal-media-icon">📢</div>
+              <p className="task-modal-media-label">Viewing advertisement…</p>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="task-modal-timer">
         <div className="task-modal-timer-track">
@@ -164,6 +184,7 @@ function SurveyPanel({
 export default function TaskModal({ task, onClose, onComplete }: Props) {
   const [phase,          setPhase]          = useState<ModalPhase>('starting');
   const [completionId,   setCompletionId]   = useState('');
+  const [embedCode,      setEmbedCode]      = useState<string | undefined>();
   const [errorMsg,       setErrorMsg]       = useState('');
 
   // Captcha state
@@ -194,6 +215,9 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
 
         if (task.type === 'captcha' && data.challenge) {
           setCaptchaQuestion(data.challenge.question);
+        }
+        if (data.embed_code) {
+          setEmbedCode(data.embed_code);
         }
 
         setPhase('active');
@@ -294,6 +318,7 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
               <VideoAdPanel
                 task={task}
                 duration={duration}
+                embedCode={embedCode}
                 onTimerDone={handleTimerDone}
               />
             )}

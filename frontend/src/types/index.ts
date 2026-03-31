@@ -26,11 +26,18 @@ export interface SurveyQuestion {
   min_length: number;
 }
 
+export interface AdNetwork {
+  name: string;
+  weight: number;
+  embed_code: string;
+}
+
 export interface VerificationConfig {
   type: TaskType | string;
   duration_seconds?: number;
   questions?: SurveyQuestion[];
   auto?: boolean;
+  networks?: AdNetwork[];
 }
 
 export interface Task {
@@ -58,6 +65,7 @@ export interface StartTaskResponse {
   completion_id: string;
   verification_config: VerificationConfig;
   challenge?: { question: string };
+  embed_code?: string;
 }
 
 export interface SubmitTaskResponse {
