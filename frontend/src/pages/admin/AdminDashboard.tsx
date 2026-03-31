@@ -1,10 +1,22 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
-import type { AdminUser, AdminTask, AdminWithdrawal, AdminStats } from '../../types/index.ts';
+import type { AdminUser, AdminTask, AdminWithdrawal, AdminStats, AdNetwork } from '../../types/index.ts';
 
-const TABS = ['overview', 'users', 'tasks', 'withdrawals'] as const;
+const TABS = ['overview', 'users', 'tasks', 'ads', 'withdrawals'] as const;
 type Tab = typeof TABS[number];
+
+const PRESET_NETWORKS = ['Adsterra', 'Monetag', 'PropellerAds', 'Custom'] as const;
+
+interface AdNetworkDraft {
+  name: string;
+  weight: number;
+  embed_code: string;
+}
+
+function emptyDraft(): AdNetworkDraft {
+  return { name: 'Adsterra', weight: 50, embed_code: '' };
+}
 
 interface TaskForm {
   title:         string;
@@ -81,6 +93,55 @@ export default function AdminDashboard() {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       toast.error(msg ?? 'Failed to create task.');
+    }
+  }
+
+  // Ad network state — keyed by task id
+  const [adNetworks,    setAdNetworks]    = useState<Record<string, AdNetwork[]>>({});
+  const [adDrafts,      setAdDrafts]      = useState<Record<string, AdNetworkDraft[]>>({});
+  const [savingAds,     setSavingAds]     = useState<string | null>(null);
+
+  function getNetworksForTask(taskId: string): AdNetworkDraft[] {
+    return adDrafts[taskId] ?? adNetworks[taskId]?.map((n) => ({ ...n })) ?? [];
+  }
+
+  function setNetworksForTask(taskId: string, nets: AdNetworkDraft[]) {
+    setAdDrafts((prev) => ({ ...prev, [taskId]: nets }));
+  }
+
+  function addNetwork(taskId: string) {
+    const nets = getNetworksForTask(taskId);
+    setNetworksForTask(taskId, [...nets, emptyDraft()]);
+  }
+
+  function removeNetwork(taskId: string, idx: number) {
+    const nets = [...getNetworksForTask(taskId)];
+    nets.splice(idx, 1);
+    setNetworksForTask(taskId, nets);
+  }
+
+  function updateNetwork(taskId: string, idx: number, patch: Partial<AdNetworkDraft>) {
+    const nets = getNetworksForTask(taskId).map((n, i) => i === idx ? { ...n, ...patch } : n);
+    setNetworksForTask(taskId, nets);
+  }
+
+  async function saveNetworks(taskId: string) {
+    const nets = getNetworksForTask(taskId);
+    if (nets.some((n) => !n.embed_code.trim())) {
+      toast.error('All networks must have an embed code.');
+      return;
+    }
+    setSavingAds(taskId);
+    try {
+      await api.put(`/admin/tasks/${taskId}/ad-networks`, { networks: nets });
+      setAdNetworks((prev) => ({ ...prev, [taskId]: nets }));
+      setAdDrafts((prev) => { const n = { ...prev }; delete n[taskId]; return n; });
+      toast.success('Ad networks saved.');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      toast.error(msg ?? 'Failed to save ad networks.');
+    } finally {
+      setSavingAds(null);
     }
   }
 
@@ -247,6 +308,100 @@ export default function AdminDashboard() {
             </table>
           </div>
         </>
+      )}
+
+      {tab === 'ads' && (
+        <div className="ads-tab">
+          <p className="ads-tab-hint text-muted">
+            Configure ad network embed codes for video / ad-click tasks. Networks are selected at
+            random (weighted) each time a user starts the task.
+          </p>
+
+          {tasks.filter((t) => t.type === 'video' || t.type === 'ad_click').length === 0 ? (
+            <p className="text-muted">No video or ad-click tasks found.</p>
+          ) : (
+            tasks
+              .filter((t) => t.type === 'video' || t.type === 'ad_click')
+              .map((task) => {
+                const nets = getNetworksForTask(task.id);
+                const isDirty = !!adDrafts[task.id];
+                return (
+                  <div key={task.id} className="card ad-task-card">
+                    <div className="ad-task-header">
+                      <div>
+                        <span className="ad-task-title">{task.title}</span>
+                        <span className="badge ml-2">{task.type}</span>
+                      </div>
+                      <div className="ad-task-actions">
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => addNetwork(task.id)}
+                        >
+                          + Add Network
+                        </button>
+                        <button
+                          className={`btn btn-sm btn-primary${!isDirty ? ' btn-disabled' : ''}`}
+                          disabled={!isDirty || savingAds === task.id}
+                          onClick={() => { void saveNetworks(task.id); }}
+                        >
+                          {savingAds === task.id ? 'Saving…' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {nets.length === 0 ? (
+                      <p className="text-muted ad-empty-hint">No ad networks configured. Click "+ Add Network" to start.</p>
+                    ) : (
+                      <div className="ad-network-list">
+                        {nets.map((net, idx) => (
+                          <div key={idx} className="ad-network-row">
+                            <div className="ad-network-row-top">
+                              <select
+                                className="form-input ad-network-name"
+                                value={net.name}
+                                onChange={(e) => updateNetwork(task.id, idx, { name: e.target.value })}
+                              >
+                                {PRESET_NETWORKS.map((p) => (
+                                  <option key={p} value={p}>{p}</option>
+                                ))}
+                              </select>
+                              <label className="ad-weight-label">
+                                Weight
+                                <input
+                                  className="form-input ad-weight-input"
+                                  type="number"
+                                  min={1}
+                                  max={100}
+                                  value={net.weight}
+                                  onChange={(e) =>
+                                    updateNetwork(task.id, idx, { weight: Number(e.target.value) })
+                                  }
+                                />
+                              </label>
+                              <button
+                                className="btn btn-sm btn-ghost btn-danger"
+                                onClick={() => removeNetwork(task.id, idx)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            <textarea
+                              className="form-input ad-embed-textarea"
+                              placeholder="Paste embed code from ad network (script or iframe tag)"
+                              value={net.embed_code}
+                              onChange={(e) =>
+                                updateNetwork(task.id, idx, { embed_code: e.target.value })
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+          )}
+        </div>
       )}
 
       {tab === 'withdrawals' && (

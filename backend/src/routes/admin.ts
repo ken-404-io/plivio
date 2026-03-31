@@ -10,6 +10,7 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  updateAdNetworks,
   listPendingWithdrawals,
   processWithdrawal,
 } from '../controllers/adminController.ts';
@@ -39,8 +40,9 @@ router.post('/tasks',
   }),
   createTask
 );
-router.put('/tasks/:id',    updateTask);
-router.delete('/tasks/:id', deleteTask);
+router.put('/tasks/:id',              updateTask);
+router.put('/tasks/:id/ad-networks',  updateAdNetworks);
+router.delete('/tasks/:id',           deleteTask);
 
 router.get('/withdrawals',      listPendingWithdrawals);
 router.put('/withdrawals/:id',

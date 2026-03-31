@@ -2,6 +2,12 @@ import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { NotFoundError, ValidationError } from '../utils/errors.ts';
 
+interface AdNetworkInput {
+  name: string;
+  weight: number;
+  embed_code: string;
+}
+
 export async function getStats(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const [users, tasks, withdrawals, earnings] = await Promise.all([
@@ -175,4 +181,35 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
   } finally {
     client.release();
   }
+}
+
+// ─── Update ad networks for a video/ad task ───────────────────────────────
+
+export async function updateAdNetworks(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id }      = req.params;
+    const { networks } = req.body as { networks: AdNetworkInput[] };
+
+    if (!Array.isArray(networks)) throw new ValidationError('networks must be an array');
+
+    for (const n of networks) {
+      if (!n.name?.trim())       throw new ValidationError('Each network must have a name');
+      if (typeof n.weight !== 'number' || n.weight < 1 || n.weight > 100) {
+        throw new ValidationError(`Network "${n.name}" weight must be 1–100`);
+      }
+      if (!n.embed_code?.trim()) throw new ValidationError(`Network "${n.name}" must have embed_code`);
+    }
+
+    const result = await pool.query(
+      `UPDATE tasks
+       SET verification_config = verification_config || jsonb_build_object('networks', $1::jsonb)
+       WHERE id = $2 AND type IN ('video', 'ad_click')
+       RETURNING id, title, verification_config`,
+      [JSON.stringify(networks), id]
+    );
+
+    if (result.rowCount === 0) throw new NotFoundError('Task not found or not a video/ad task');
+
+    res.json({ success: true, task: result.rows[0] });
+  } catch (err) { next(err); }
 }

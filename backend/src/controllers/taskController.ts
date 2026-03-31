@@ -13,11 +13,30 @@ interface SurveyQuestion {
   min_length: number;
 }
 
+interface AdNetwork {
+  name: string;
+  weight: number;
+  embed_code: string;
+}
+
 interface VerificationConfig {
   type: string;
   duration_seconds?: number;
   questions?: SurveyQuestion[];
   auto?: boolean;
+  networks?: AdNetwork[];
+}
+
+/** Weighted random selection from configured ad networks. */
+function selectNetwork(networks: AdNetwork[]): AdNetwork | null {
+  if (!networks.length) return null;
+  const total  = networks.reduce((s, n) => s + (n.weight || 1), 0);
+  let   cursor = Math.random() * total;
+  for (const n of networks) {
+    cursor -= n.weight || 1;
+    if (cursor <= 0) return n;
+  }
+  return networks[networks.length - 1];
 }
 
 interface TaskRow {
@@ -201,14 +220,24 @@ export async function startTask(req: Request, res: Response, next: NextFunction)
       throw new ValidationError('Referral rewards are issued automatically when a friend registers using your code.');
     }
 
-    // Generate captcha challenge if needed
+    // Generate captcha challenge or select ad network
     let serverData: Record<string, unknown> = {};
     let challenge: Record<string, string>   = {};
+    let embedCode: string | undefined;
 
     if (task.type === 'captcha') {
-      const captcha              = await generateCaptcha();
-      serverData.captcha_hash    = captcha.answerHash;
-      challenge.question         = captcha.question;
+      const captcha           = await generateCaptcha();
+      serverData.captcha_hash = captcha.answerHash;
+      challenge.question      = captcha.question;
+    }
+
+    if (task.type === 'video' || task.type === 'ad_click') {
+      const networks = (config.networks ?? []).filter((n) => n.embed_code?.trim());
+      if (networks.length > 0) {
+        const picked              = selectNetwork(networks);
+        serverData.selected_network = picked?.name ?? '';
+        embedCode                   = picked?.embed_code ?? '';
+      }
     }
 
     // Insert pending completion — completed_at is intentionally NULL until approved
@@ -228,6 +257,7 @@ export async function startTask(req: Request, res: Response, next: NextFunction)
       completion_id:       completionId,
       verification_config: config,
       ...(Object.keys(challenge).length > 0 && { challenge }),
+      ...(embedCode                           && { embed_code: embedCode }),
     });
   } catch (err) {
     await client.query('ROLLBACK');
