@@ -135,10 +135,36 @@ export default function Tasks() {
     setActiveTask(task);
   }
 
-  function handleModalComplete(message: string) {
+  async function handleModalComplete(message: string) {
     setActiveTask(null);
     toast.success(message);
-    void load();
+
+    // Fetch updated task list to get the new completed count
+    try {
+      const { data } = await api.get<TaskListResponse>('/tasks');
+      setTaskData(data);
+
+      // Auto check-in when 5 or more tasks completed today
+      const completedCount = data.tasks?.filter((t) => t.completed_today).length ?? 0;
+      if (completedCount >= 5) {
+        try {
+          const { data: checkin } = await api.post<{
+            already_checked_in?: boolean;
+            streak_count: number;
+            bonus_day: boolean;
+          }>('/coins/checkin');
+          if (!checkin.already_checked_in) {
+            if (checkin.bonus_day) {
+              toast.success(`Streak day ${checkin.streak_count}! +50 coins bonus!`);
+            } else {
+              toast.success(`Day ${checkin.streak_count} streak earned! Keep it up.`);
+            }
+          }
+        } catch { /* silent — streak already claimed */ }
+      }
+    } catch {
+      toast.error('Failed to load tasks.');
+    }
   }
 
   if (loading) return <div className="page-loading"><div className="spinner" /></div>;
