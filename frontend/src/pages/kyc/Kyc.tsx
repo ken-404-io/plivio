@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
+import BackButton from '../../components/common/BackButton.tsx';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { KycStatus } from '../../types/index.ts';
 import { ClipboardList, Clock, CheckCircle2, XCircle, FileText, Camera } from 'lucide-react';
@@ -96,6 +97,7 @@ export default function Kyc() {
     <div className="page">
       <header className="page-header">
         <div>
+          <BackButton />
           <h1 className="page-title">Verify Identity</h1>
           <p className="page-subtitle">Required to enable withdrawals</p>
         </div>

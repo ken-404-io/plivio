@@ -28,29 +28,24 @@ interface NavItem {
 
 // Primary bottom-bar items (always visible)
 const NAV_PRIMARY: NavItem[] = [
-  { to: '/dashboard', label: 'Home',     Icon: LayoutDashboard },
-  { to: '/tasks',     label: 'Tasks',    Icon: CheckSquare     },
-  { to: '/coins',     label: 'Coins',    Icon: Coins           },
-  { to: '/withdraw',  label: 'Withdraw', Icon: ArrowUpCircle   },
+  { to: '/dashboard', label: 'Home',  Icon: LayoutDashboard },
+  { to: '/tasks',     label: 'Tasks', Icon: CheckSquare     },
+  { to: '/coins',     label: 'Coins', Icon: Coins           },
+  { to: '/plans',     label: 'Plans', Icon: Star            },
 ];
 
 // Grouped menu items for the full-screen "Menu" page
 const MENU_GROUPS: { title?: string; items: NavItem[] }[] = [
   {
     items: [
-      { to: '/earnings',  label: 'Earnings',   Icon: DollarSign, desc: 'View your earnings history'  },
-      { to: '/plans',     label: 'Plans',      Icon: Star,       desc: 'Upgrade your membership'     },
+      { to: '/earnings',  label: 'Earnings',   Icon: DollarSign,   desc: 'View your earnings history'  },
+      { to: '/withdraw',  label: 'Withdraw',   Icon: ArrowUpCircle, desc: 'Cash out your balance'      },
     ],
   },
   {
     items: [
-      { to: '/referrals', label: 'Referrals',  Icon: UserPlus,   desc: 'Invite friends & earn'       },
-      { to: '/kyc',       label: 'Verify ID',  Icon: BadgeCheck, desc: 'Complete identity check'     },
-    ],
-  },
-  {
-    items: [
-      { to: '/profile',   label: 'Profile',    Icon: User,       desc: 'Manage your account'         },
+      { to: '/referrals', label: 'Referrals',  Icon: UserPlus,     desc: 'Invite friends & earn'       },
+      { to: '/kyc',       label: 'Verify ID',  Icon: BadgeCheck,   desc: 'Complete identity check'     },
     ],
   },
 ];

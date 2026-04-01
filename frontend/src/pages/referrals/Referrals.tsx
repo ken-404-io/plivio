@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { User, Check } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
+import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
 import type { PlanType } from '../../types/index.ts';
 
@@ -45,6 +46,7 @@ export default function Referrals() {
     <div className="page">
       <header className="page-header">
         <div>
+          <BackButton />
           <h1 className="page-title">Referrals</h1>
           <p className="page-subtitle">Invite friends · earn ₱10 per signup</p>
         </div>

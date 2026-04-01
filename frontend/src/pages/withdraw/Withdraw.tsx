@@ -5,6 +5,7 @@ import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { Withdrawal } from '../../types/index.ts';
 import { Smartphone, CreditCard, Banknote } from 'lucide-react';
+import BackButton from '../../components/common/BackButton.tsx';
 
 const STATUS_LABEL: Record<string, string> = {
   pending:    'Pending',
@@ -65,6 +66,7 @@ export default function Withdraw() {
     <div className="page">
       <header className="page-header">
         <div>
+          <BackButton />
           <h1 className="page-title">Withdraw</h1>
           <p className="page-subtitle">
             Available balance: <strong>₱{Number(user?.balance ?? 0).toFixed(2)}</strong>

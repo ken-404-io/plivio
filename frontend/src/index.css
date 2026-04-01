@@ -647,6 +647,28 @@ img { display: block; max-width: 100%; }
   flex-wrap: wrap;
 }
 
+/* Back button */
+.back-btn {
+  display: none; /* desktop: hidden — use sidebar/browser back */
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 4px;
+  transition: color 0.15s;
+}
+.back-btn:hover { color: var(--text-heading); }
+.back-btn svg { flex-shrink: 0; }
+
+@media (max-width: 768px) {
+  .back-btn { display: flex; }
+}
+
 .page-title    { font-size: 26px; font-weight: 700; color: var(--text-heading); letter-spacing: -0.5px; }
 .page-subtitle { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
 

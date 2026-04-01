@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
+import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { Subscription, PlansResponse, PlanInfo } from '../../types/index.ts';
@@ -73,6 +74,7 @@ export default function Plans() {
     <div className="page">
       <header className="page-header">
         <div>
+          <BackButton />
           <h1 className="page-title">Plans</h1>
           <p className="page-subtitle">
             Current: <strong>{user?.plan?.toUpperCase()}</strong>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api.ts';
+import BackButton from '../../components/common/BackButton.tsx';
 import type { EarningsResponse, Earning } from '../../types/index.ts';
 import {
   ShieldCheck,
@@ -70,6 +71,7 @@ export default function Earnings() {
     <div className="page">
       <header className="page-header">
         <div>
+          <BackButton />
           <h1 className="page-title">Earnings</h1>
           <p className="page-subtitle">{total} total transaction{total !== 1 ? 's' : ''}</p>
         </div>
