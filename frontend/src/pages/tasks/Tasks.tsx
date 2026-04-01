@@ -1,5 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Lock, Play, MousePointerClick, ClipboardList, Users,
+  Zap, Check, Clock, Inbox, CheckCircle2,
+} from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import TaskModal from './TaskModal.tsx';
@@ -7,16 +11,16 @@ import type { Task, TaskListResponse } from '../../types/index.ts';
 
 // ─── Task type meta (label + icon + colour class) ─────────────────────────────
 
-const TYPE_META: Record<string, { label: string; icon: string; cls: string }> = {
-  captcha:  { label: 'Captcha',    icon: '🔐', cls: 'type--captcha'  },
-  video:    { label: 'Watch Video', icon: '▶️', cls: 'type--video'    },
-  ad_click: { label: 'Ad Click',   icon: '👆', cls: 'type--adclick'  },
-  survey:   { label: 'Survey',     icon: '📝', cls: 'type--survey'   },
-  referral: { label: 'Referral',   icon: '👥', cls: 'type--referral' },
+const TYPE_META: Record<string, { label: string; icon: React.ReactElement; cls: string }> = {
+  captcha:  { label: 'Captcha',    icon: <Lock               size={18} />, cls: 'type--captcha'  },
+  video:    { label: 'Watch Video', icon: <Play              size={18} />, cls: 'type--video'    },
+  ad_click: { label: 'Ad Click',   icon: <MousePointerClick  size={18} />, cls: 'type--adclick'  },
+  survey:   { label: 'Survey',     icon: <ClipboardList      size={18} />, cls: 'type--survey'   },
+  referral: { label: 'Referral',   icon: <Users              size={18} />, cls: 'type--referral' },
 };
 
 function typeMeta(type: string) {
-  return TYPE_META[type] ?? { label: type, icon: '⚡', cls: '' };
+  return TYPE_META[type] ?? { label: type, icon: <Zap size={18} />, cls: '' };
 }
 
 // ─── Duration / hint helper ───────────────────────────────────────────────────
@@ -75,7 +79,7 @@ function TaskCard({ task, variant, onStart, atLimit }: TaskCardProps) {
         </span>
 
         {variant === 'done' ? (
-          <span className="task-card2-done-badge">✓ Done</span>
+          <span className="task-card2-done-badge"><Check size={13} /> Done</span>
         ) : (
           <button
             className={`btn btn-sm ${variant === 'progress' ? 'btn-warning' : 'btn-primary'}`}
@@ -191,7 +195,7 @@ export default function Tasks() {
         {inProgress.length > 0 && (
           <section className="tasks-section">
             <h2 className="tasks-section-title tasks-section-title--warning">
-              ⏳ In Progress
+              <Clock size={16} /> In Progress
             </h2>
             <div className="task-list">
               {inProgress.map((task) => (
@@ -215,12 +219,12 @@ export default function Tasks() {
             <div className="tasks-empty">
               {(taskData?.tasks?.length ?? 0) === 0 ? (
                 <>
-                  <span className="tasks-empty-icon">📭</span>
+                  <span className="tasks-empty-icon"><Inbox size={40} /></span>
                   <p>No tasks available right now. Check back soon.</p>
                 </>
               ) : (
                 <>
-                  <span className="tasks-empty-icon">🎉</span>
+                  <span className="tasks-empty-icon"><CheckCircle2 size={40} /></span>
                   <p>All tasks completed for today. Great work!</p>
                   <p className="text-muted">Come back tomorrow for more tasks.</p>
                 </>
@@ -245,7 +249,7 @@ export default function Tasks() {
         {completed.length > 0 && (
           <section className="tasks-section">
             <h2 className="tasks-section-title tasks-section-title--muted">
-              ✓ Completed Today
+              <Check size={16} /> Completed Today
             </h2>
             <div className="task-list task-list--dim">
               {completed.map((task) => (

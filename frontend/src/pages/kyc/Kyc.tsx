@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
+import { FileText, Clock, CheckCircle2, XCircle, FileCheck, Camera } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
@@ -22,11 +23,11 @@ interface KycStatusData {
   rejection_reason: string | null;
 }
 
-const STATUS_CONFIG: Record<KycStatus, { label: string; cls: string; icon: string }> = {
-  none:     { label: 'Not submitted', cls: '',               icon: '📋' },
-  pending:  { label: 'Under review',  cls: 'badge--warning', icon: '⏳' },
-  approved: { label: 'Approved',      cls: 'badge--success', icon: '✅' },
-  rejected: { label: 'Rejected',      cls: 'badge--error',   icon: '❌' },
+const STATUS_CONFIG: Record<KycStatus, { label: string; cls: string; icon: React.ReactElement }> = {
+  none:     { label: 'Not submitted', cls: '',               icon: <FileText     size={22} /> },
+  pending:  { label: 'Under review',  cls: 'badge--warning', icon: <Clock        size={22} /> },
+  approved: { label: 'Approved',      cls: 'badge--success', icon: <CheckCircle2 size={22} /> },
+  rejected: { label: 'Rejected',      cls: 'badge--error',   icon: <XCircle      size={22} /> },
 };
 
 export default function Kyc() {
@@ -122,12 +123,12 @@ export default function Kyc() {
       )}
       {currentStatus === 'approved' && (
         <div className="alert alert--success">
-          ✅ Identity verified. You can now withdraw your earnings.
+          <CheckCircle2 size={16} /> Identity verified. You can now withdraw your earnings.
         </div>
       )}
       {currentStatus === 'pending' && (
         <div className="alert alert--info">
-          ⏳ Your documents are under review. This typically takes 1–3 business days.
+          <Clock size={16} /> Your documents are under review. This typically takes 1–3 business days.
         </div>
       )}
 
@@ -172,7 +173,7 @@ export default function Kyc() {
                 >
                   {idFront ? (
                     <>
-                      <span style={{ fontSize: 24 }}>📄</span>
+                      <span style={{ fontSize: 24 }}><FileCheck size={24} /></span>
                       <p className="kyc-upload-filename">{idFront.name}</p>
                       <span className="kyc-upload-change">Tap to change</span>
                     </>
@@ -205,7 +206,7 @@ export default function Kyc() {
                 >
                   {idSelfie ? (
                     <>
-                      <span style={{ fontSize: 24 }}>🤳</span>
+                      <span style={{ fontSize: 24 }}><Camera size={24} /></span>
                       <p className="kyc-upload-filename">{idSelfie.name}</p>
                       <span className="kyc-upload-change">Tap to change</span>
                     </>

@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Lock, Play, MousePointerClick, ClipboardList, Users,
+  Zap, ShieldCheck,
+} from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import type { TaskListResponse, Earning } from '../../types/index.ts';
@@ -7,12 +11,12 @@ import EmailVerificationBanner from '../../components/common/EmailVerificationBa
 
 const PLAN_LABEL: Record<string, string> = { free: 'Free', premium: 'Premium', elite: 'Elite' };
 
-const EARNING_TYPE_ICON: Record<string, string> = {
-  captcha:  '🔐',
-  video:    '▶️',
-  ad_click: '👆',
-  survey:   '📝',
-  referral: '👥',
+const EARNING_TYPE_ICON: Record<string, React.ReactElement> = {
+  captcha:  <Lock              size={18} />,
+  video:    <Play              size={18} />,
+  ad_click: <MousePointerClick size={18} />,
+  survey:   <ClipboardList     size={18} />,
+  referral: <Users             size={18} />,
 };
 
 export default function Dashboard() {
@@ -63,7 +67,7 @@ export default function Dashboard() {
       {/* ── Greeting header ── */}
       <header className="page-header">
         <div>
-          <h1 className="page-title">Hi, {user?.username} 👋</h1>
+          <h1 className="page-title">Hi, {user?.username}</h1>
           <p className="page-subtitle">
             {PLAN_LABEL[user?.plan ?? 'free']} plan
             {user?.active_sub_plan && user.sub_expires_at && (
@@ -132,7 +136,7 @@ export default function Dashboard() {
       {/* ── KYC warning ── */}
       {user?.kyc_status === 'none' && (
         <Link to="/kyc" className="dash-kyc-banner">
-          <span className="dash-kyc-icon">🪪</span>
+          <span className="dash-kyc-icon"><ShieldCheck size={22} /></span>
           <div>
             <p className="dash-kyc-title">Verify your identity to enable withdrawals</p>
             <p className="dash-kyc-sub">Takes only 2 minutes — tap to start</p>
@@ -157,7 +161,7 @@ export default function Dashboard() {
             {earnings?.map((e) => (
               <div key={e.id} className="earning-row">
                 <div className="earning-row-icon">
-                  {EARNING_TYPE_ICON[e.type] ?? '⚡'}
+                  {EARNING_TYPE_ICON[e.type] ?? <Zap size={18} />}
                 </div>
                 <div className="earning-row-body">
                   <p className="earning-row-title">{e.title}</p>

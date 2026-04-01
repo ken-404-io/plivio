@@ -1,25 +1,36 @@
 import { NavLink } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  ListChecks,
+  Banknote,
+  ArrowUpFromLine,
+  Star,
+  UserPlus,
+  ShieldCheck,
+  UserCircle,
+  Settings,
+} from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 
 interface NavItem {
   to:    string;
   label: string;
-  icon:  string;
+  icon:  React.ReactNode;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { to: '/tasks',     label: 'Tasks',     icon: '✓' },
-  { to: '/earnings',  label: 'Earnings',  icon: '₱' },
-  { to: '/withdraw',  label: 'Withdraw',  icon: '↑' },
-  { to: '/plans',     label: 'Plans',     icon: '★' },
-  { to: '/referrals', label: 'Referrals', icon: '↗' },
-  { to: '/kyc',       label: 'Verify ID', icon: '🪪' },
-  { to: '/profile',   label: 'Profile',   icon: '◉' },
+  { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard   size={18} /> },
+  { to: '/tasks',     label: 'Tasks',     icon: <ListChecks        size={18} /> },
+  { to: '/earnings',  label: 'Earnings',  icon: <Banknote          size={18} /> },
+  { to: '/withdraw',  label: 'Withdraw',  icon: <ArrowUpFromLine   size={18} /> },
+  { to: '/plans',     label: 'Plans',     icon: <Star              size={18} /> },
+  { to: '/referrals', label: 'Referrals', icon: <UserPlus          size={18} /> },
+  { to: '/kyc',       label: 'Verify ID', icon: <ShieldCheck       size={18} /> },
+  { to: '/profile',   label: 'Profile',   icon: <UserCircle        size={18} /> },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
-  { to: '/admin', label: 'Admin Panel', icon: '⚙' },
+  { to: '/admin', label: 'Admin Panel', icon: <Settings size={18} /> },
 ];
 
 interface SidebarProps {

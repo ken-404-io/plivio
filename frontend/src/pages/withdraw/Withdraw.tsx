@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Smartphone, CreditCard, Banknote } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
@@ -12,9 +13,9 @@ const STATUS_LABEL: Record<string, string> = {
   rejected:   'Rejected',
 };
 
-const METHOD_ICON: Record<string, string> = {
-  gcash:  '📱',
-  paypal: '🅿️',
+const METHOD_ICON: Record<string, React.ReactElement> = {
+  gcash:  <Smartphone size={20} />,
+  paypal: <CreditCard size={20} />,
 };
 
 export default function Withdraw() {
@@ -162,7 +163,7 @@ export default function Withdraw() {
             {history.map((w) => (
               <div key={w.id} className="earning-row">
                 <div className="earning-row-icon">
-                  {METHOD_ICON[w.method] ?? '💸'}
+                  {METHOD_ICON[w.method] ?? <Banknote size={20} />}
                 </div>
                 <div className="earning-row-body">
                   <p className="earning-row-title">{w.method.toUpperCase()} Withdrawal</p>

@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Zap, Sun, Moon, Star, User, CheckCircle2, Banknote, Check,
+  Building, Building2, ShieldCheck, FileText, CreditCard, Shield,
+} from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import './LandingPage.css';
 
@@ -19,7 +23,7 @@ export default function LandingPage() {
       <header className="lp-nav">
         <div className="lp-nav-inner">
           <a href="/" className="lp-logo">
-            <span className="lp-logo-bolt">⚡</span>
+            <span className="lp-logo-bolt"><Zap size={22} /></span>
             <span className="lp-logo-text">Plivio</span>
           </a>
 
@@ -39,7 +43,7 @@ export default function LandingPage() {
               onClick={toggleTheme}
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
-              {theme === 'dark' ? '☀' : '☾'}
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <button
               className="lp-menu-btn"
@@ -101,7 +105,7 @@ export default function LandingPage() {
             </div>
             <div className="lp-stat-divider" />
             <div className="lp-stat">
-              <strong>4.8★</strong>
+              <strong>4.8 <Star size={14} /></strong>
               <span>User Rating</span>
             </div>
           </div>
@@ -160,7 +164,7 @@ export default function LandingPage() {
           <div className="lp-steps">
             <div className="lp-step">
               <div className="lp-step-num">01</div>
-              <div className="lp-step-icon">👤</div>
+              <div className="lp-step-icon"><User size={32} /></div>
               <h3 className="lp-step-title">Create Free Account</h3>
               <p className="lp-step-desc">
                 Sign up with your email in under 60 seconds. No fees, no credit card.
@@ -172,7 +176,7 @@ export default function LandingPage() {
 
             <div className="lp-step">
               <div className="lp-step-num">02</div>
-              <div className="lp-step-icon">✅</div>
+              <div className="lp-step-icon"><CheckCircle2 size={32} /></div>
               <h3 className="lp-step-title">Complete Tasks</h3>
               <p className="lp-step-desc">
                 Watch videos, solve captchas, answer surveys, and click ads.
@@ -184,7 +188,7 @@ export default function LandingPage() {
 
             <div className="lp-step">
               <div className="lp-step-num">03</div>
-              <div className="lp-step-icon">💸</div>
+              <div className="lp-step-icon"><Banknote size={32} /></div>
               <h3 className="lp-step-title">Withdraw Earnings</h3>
               <p className="lp-step-desc">
                 Cash out to GCash or PayPal once you reach ₱50.
@@ -247,10 +251,10 @@ export default function LandingPage() {
                 <span className="lp-price-period">/month</span>
               </div>
               <ul className="lp-plan-features">
-                <li><span className="lp-check">✓</span> Basic tasks access</li>
-                <li><span className="lp-check">✓</span> ₱20/day earning limit</li>
-                <li><span className="lp-check">✓</span> GCash & PayPal withdrawal</li>
-                <li><span className="lp-check">✓</span> Referral bonuses</li>
+                <li><span className="lp-check"><Check size={14} /></span> Basic tasks access</li>
+                <li><span className="lp-check"><Check size={14} /></span> ₱20/day earning limit</li>
+                <li><span className="lp-check"><Check size={14} /></span> GCash & PayPal withdrawal</li>
+                <li><span className="lp-check"><Check size={14} /></span> Referral bonuses</li>
               </ul>
               <Link to="/register" className="lp-plan-btn lp-plan-btn--outline">
                 Get Started Free
@@ -266,11 +270,11 @@ export default function LandingPage() {
                 <span className="lp-price-period">/month</span>
               </div>
               <ul className="lp-plan-features">
-                <li><span className="lp-check">✓</span> All task types</li>
-                <li><span className="lp-check">✓</span> ₱100/day earning limit</li>
-                <li><span className="lp-check">✓</span> Exclusive premium tasks</li>
-                <li><span className="lp-check">✓</span> No ads</li>
-                <li><span className="lp-check">✓</span> Priority support</li>
+                <li><span className="lp-check"><Check size={14} /></span> All task types</li>
+                <li><span className="lp-check"><Check size={14} /></span> ₱100/day earning limit</li>
+                <li><span className="lp-check"><Check size={14} /></span> Exclusive premium tasks</li>
+                <li><span className="lp-check"><Check size={14} /></span> No ads</li>
+                <li><span className="lp-check"><Check size={14} /></span> Priority support</li>
               </ul>
               <Link to="/register" className="lp-plan-btn lp-plan-btn--primary">
                 Upgrade to Premium
@@ -285,12 +289,12 @@ export default function LandingPage() {
                 <span className="lp-price-period">/month</span>
               </div>
               <ul className="lp-plan-features">
-                <li><span className="lp-check">✓</span> All task types</li>
-                <li><span className="lp-check lp-check--gold">✓</span> <strong>Unlimited</strong> daily earnings</li>
-                <li><span className="lp-check">✓</span> Exclusive elite tasks</li>
-                <li><span className="lp-check">✓</span> No ads</li>
-                <li><span className="lp-check">✓</span> Early access to new tasks</li>
-                <li><span className="lp-check">✓</span> VIP support</li>
+                <li><span className="lp-check"><Check size={14} /></span> All task types</li>
+                <li><span className="lp-check lp-check--gold"><Check size={14} /></span> <strong>Unlimited</strong> daily earnings</li>
+                <li><span className="lp-check"><Check size={14} /></span> Exclusive elite tasks</li>
+                <li><span className="lp-check"><Check size={14} /></span> No ads</li>
+                <li><span className="lp-check"><Check size={14} /></span> Early access to new tasks</li>
+                <li><span className="lp-check"><Check size={14} /></span> VIP support</li>
               </ul>
               <Link to="/register" className="lp-plan-btn lp-plan-btn--outline">
                 Go Elite
@@ -312,7 +316,7 @@ export default function LandingPage() {
 
           <div className="lp-certs-grid">
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">🏛️</div>
+              <div className="lp-cert-icon"><Building size={28} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">SEC Registered</h4>
                 <p className="lp-cert-sub">Securities and Exchange Commission</p>
@@ -325,7 +329,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">🏢</div>
+              <div className="lp-cert-icon"><Building2 size={28} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">DTI Registered</h4>
                 <p className="lp-cert-sub">Department of Trade and Industry</p>
@@ -338,7 +342,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">🔒</div>
+              <div className="lp-cert-icon"><ShieldCheck size={28} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">NPC Compliant</h4>
                 <p className="lp-cert-sub">National Privacy Commission</p>
@@ -351,7 +355,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">📋</div>
+              <div className="lp-cert-icon"><FileText size={28} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">BIR Registered</h4>
                 <p className="lp-cert-sub">Bureau of Internal Revenue</p>
@@ -364,7 +368,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">💳</div>
+              <div className="lp-cert-icon"><CreditCard size={28} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">BSP Guidelines</h4>
                 <p className="lp-cert-sub">Bangko Sentral ng Pilipinas</p>
@@ -377,7 +381,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">🛡️</div>
+              <div className="lp-cert-icon"><Shield size={28} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">DICT Aligned</h4>
                 <p className="lp-cert-sub">Dept. of Information &amp; Communications Technology</p>
@@ -403,7 +407,7 @@ export default function LandingPage() {
       {/* ─── CTA Banner ────────────────────────────────────────────────── */}
       <section className="lp-cta-banner">
         <div className="lp-cta-inner">
-          <div className="lp-cta-bolt" aria-hidden="true">⚡</div>
+          <div className="lp-cta-bolt" aria-hidden="true"><Zap size={40} /></div>
           <h2 className="lp-cta-title">Ready to Start Earning?</h2>
           <p className="lp-cta-sub">
             Join thousands of Filipinos already earning with Plivio.
@@ -419,7 +423,7 @@ export default function LandingPage() {
       <footer className="lp-footer">
         <div className="lp-footer-inner">
           <div className="lp-footer-brand">
-            <span className="lp-logo-bolt">⚡</span>
+            <span className="lp-logo-bolt"><Zap size={18} /></span>
             <span className="lp-logo-text">Plivio</span>
             <p className="lp-footer-tagline">Get Paid To · Philippines</p>
           </div>

@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import {
+  Lock, Play, MousePointerClick, ClipboardList, Users, Zap,
+} from 'lucide-react';
 import api from '../../services/api.ts';
 import type { EarningsResponse, Earning } from '../../types/index.ts';
 
@@ -8,18 +11,18 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: 'Rejected',
 };
 
-const TYPE_ICON: Record<string, string> = {
-  captcha:  '🔐',
-  video:    '▶️',
-  ad_click: '👆',
-  survey:   '📝',
-  referral: '👥',
+const TYPE_ICON: Record<string, React.ReactElement> = {
+  captcha:  <Lock              size={18} />,
+  video:    <Play              size={18} />,
+  ad_click: <MousePointerClick size={18} />,
+  survey:   <ClipboardList     size={18} />,
+  referral: <Users             size={18} />,
 };
 
 function EarningCard({ row }: { row: Earning }) {
   return (
     <div className="earning-row">
-      <div className="earning-row-icon">{TYPE_ICON[row.type] ?? '⚡'}</div>
+      <div className="earning-row-icon">{TYPE_ICON[row.type] ?? <Zap size={18} />}</div>
       <div className="earning-row-body">
         <p className="earning-row-title">{row.title}</p>
         <div className="earning-row-meta">
