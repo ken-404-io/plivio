@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
+import { Flame } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import {
   LayoutDashboard,
@@ -66,12 +67,45 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="user-info">
-          <span className="user-name">{user?.username}</span>
-          <span className={`plan-badge plan-badge--${user?.plan ?? 'free'}`}>
-            {user?.plan?.toUpperCase() ?? 'FREE'}
-          </span>
+        {/* User card */}
+        <div className="sidebar-user-card">
+          <Link to="/profile" className="sidebar-user-avatar-wrap" aria-label="Profile">
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="Profile" className="sidebar-user-avatar" />
+            ) : (
+              <div className="sidebar-user-avatar sidebar-user-avatar--initials">
+                {user?.username?.[0]?.toUpperCase() ?? 'U'}
+              </div>
+            )}
+          </Link>
+          <div className="sidebar-user-meta">
+            <span className="sidebar-user-name">{user?.username}</span>
+            <Link to="/plans" className="sidebar-user-plan">
+              {user?.plan ?? 'Free'}
+            </Link>
+          </div>
         </div>
+
+        {/* Stats row */}
+        <div className="sidebar-stats-row">
+          <Link to="/coins" className="sidebar-stat-item" aria-label="Streak">
+            <Flame size={14} className="sidebar-stat-flame" />
+            <span className="sidebar-stat-value">{user?.streak_count ?? 0}</span>
+            <span className="sidebar-stat-label">streak</span>
+          </Link>
+          <div className="sidebar-stat-divider" />
+          <Link to="/earnings" className="sidebar-stat-item" aria-label="Balance">
+            <span className="sidebar-stat-currency">₱</span>
+            <span className="sidebar-stat-value">
+              {Number(user?.balance ?? 0).toLocaleString('en-PH', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+            <span className="sidebar-stat-label">earned</span>
+          </Link>
+        </div>
+
         <button className="btn btn-ghost btn-sm" onClick={logout}>
           Sign out
         </button>
