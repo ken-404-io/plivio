@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -55,12 +56,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
   }, [dismiss]);
 
-  const value: ToastContextValue = {
+  // Memoize so consumers that list `toast` in useCallback deps don't infinite-loop
+  const value = useMemo<ToastContextValue>(() => ({
     success: (msg) => add('success', msg),
     error:   (msg) => add('error',   msg),
     warning: (msg) => add('warning', msg),
     info:    (msg) => add('info',    msg),
-  };
+  }), [add]);
 
   return (
     <ToastContext.Provider value={value}>
