@@ -25,9 +25,15 @@
   --sidebar-w:     240px;
   --radius:        10px;
   --radius-sm:     6px;
+  --radius-lg:     14px;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.45);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+
+  --input-h:   44px;
+  --btn-h:     44px;
+  --btn-sm-h:  36px;
 
   color-scheme: dark;
 }
@@ -57,6 +63,7 @@
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
 
   color-scheme: light;
 }
@@ -90,8 +97,14 @@ img { display: block; max-width: 100%; }
 .main-content {
   flex: 1;
   min-width: 0;
-  padding: 24px 32px;
+  padding: 0 32px 40px;
   overflow-y: auto;
+}
+
+/* Desktop: topbar provides top padding; no need for extra padding on main-content */
+@media (min-width: 769px) {
+  .topbar { padding-top: 20px; padding-bottom: 4px; }
+  .topbar-brand { display: none !important; }
 }
 
 /* ─── Bottom navigation (mobile only) ───────────────────────────────────────── */
@@ -564,9 +577,17 @@ img { display: block; max-width: 100%; }
 @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
 
 /* ─── Tabs ───────────────────────────────────────────────────────────────────── */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
 .tab-btn {
-  padding: 8px 16px;
+  padding: 10px 16px;
   background: none;
   border: none;
   color: var(--text-muted);
@@ -575,6 +596,8 @@ img { display: block; max-width: 100%; }
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .tab-btn:hover { color: var(--text-heading); }
 .tab-btn--active { color: var(--accent); border-bottom-color: var(--accent); }
@@ -586,6 +609,7 @@ img { display: block; max-width: 100%; }
 
 .form-input {
   width: 100%;
+  min-height: var(--input-h);
   padding: 9px 12px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -618,6 +642,7 @@ img { display: block; max-width: 100%; }
   align-items: center;
   justify-content: center;
   gap: 6px;
+  min-height: var(--btn-h);
   padding: 9px 18px;
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -634,7 +659,7 @@ img { display: block; max-width: 100%; }
 .btn-ghost   { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); }
 .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
 
-.btn-sm   { padding: 6px 12px; font-size: 13px; }
+.btn-sm   { min-height: var(--btn-sm-h); padding: 6px 12px; font-size: 13px; }
 .btn-full { width: 100%; }
 
 /* ─── Alerts ─────────────────────────────────────────────────────────────────── */
@@ -1293,6 +1318,91 @@ img { display: block; max-width: 100%; }
   border-radius: 4px;
   pointer-events: none;
   user-select: none;
+}
+
+/* ─── Admin – Card lists ─────────────────────────────────────────────────────── */
+.admin-list { display: flex; flex-direction: column; gap: 10px; }
+
+.admin-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-card-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-card-title {
+  font-weight: 600;
+  color: var(--text-heading);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-card-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.admin-card-balance {
+  font-size: 13px;
+  color: var(--text-heading);
+  font-weight: 600;
+}
+
+.admin-card-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.admin-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Create-task form stacks on mobile */
+.admin-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* ─── Admin – Ads tab ────────────────────────────────────────────────────────── */
