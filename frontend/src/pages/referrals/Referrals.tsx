@@ -20,7 +20,7 @@ export default function Referrals() {
 
   const [referrals, setReferrals] = useState<ReferredUser[]>([]);
   const [loading,   setLoading]   = useState(true);
-  const [copied,    setCopied]    = useState(false);
+  const [copied,    setCopied]    = useState<'code' | 'link' | null>(null);
 
   useEffect(() => {
     api.get<ReferralsResponse>('/users/me/referrals')
@@ -29,83 +29,84 @@ export default function Referrals() {
       .finally(() => setLoading(false));
   }, []);
 
-  function copyCode() {
-    if (!user?.referral_code) return;
-    void navigator.clipboard.writeText(user.referral_code).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
-
   const referralLink = `${window.location.origin}/register?ref=${user?.referral_code ?? ''}`;
 
-  function copyLink() {
-    void navigator.clipboard.writeText(referralLink).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  function copy(text: string, type: 'code' | 'link') {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(type);
+      setTimeout(() => setCopied(null), 2000);
     });
   }
+
+  const premiumCount = referrals.filter((r) => r.plan !== 'free').length;
 
   return (
     <div className="page">
       <header className="page-header">
         <div>
           <h1 className="page-title">Referrals</h1>
-          <p className="page-subtitle">
-            Invite friends and earn a bonus when they sign up.
-          </p>
+          <p className="page-subtitle">Invite friends · earn ₱10 per signup</p>
         </div>
       </header>
 
       {/* Stats */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <span className="stat-label">Total Referrals</span>
-          <span className="stat-value">{loading ? '—' : referrals.length}</span>
+      <div className="ref-stats-row">
+        <div className="ref-stat">
+          <span className="ref-stat-num">{loading ? '—' : referrals.length}</span>
+          <span className="ref-stat-lbl">Total</span>
         </div>
-        <div className="stat-card">
-          <span className="stat-label">Premium Referrals</span>
-          <span className="stat-value">
-            {loading ? '—' : referrals.filter((r) => r.plan !== 'free').length}
+        <div className="ref-stat-divider" />
+        <div className="ref-stat">
+          <span className="ref-stat-num">{loading ? '—' : premiumCount}</span>
+          <span className="ref-stat-lbl">Premium</span>
+        </div>
+        <div className="ref-stat-divider" />
+        <div className="ref-stat">
+          <span className="ref-stat-num ref-stat-num--accent">
+            ₱{loading ? '—' : (referrals.length * 10).toFixed(0)}
           </span>
+          <span className="ref-stat-lbl">Earned</span>
         </div>
       </div>
 
-      {/* Referral code + link */}
+      {/* Share card */}
       <div className="card">
-        <h2 className="card-title">Your referral code</h2>
-        <p className="text-muted" style={{ fontSize: 14, marginBottom: 16 }}>
-          Share your code or link. Anyone who signs up using it gets linked to your account.
+        <h2 className="card-title">Your referral</h2>
+        <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>
+          Anyone who signs up with your code or link gets linked to your account.
         </p>
 
-        <div className="referral-share-grid">
-          <div>
-            <p className="form-label" style={{ marginBottom: 8 }}>Code</p>
+        <div className="ref-share-stack">
+          <div className="ref-share-item">
+            <span className="ref-share-label">Code</span>
             <div className="referral-field">
               <span className="referral-code">{user?.referral_code ?? '—'}</span>
               <button
-                className={`btn btn-sm ${copied ? 'btn-outline' : 'btn-ghost'}`}
-                onClick={copyCode}
+                className={`btn btn-sm ${copied === 'code' ? 'btn-outline' : 'btn-ghost'}`}
+                onClick={() => copy(user?.referral_code ?? '', 'code')}
                 disabled={!user?.referral_code}
               >
-                {copied ? 'Copied!' : 'Copy'}
+                {copied === 'code' ? '✓ Copied' : 'Copy'}
               </button>
             </div>
           </div>
 
-          <div>
-            <p className="form-label" style={{ marginBottom: 8 }}>Link</p>
+          <div className="ref-share-item">
+            <span className="ref-share-label">Link</span>
             <div className="referral-field">
               <span className="referral-link">{referralLink}</span>
-              <button className="btn btn-sm btn-ghost" onClick={copyLink}>
-                Copy link
+              <button
+                className={`btn btn-sm ${copied === 'link' ? 'btn-outline' : 'btn-ghost'}`}
+                onClick={() => copy(referralLink, 'link')}
+              >
+                {copied === 'link' ? '✓ Copied' : 'Copy link'}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Referred users table */}
+      {/* Referred users */}
       <section className="section">
         <div className="section-header">
           <h2 className="section-title">People you've referred</h2>
@@ -116,37 +117,32 @@ export default function Referrals() {
         ) : referrals.length === 0 ? (
           <div className="empty-state">
             <p>No referrals yet.</p>
-            <p style={{ marginTop: 8, fontSize: 14 }}>
+            <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
               Share your code and start earning.{' '}
-              <Link to="/plans" className="link">Upgrade to Premium</Link> to maximize your referral bonus.
+              <Link to="/plans" className="link">Upgrade to Premium</Link> to maximize bonuses.
             </p>
           </div>
         ) : (
-          <div className="table-wrapper">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Plan</th>
-                  <th>Joined</th>
-                </tr>
-              </thead>
-              <tbody>
-                {referrals.map((r) => (
-                  <tr key={r.username}>
-                    <td>{r.username}</td>
-                    <td>
-                      <span className={`plan-badge plan-badge--${r.plan}`}>
-                        {r.plan.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="text-muted">
-                      {new Date(r.created_at).toLocaleDateString('en-PH')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="earnings-list">
+            {referrals.map((r) => (
+              <div key={r.username} className="earning-row">
+                <div className="earning-row-icon">👤</div>
+                <div className="earning-row-body">
+                  <p className="earning-row-title">{r.username}</p>
+                  <div className="earning-row-meta">
+                    <span className={`plan-badge plan-badge--${r.plan}`}>
+                      {r.plan.toUpperCase()}
+                    </span>
+                    <span className="earning-row-date">
+                      Joined {new Date(r.created_at).toLocaleDateString('en-PH', {
+                        month: 'short', day: 'numeric', year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <span className="earning-row-amount">+₱10</span>
+              </div>
+            ))}
           </div>
         )}
       </section>
