@@ -221,6 +221,10 @@ export interface AdminStats {
   pending_withdrawals: number;
   pending_withdrawal_total: number;
   total_approved_earnings: number;
+  new_users_today: number;
+  completed_tasks_today: number;
+  pending_kyc: number;
+  total_coins_distributed: number;
 }
 
 export interface AdminKycSubmission {
