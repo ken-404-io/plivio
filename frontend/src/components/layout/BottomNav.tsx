@@ -13,7 +13,9 @@ import {
   BadgeCheck,
   User,
   X,
+  ChevronRight,
 } from 'lucide-react';
+import { useAuth } from '../../store/authStore.tsx';
 
 type LucideIcon = React.ElementType;
 
@@ -21,6 +23,7 @@ interface NavItem {
   to:    string;
   label: string;
   Icon:  LucideIcon;
+  desc?: string;
 }
 
 // Primary bottom-bar items (always visible)
@@ -31,13 +34,25 @@ const NAV_PRIMARY: NavItem[] = [
   { to: '/withdraw',  label: 'Withdraw', Icon: ArrowUpCircle   },
 ];
 
-// Overflow items shown in "More" drawer
-const NAV_MORE: NavItem[] = [
-  { to: '/earnings',  label: 'Earnings',  Icon: DollarSign  },
-  { to: '/plans',     label: 'Plans',     Icon: Star        },
-  { to: '/referrals', label: 'Referrals', Icon: UserPlus    },
-  { to: '/kyc',       label: 'Verify ID', Icon: BadgeCheck  },
-  { to: '/profile',   label: 'Profile',   Icon: User        },
+// Grouped menu items for the full-screen "Menu" page
+const MENU_GROUPS: { title?: string; items: NavItem[] }[] = [
+  {
+    items: [
+      { to: '/earnings',  label: 'Earnings',   Icon: DollarSign, desc: 'View your earnings history'  },
+      { to: '/plans',     label: 'Plans',      Icon: Star,       desc: 'Upgrade your membership'     },
+    ],
+  },
+  {
+    items: [
+      { to: '/referrals', label: 'Referrals',  Icon: UserPlus,   desc: 'Invite friends & earn'       },
+      { to: '/kyc',       label: 'Verify ID',  Icon: BadgeCheck, desc: 'Complete identity check'     },
+    ],
+  },
+  {
+    items: [
+      { to: '/profile',   label: 'Profile',    Icon: User,       desc: 'Manage your account'         },
+    ],
+  },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
@@ -49,8 +64,9 @@ interface BottomNavProps {
 }
 
 export default function BottomNav({ isAdmin = false }: BottomNavProps) {
-  const [showMore, setShowMore] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   if (isAdmin) {
     const item = ADMIN_ITEMS[0];
@@ -67,8 +83,8 @@ export default function BottomNav({ isAdmin = false }: BottomNavProps) {
     );
   }
 
-  function handleMoreItem(to: string) {
-    setShowMore(false);
+  function handleMenuItem(to: string) {
+    setShowMenu(false);
     navigate(to);
   }
 
@@ -89,42 +105,77 @@ export default function BottomNav({ isAdmin = false }: BottomNavProps) {
         ))}
 
         <button
-          className={`bottom-nav-item${showMore ? ' bottom-nav-item--active' : ''}`}
-          onClick={() => setShowMore((v) => !v)}
-          aria-label="More navigation"
-          aria-expanded={showMore}
+          className={`bottom-nav-item${showMenu ? ' bottom-nav-item--active' : ''}`}
+          onClick={() => setShowMenu((v) => !v)}
+          aria-label="Open menu"
+          aria-expanded={showMenu}
         >
           <span className="bottom-nav-icon"><Menu size={22} /></span>
-          <span className="bottom-nav-label">More</span>
+          <span className="bottom-nav-label">Menu</span>
         </button>
       </nav>
 
-      {/* More drawer */}
-      {showMore && (
-        <div className="more-drawer-overlay" onClick={() => setShowMore(false)}>
-          <div className="more-drawer" onClick={(e) => e.stopPropagation()}>
-            <div className="more-drawer-header">
-              <span className="more-drawer-title">More</span>
-              <button
-                className="more-drawer-close"
-                onClick={() => setShowMore(false)}
-                aria-label="Close"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="more-drawer-grid">
-              {NAV_MORE.map(({ to, label, Icon }) => (
-                <button
-                  key={to}
-                  className="more-drawer-item"
-                  onClick={() => handleMoreItem(to)}
-                >
-                  <span className="more-drawer-item-icon"><Icon size={24} /></span>
-                  <span className="more-drawer-item-label">{label}</span>
-                </button>
-              ))}
-            </div>
+      {/* Full-screen menu overlay */}
+      {showMenu && (
+        <div className="menu-screen">
+          {/* Header */}
+          <div className="menu-screen-header">
+            <h2 className="menu-screen-title">Menu</h2>
+            <button
+              className="menu-screen-close"
+              onClick={() => setShowMenu(false)}
+              aria-label="Close menu"
+            >
+              <X size={22} />
+            </button>
+          </div>
+
+          <div className="menu-screen-body">
+            {/* User profile row */}
+            <button
+              className="menu-profile-row"
+              onClick={() => handleMenuItem('/profile')}
+            >
+              <div className="menu-profile-avatar-wrap">
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="Profile" className="menu-profile-avatar" />
+                ) : (
+                  <div className="menu-profile-avatar menu-profile-avatar--initials">
+                    {user?.username?.[0]?.toUpperCase() ?? 'U'}
+                  </div>
+                )}
+              </div>
+              <div className="menu-profile-meta">
+                <span className="menu-profile-name">{user?.username}</span>
+                <span className="menu-profile-sub">
+                  {user?.plan ? `${user.plan} plan` : 'Free plan'} · View profile
+                </span>
+              </div>
+              <ChevronRight size={18} className="menu-row-chevron" />
+            </button>
+
+            {/* Nav groups */}
+            {MENU_GROUPS.map((group, gi) => (
+              <div key={gi} className="menu-group">
+                {group.title && <span className="menu-group-title">{group.title}</span>}
+                <div className="menu-group-card">
+                  {group.items.map(({ to, label, Icon, desc }, ii) => (
+                    <button
+                      key={to}
+                      className={`menu-row${ii < group.items.length - 1 ? ' menu-row--bordered' : ''}`}
+                      onClick={() => handleMenuItem(to)}
+                    >
+                      <span className="menu-row-icon"><Icon size={20} /></span>
+                      <div className="menu-row-body">
+                        <span className="menu-row-label">{label}</span>
+                        {desc && <span className="menu-row-desc">{desc}</span>}
+                      </div>
+                      <ChevronRight size={16} className="menu-row-chevron" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
