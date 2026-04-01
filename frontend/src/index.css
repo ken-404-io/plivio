@@ -2864,6 +2864,44 @@ img { display: block; max-width: 100%; }
 
 .btn-checked-in { opacity: 0.6; }
 
+/* Streak claimed state */
+.streak-claimed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(34,197,94,0.1);
+  border: 1px solid rgba(34,197,94,0.3);
+  color: #22c55e;
+  font-size: 14px;
+  font-weight: 500;
+}
+.streak-claimed-icon { flex-shrink: 0; }
+
+/* Streak task progress bar */
+.streak-task-progress { display: flex; flex-direction: column; gap: 8px; }
+.streak-task-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.streak-task-progress-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.streak-task-progress-label svg { color: #f97316; flex-shrink: 0; }
+.streak-task-progress-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
 /* ─── Coin conversion form ───────────────────────────────────────────────────── */
 .card-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .coins-convert-hint { font-size: 12px; margin-bottom: 14px; }

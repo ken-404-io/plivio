@@ -27,6 +27,16 @@ export async function getCoins(req: Request, res: Response, next: NextFunction):
       (u.streak_broken_at === today ||
         new Date(today).getTime() - new Date(u.streak_broken_at).getTime() <= 86_400_000);
 
+    // Count tasks completed today for streak progress
+    const { rows: taskRows } = await pool.query<{ count: string }>(
+      `SELECT COUNT(*) FROM task_completions
+       WHERE user_id = $1
+         AND status = 'approved'
+         AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
+      [userId],
+    );
+    const todayCompletions = Number(taskRows[0]?.count ?? 0);
+
     res.json({
       success: true,
       coins: Number(u.coins),
@@ -35,6 +45,7 @@ export async function getCoins(req: Request, res: Response, next: NextFunction):
       streak_broken_at: u.streak_broken_at,
       streak_before_break: u.streak_before_break,
       can_recover: canRecover,
+      today_completions: todayCompletions,
     });
   } catch (err) {
     next(err);

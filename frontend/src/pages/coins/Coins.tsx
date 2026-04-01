@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Plus,
   Minus,
+  CheckCircle2,
 } from 'lucide-react';
 
 // ─── Streak Recovery Modal ────────────────────────────────────────────────────
@@ -105,7 +106,6 @@ export default function Coins() {
   const [info,     setInfo]     = useState<CoinsResponse | null>(null);
   const [txList,   setTxList]   = useState<CoinTransaction[]>([]);
   const [loading,  setLoading]  = useState(true);
-  const [checking, setChecking] = useState(false);
   const [converting, setConverting] = useState(false);
   const [amount,   setAmount]   = useState('');
   const [showRecovery, setShowRecovery] = useState(false);
@@ -132,38 +132,6 @@ export default function Coins() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
-
-  async function handleCheckIn() {
-    setChecking(true);
-    try {
-      const { data } = await api.post<{
-        success: boolean;
-        already_checked_in?: boolean;
-        streak_count: number;
-        coins_awarded: number;
-        bonus_day: boolean;
-        streak_broken?: boolean;
-        message?: string;
-      }>('/coins/checkin');
-
-      if (data.already_checked_in) {
-        toast.info(data.message ?? 'Already checked in today.');
-      } else if (data.bonus_day) {
-        toast.success(`Day ${data.streak_count} streak! +50 coins bonus!`);
-      } else if (data.streak_broken) {
-        toast.warning('Streak broken — new streak started.');
-      } else {
-        toast.success(`Day ${data.streak_count} streak! Keep it up.`);
-      }
-      await load();
-      fetchMe();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Check-in failed.');
-    } finally {
-      setChecking(false);
-    }
-  }
 
   async function handleConvert(e: React.FormEvent) {
     e.preventDefault();
@@ -215,6 +183,8 @@ export default function Coins() {
 
   const today = new Date().toISOString().slice(0, 10);
   const checkedInToday = info?.last_streak_date === today;
+  const todayCompletions = info?.today_completions ?? 0;
+  const STREAK_TASK_GOAL = 5;
 
   return (
     <>
@@ -282,14 +252,31 @@ export default function Coins() {
             </div>
           </div>
 
-          <button
-            className={`btn btn-primary btn-full${checkedInToday ? ' btn-checked-in' : ''}`}
-            onClick={() => { void handleCheckIn(); }}
-            disabled={checking || checkedInToday}
-          >
-            <Flame size={16} />
-            {checkedInToday ? 'Checked In Today' : checking ? 'Checking in…' : 'Check In'}
-          </button>
+          {/* Task progress → auto check-in at 5 tasks */}
+          {checkedInToday ? (
+            <div className="streak-claimed">
+              <CheckCircle2 size={18} className="streak-claimed-icon" />
+              <span>Streak earned today! Come back tomorrow.</span>
+            </div>
+          ) : (
+            <div className="streak-task-progress">
+              <div className="streak-task-progress-row">
+                <span className="streak-task-progress-label">
+                  <Flame size={14} />
+                  Complete {STREAK_TASK_GOAL} tasks to earn today's streak
+                </span>
+                <span className="streak-task-progress-count">
+                  {todayCompletions}/{STREAK_TASK_GOAL}
+                </span>
+              </div>
+              <div className="streak-progress-bar">
+                <div
+                  className="streak-progress-fill"
+                  style={{ width: `${Math.min(100, (todayCompletions / STREAK_TASK_GOAL) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Convert coins ── */}

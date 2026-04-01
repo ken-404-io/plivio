@@ -44,6 +44,7 @@ export interface CoinsResponse {
   streak_broken_at: string | null;
   streak_before_break: number;
   can_recover: boolean;
+  today_completions: number;
 }
 
 export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected';
