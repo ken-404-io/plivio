@@ -62,7 +62,8 @@ export default function AdminDashboard() {
       }
     }
     void load();
-  }, [toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function toggleBan(userId: string, isBanned: boolean) {
     try {
