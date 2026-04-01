@@ -4,6 +4,8 @@ import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { Subscription, PlansResponse, PlanInfo } from '../../types/index.ts';
 
+const PLAN_ORDER = ['free', 'premium', 'elite'];
+
 export default function Plans() {
   const { user, fetchMe } = useAuth();
   const toast             = useToast();
@@ -33,14 +35,10 @@ export default function Plans() {
         '/subscriptions/checkout',
         { plan: planKey, duration_days: 30 },
       );
-
       if (data.demo || !data.checkout_url) {
-        // PayMongo not configured — show informational message
         toast.error('Payment gateway not configured yet. Please contact admin.');
         return;
       }
-
-      // Redirect user to PayMongo's hosted payment page
       window.location.href = data.checkout_url;
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
@@ -50,9 +48,8 @@ export default function Plans() {
     }
   }
 
-  // Show success/failure message after returning from PayMongo
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params  = new URLSearchParams(window.location.search);
     const payment = params.get('payment');
     if (payment === 'success') {
       toast.success('Payment received! Your plan will activate shortly.');
@@ -67,71 +64,78 @@ export default function Plans() {
 
   if (loading) return <div className="page-loading"><div className="spinner" /></div>;
 
+  const sortedPlans = PLAN_ORDER
+    .filter((k) => k in plans)
+    .map((k) => [k, plans[k]] as [string, PlanInfo]);
+
   return (
     <div className="page">
       <header className="page-header">
         <div>
-          <h1 className="page-title">Subscription Plans</h1>
+          <h1 className="page-title">Plans</h1>
           <p className="page-subtitle">
-            Current plan: <strong>{user?.plan?.toUpperCase()}</strong>
+            Current: <strong>{user?.plan?.toUpperCase()}</strong>
             {sub && ` · Active until ${new Date(sub.expires_at).toLocaleDateString('en-PH')}`}
           </p>
         </div>
       </header>
 
-      <div className="plans-grid">
-        {Object.entries(plans).map(([key, plan]) => {
-          const isCurrent = user?.plan === key;
-          const isActive  = sub?.plan === key;
+      <div className="plans-scroll-wrap">
+        <div className="plans-grid">
+          {sortedPlans.map(([key, plan]) => {
+            const isCurrent = user?.plan === key;
+            const isActive  = sub?.plan === key;
+            const featured  = key === 'premium';
 
-          return (
-            <div key={key} className={`plan-card${key === 'elite' ? ' plan-card--featured' : ''}`}>
-              {key === 'elite' && <div className="plan-badge-top">Most Popular</div>}
+            return (
+              <div key={key} className={`plan-card${featured ? ' plan-card--featured' : ''}`}>
+                {featured && <div className="plan-badge-top">Most Popular</div>}
 
-              <div className="plan-header">
-                <h2 className="plan-name">{plan.name}</h2>
-                <div className="plan-price">
-                  {plan.price_php === 0 ? (
-                    <span className="price-free">Free</span>
+                <div className="plan-header">
+                  <h2 className="plan-name">{plan.name}</h2>
+                  <div className="plan-price">
+                    {plan.price_php === 0 ? (
+                      <span className="price-free">Free</span>
+                    ) : (
+                      <>
+                        <span className="price-currency">₱</span>
+                        <span className="price-amount">{plan.price_php}</span>
+                        <span className="price-period">/mo</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <ul className="plan-features">
+                  {plan.features.map((f) => (
+                    <li key={f}>
+                      <span className="feature-check" aria-hidden="true">✓</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="plan-action">
+                  {key === 'free' ? (
+                    <button className="btn btn-outline btn-full" disabled>
+                      {isCurrent ? 'Current plan' : 'Free forever'}
+                    </button>
+                  ) : isCurrent && isActive ? (
+                    <button className="btn btn-outline btn-full" disabled>Active</button>
                   ) : (
-                    <>
-                      <span className="price-currency">₱</span>
-                      <span className="price-amount">{plan.price_php}</span>
-                      <span className="price-period">/mo</span>
-                    </>
+                    <button
+                      className="btn btn-primary btn-full"
+                      onClick={() => { void handleSubscribe(key); }}
+                      disabled={!!subscribing}
+                    >
+                      {subscribing === key ? 'Activating…' : `Get ${plan.name}`}
+                    </button>
                   )}
                 </div>
               </div>
-
-              <ul className="plan-features">
-                {plan.features.map((f) => (
-                  <li key={f}>
-                    <span className="feature-check" aria-hidden="true">✓</span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <div className="plan-action">
-                {key === 'free' ? (
-                  <button className="btn btn-outline btn-full" disabled>
-                    {isCurrent ? 'Current plan' : 'Free forever'}
-                  </button>
-                ) : isCurrent && isActive ? (
-                  <button className="btn btn-outline btn-full" disabled>Active</button>
-                ) : (
-                  <button
-                    className="btn btn-primary btn-full"
-                    onClick={() => { void handleSubscribe(key); }}
-                    disabled={!!subscribing}
-                  >
-                    {subscribing === key ? 'Activating…' : `Get ${plan.name}`}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -945,17 +945,42 @@
 
 @media (max-width: 480px) {
   .lp-hero-title {
-    font-size: 32px;
+    font-size: 30px;
     letter-spacing: -0.8px;
   }
 
+  /* Hero: hide bolt visual on very small screens to give content room */
+  .lp-hero-visual { display: none; }
+
+  .lp-hero {
+    padding: 40px 16px 36px;
+    min-height: auto;
+    text-align: center;
+    align-items: center;
+  }
+
+  .lp-hero-content {
+    align-items: center;
+    gap: 18px;
+  }
+
+  .lp-hero-subtitle { font-size: 15px; }
+
   .lp-hero-form {
     flex-direction: column;
+    width: 100%;
   }
 
   .lp-hero-input,
   .lp-hero-btn {
     width: 100%;
+    min-width: unset;
+  }
+
+  .lp-hero-stats {
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .lp-plans-grid {
@@ -967,6 +992,23 @@
   }
 
   .lp-section {
-    padding: 64px 16px;
+    padding: 56px 16px;
   }
+
+  .lp-section-title { font-size: 26px; }
+
+  .lp-certs-grid { grid-template-columns: 1fr; }
+
+  /* Footer compact on mobile */
+  .lp-footer { padding: 40px 16px 24px; }
+  .lp-footer-inner { flex-direction: column; gap: 28px; }
+  .lp-footer-links { flex-direction: column; gap: 20px; }
+  .lp-footer-col { gap: 8px; }
+
+  /* CTA banner compact */
+  .lp-cta-inner { padding: 40px 20px; }
+  .lp-cta-title { font-size: 24px; }
+
+  /* Nav inner tighter */
+  .lp-nav-inner { padding: 0 16px; }
 }

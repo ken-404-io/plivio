@@ -12,6 +12,11 @@ const STATUS_LABEL: Record<string, string> = {
   rejected:   'Rejected',
 };
 
+const METHOD_ICON: Record<string, string> = {
+  gcash:  '📱',
+  paypal: '🅿️',
+};
+
 export default function Withdraw() {
   const { user, fetchMe } = useAuth();
   const toast             = useToast();
@@ -51,7 +56,7 @@ export default function Withdraw() {
     }
   }
 
-  const kycStatus = user?.kyc_status ?? 'none';
+  const kycStatus  = user?.kyc_status ?? 'none';
   const kycBlocked = kycStatus !== 'approved';
 
   return (
@@ -73,95 +78,113 @@ export default function Withdraw() {
           </svg>
           <div>
             {kycStatus === 'pending' ? (
-              <><strong>KYC under review.</strong> Withdrawals will be enabled once your identity is verified.</>
+              <><strong>KYC under review.</strong> Withdrawals will be enabled once verified.</>
             ) : kycStatus === 'rejected' ? (
-              <><strong>KYC rejected.</strong> Please resubmit your documents. <Link to="/kyc">Update KYC →</Link></>
+              <><strong>KYC rejected.</strong> <Link to="/kyc">Resubmit documents →</Link></>
             ) : (
-              <><strong>Identity verification required.</strong> You must complete KYC before withdrawing. <Link to="/kyc">Verify now →</Link></>
+              <><strong>Verification required.</strong> <Link to="/kyc">Complete KYC to withdraw →</Link></>
             )}
           </div>
         </div>
       )}
 
-      <div className="two-col">
-        <section className="card">
-          <h2 className="card-title">New request</h2>
-          <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
-            <div className="form-group">
-              <label className="form-label" htmlFor="method">Method</label>
-              <select
-                id="method"
-                className="form-input"
-                value={form.method}
-                onChange={(e) => setForm((f) => ({ ...f, method: e.target.value }))}
-              >
-                <option value="gcash">GCash</option>
-                <option value="paypal">PayPal</option>
-              </select>
-            </div>
+      {/* Balance pill */}
+      <div className="withdraw-balance-card">
+        <div className="withdraw-balance-left">
+          <span className="withdraw-balance-label">Available to withdraw</span>
+          <span className="withdraw-balance-value">₱{Number(user?.balance ?? 0).toFixed(2)}</span>
+        </div>
+        <div className="withdraw-balance-right">
+          <span className="withdraw-min-note">Min ₱50 · Max ₱5,000</span>
+        </div>
+      </div>
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="amount">Amount (₱50 – ₱5,000)</label>
+      {/* Request form */}
+      <section className="card">
+        <h2 className="card-title">New withdrawal request</h2>
+        <form onSubmit={(e) => { void handleSubmit(e); }} noValidate className="withdraw-form">
+          <div className="withdraw-method-grid">
+            {['gcash', 'paypal'].map((m) => (
+              <label key={m} className={`withdraw-method-option${form.method === m ? ' withdraw-method-option--active' : ''}`}>
+                <input
+                  type="radio"
+                  name="method"
+                  value={m}
+                  checked={form.method === m}
+                  onChange={() => setForm((f) => ({ ...f, method: m }))}
+                  className="sr-only"
+                />
+                <span className="withdraw-method-icon">{METHOD_ICON[m]}</span>
+                <span className="withdraw-method-label">{m.toUpperCase()}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="amount">Amount (₱)</label>
+            <div className="withdraw-amount-wrap">
+              <span className="withdraw-amount-prefix">₱</span>
               <input
                 id="amount"
                 type="number"
-                className="form-input"
+                className="form-input withdraw-amount-input"
                 value={form.amount}
                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                min={50}
-                max={5000}
-                step={1}
+                min={50} max={5000} step={1}
                 placeholder="0.00"
                 required
               />
             </div>
+          </div>
 
-            <button
-              type="submit"
-              className="btn btn-primary btn-full"
-              disabled={submitting || !form.amount || kycBlocked}
-            >
-              {submitting ? 'Submitting…' : 'Request withdrawal'}
-            </button>
-            {kycBlocked && (
-              <p className="text-muted" style={{ fontSize: 13, marginTop: 8 }}>
-                Complete KYC verification to enable withdrawals.
-              </p>
-            )}
-          </form>
-        </section>
+          <button
+            type="submit"
+            className="btn btn-primary btn-full"
+            disabled={submitting || !form.amount || kycBlocked}
+          >
+            {submitting ? 'Submitting…' : 'Request withdrawal'}
+          </button>
+        </form>
+      </section>
 
-        <section className="card">
-          <h2 className="card-title">Withdrawal history</h2>
-          {history.length === 0 ? (
-            <p className="text-muted">No withdrawals yet.</p>
-          ) : (
-            <div className="table-wrapper">
-              <table className="table">
-                <thead>
-                  <tr><th>Method</th><th>Amount</th><th>Status</th><th>Date</th></tr>
-                </thead>
-                <tbody>
-                  {history.map((w) => (
-                    <tr key={w.id}>
-                      <td>{w.method.toUpperCase()}</td>
-                      <td>₱{Number(w.amount).toFixed(2)}</td>
-                      <td>
-                        <span className={`status-dot status-dot--${w.status}`}>
-                          {STATUS_LABEL[w.status] ?? w.status}
-                        </span>
-                      </td>
-                      <td className="text-muted">
-                        {new Date(w.requested_at).toLocaleDateString('en-PH')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </div>
+      {/* History */}
+      <section className="section">
+        <div className="section-header">
+          <h2 className="section-title">Withdrawal history</h2>
+        </div>
+
+        {history.length === 0 ? (
+          <div className="empty-state">
+            <p>No withdrawals yet.</p>
+          </div>
+        ) : (
+          <div className="earnings-list">
+            {history.map((w) => (
+              <div key={w.id} className="earning-row">
+                <div className="earning-row-icon">
+                  {METHOD_ICON[w.method] ?? '💸'}
+                </div>
+                <div className="earning-row-body">
+                  <p className="earning-row-title">{w.method.toUpperCase()} Withdrawal</p>
+                  <div className="earning-row-meta">
+                    <span className={`status-dot status-dot--${w.status}`}>
+                      {STATUS_LABEL[w.status] ?? w.status}
+                    </span>
+                    <span className="earning-row-date">
+                      {new Date(w.requested_at).toLocaleDateString('en-PH', {
+                        month: 'short', day: 'numeric', year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <span className="earning-row-amount" style={{ color: 'var(--text-heading)' }}>
+                  ₱{Number(w.amount).toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
