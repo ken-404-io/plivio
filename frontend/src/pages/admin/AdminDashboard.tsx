@@ -100,9 +100,9 @@ export default function AdminDashboard() {
   }
 
   // Ad network state — keyed by task id
-  const [adNetworks,    setAdNetworks]    = useState<Record<string, AdNetwork[]>>({});
-  const [adDrafts,      setAdDrafts]      = useState<Record<string, AdNetworkDraft[]>>({});
-  const [savingAds,     setSavingAds]     = useState<string | null>(null);
+  const [adNetworks, setAdNetworks] = useState<Record<string, AdNetwork[]>>({});
+  const [adDrafts,   setAdDrafts]   = useState<Record<string, AdNetworkDraft[]>>({});
+  const [savingAds,  setSavingAds]  = useState<string | null>(null);
 
   function getNetworksForTask(taskId: string): AdNetworkDraft[] {
     return adDrafts[taskId] ?? adNetworks[taskId]?.map((n) => ({ ...n })) ?? [];
@@ -113,8 +113,7 @@ export default function AdminDashboard() {
   }
 
   function addNetwork(taskId: string) {
-    const nets = getNetworksForTask(taskId);
-    setNetworksForTask(taskId, [...nets, emptyDraft()]);
+    setNetworksForTask(taskId, [...getNetworksForTask(taskId), emptyDraft()]);
   }
 
   function removeNetwork(taskId: string, idx: number) {
@@ -190,6 +189,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      {/* ── Overview ── */}
       {tab === 'overview' && stats && (
         <div className="stats-grid">
           <div className="stat-card">
@@ -212,44 +212,45 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ── Users ── */}
       {tab === 'users' && (
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr><th>Username</th><th>Email</th><th>Plan</th><th>Balance</th><th>Status</th><th>Action</th></tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td>{u.username}</td>
-                  <td className="text-muted">{u.email}</td>
-                  <td><span className={`plan-badge plan-badge--${u.plan}`}>{u.plan.toUpperCase()}</span></td>
-                  <td>₱{Number(u.balance).toFixed(2)}</td>
-                  <td>
-                    <span className={`status-dot status-dot--${u.is_banned ? 'rejected' : 'approved'}`}>
-                      {u.is_banned ? 'Banned' : 'Active'}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className={`btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={() => { void toggleBan(u.id, u.is_banned); }}
-                    >
-                      {u.is_banned ? 'Unban' : 'Ban'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="admin-list">
+          {users.length === 0 ? (
+            <div className="empty-state"><p>No users found.</p></div>
+          ) : users.map((u) => (
+            <div key={u.id} className="admin-card">
+              <div className="admin-card-body">
+                <div className="admin-card-main">
+                  <span className="admin-card-title">{u.username}</span>
+                  <span className="admin-card-sub">{u.email}</span>
+                </div>
+                <div className="admin-card-meta">
+                  <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan.toUpperCase()}</span>
+                  <span className="admin-card-balance">₱{Number(u.balance).toFixed(2)}</span>
+                  <span className={`status-dot status-dot--${u.is_banned ? 'rejected' : 'approved'}`}>
+                    {u.is_banned ? 'Banned' : 'Active'}
+                  </span>
+                </div>
+              </div>
+              <div className="admin-card-actions">
+                <button
+                  className={`btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => { void toggleBan(u.id, u.is_banned); }}
+                >
+                  {u.is_banned ? 'Unban' : 'Ban'}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
+      {/* ── Tasks ── */}
       {tab === 'tasks' && (
         <>
-          <section className="card mb-4">
+          <section className="card" style={{ marginBottom: 16 }}>
             <h2 className="card-title">Create task</h2>
-            <form onSubmit={(e) => { void createTask(e); }} className="form-row">
+            <form onSubmit={(e) => { void createTask(e); }} className="admin-task-form">
               <input
                 className="form-input"
                 placeholder="Task title"
@@ -287,43 +288,45 @@ export default function AdminDashboard() {
                 <option value="premium">Premium+</option>
                 <option value="elite">Elite only</option>
               </select>
-              <button type="submit" className="btn btn-primary">Add Task</button>
+              <button type="submit" className="btn btn-primary btn-full">Add Task</button>
             </form>
           </section>
 
-          <div className="table-wrapper">
-            <table className="table">
-              <thead>
-                <tr><th>Title</th><th>Type</th><th>Reward</th><th>Min Plan</th><th>Status</th><th>Action</th></tr>
-              </thead>
-              <tbody>
-                {tasks.map((t) => (
-                  <tr key={t.id}>
-                    <td>{t.title}</td>
-                    <td><span className="badge">{t.type}</span></td>
-                    <td>₱{Number(t.reward_amount).toFixed(2)}</td>
-                    <td>{t.min_plan}</td>
-                    <td>
-                      <span className={`status-dot status-dot--${t.is_active ? 'approved' : 'rejected'}`}>
-                        {t.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        onClick={() => { void toggleTask(t.id, t.is_active); }}
-                      >
-                        {t.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="admin-list">
+            {tasks.length === 0 ? (
+              <div className="empty-state"><p>No tasks yet.</p></div>
+            ) : tasks.map((t) => (
+              <div key={t.id} className="admin-card">
+                <div className="admin-card-body">
+                  <div className="admin-card-main">
+                    <span className="admin-card-title">{t.title}</span>
+                    <div className="admin-card-meta" style={{ marginTop: 4 }}>
+                      <span className="badge">{t.type}</span>
+                      <span className="text-muted" style={{ fontSize: 12 }}>{t.min_plan}</span>
+                    </div>
+                  </div>
+                  <div className="admin-card-right">
+                    <span className="admin-card-balance">₱{Number(t.reward_amount).toFixed(2)}</span>
+                    <span className={`status-dot status-dot--${t.is_active ? 'approved' : 'rejected'}`}>
+                      {t.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </div>
+                <div className="admin-card-actions">
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => { void toggleTask(t.id, t.is_active); }}
+                  >
+                    {t.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}
 
+      {/* ── Ads ── */}
       {tab === 'ads' && (
         <div className="ads-tab">
           <p className="ads-tab-hint text-muted">
@@ -418,87 +421,83 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ── Withdrawals ── */}
+      {tab === 'withdrawals' && (
+        <div className="admin-list">
+          {withdrawals.length === 0 ? (
+            <div className="empty-state"><p>No pending withdrawals.</p></div>
+          ) : withdrawals.map((w) => (
+            <div key={w.id} className="admin-card">
+              <div className="admin-card-body">
+                <div className="admin-card-main">
+                  <span className="admin-card-title">{w.username}</span>
+                  <span className="admin-card-sub">
+                    {w.method.toUpperCase()} · {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+                <span className="admin-card-amount">₱{Number(w.amount).toFixed(2)}</span>
+              </div>
+              <div className="admin-card-actions">
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => { void processWithdrawal(w.id, 'approve'); }}
+                >
+                  Approve
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => { void processWithdrawal(w.id, 'reject'); }}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── KYC ── */}
       {tab === 'kyc' && (
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr><th>User</th><th>ID Type</th><th>Submitted</th><th>Status</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-              {kycList.length === 0 ? (
-                <tr><td colSpan={5} className="text-center text-muted">No pending KYC submissions</td></tr>
-              ) : kycList.map((k) => (
-                <tr key={k.id}>
-                  <td>
-                    <div>{k.username}</div>
-                    <div className="text-muted" style={{ fontSize: 12 }}>{k.email}</div>
-                  </td>
-                  <td>{k.id_type.replace('_', ' ')}</td>
-                  <td className="text-muted">{new Date(k.submitted_at).toLocaleDateString('en-PH')}</td>
-                  <td>
+        <div className="admin-list">
+          {kycList.length === 0 ? (
+            <div className="empty-state"><p>No pending KYC submissions.</p></div>
+          ) : kycList.map((k) => (
+            <div key={k.id} className="admin-card">
+              <div className="admin-card-body">
+                <div className="admin-card-main">
+                  <span className="admin-card-title">{k.username}</span>
+                  <span className="admin-card-sub">{k.email}</span>
+                  <div className="admin-card-meta" style={{ marginTop: 4 }}>
+                    <span className="text-muted" style={{ fontSize: 12 }}>
+                      {k.id_type.replace('_', ' ')} · {new Date(k.submitted_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
                     <span className={`badge ${
                       k.status === 'approved' ? 'badge--success' :
                       k.status === 'rejected' ? 'badge--error' :
                       k.status === 'pending'  ? 'badge--warning' : ''
                     }`}>{k.status}</span>
-                  </td>
-                  <td className="action-cell">
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => { void reviewKyc(k.id, 'approve'); }}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => {
-                        const reason = window.prompt('Rejection reason (shown to user):');
-                        if (reason !== null) void reviewKyc(k.id, 'reject', reason);
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {tab === 'withdrawals' && (
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr><th>User</th><th>Amount</th><th>Method</th><th>Requested</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-              {withdrawals.length === 0 ? (
-                <tr><td colSpan={5} className="text-center text-muted">No pending withdrawals</td></tr>
-              ) : withdrawals.map((w) => (
-                <tr key={w.id}>
-                  <td>{w.username}</td>
-                  <td>₱{Number(w.amount).toFixed(2)}</td>
-                  <td>{w.method.toUpperCase()}</td>
-                  <td className="text-muted">{new Date(w.requested_at).toLocaleDateString('en-PH')}</td>
-                  <td className="action-cell">
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => { void processWithdrawal(w.id, 'approve'); }}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => { void processWithdrawal(w.id, 'reject'); }}
-                    >
-                      Reject
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              </div>
+              <div className="admin-card-actions">
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => { void reviewKyc(k.id, 'approve'); }}
+                >
+                  Approve
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => {
+                    const reason = window.prompt('Rejection reason (shown to user):');
+                    if (reason !== null) void reviewKyc(k.id, 'reject', reason);
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
