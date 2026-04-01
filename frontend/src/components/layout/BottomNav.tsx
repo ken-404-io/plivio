@@ -4,14 +4,14 @@ import {
   LayoutDashboard,
   CheckSquare,
   ArrowUpCircle,
-  User,
   Settings,
   Coins,
-  MoreHorizontal,
+  Menu,
   DollarSign,
   Star,
   UserPlus,
   BadgeCheck,
+  User,
   X,
 } from 'lucide-react';
 
@@ -29,7 +29,6 @@ const NAV_PRIMARY: NavItem[] = [
   { to: '/tasks',     label: 'Tasks',    Icon: CheckSquare     },
   { to: '/coins',     label: 'Coins',    Icon: Coins           },
   { to: '/withdraw',  label: 'Withdraw', Icon: ArrowUpCircle   },
-  { to: '/profile',   label: 'Profile',  Icon: User            },
 ];
 
 // Overflow items shown in "More" drawer
@@ -38,6 +37,7 @@ const NAV_MORE: NavItem[] = [
   { to: '/plans',     label: 'Plans',     Icon: Star        },
   { to: '/referrals', label: 'Referrals', Icon: UserPlus    },
   { to: '/kyc',       label: 'Verify ID', Icon: BadgeCheck  },
+  { to: '/profile',   label: 'Profile',   Icon: User        },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
@@ -94,7 +94,7 @@ export default function BottomNav({ isAdmin = false }: BottomNavProps) {
           aria-label="More navigation"
           aria-expanded={showMore}
         >
-          <span className="bottom-nav-icon"><MoreHorizontal size={22} /></span>
+          <span className="bottom-nav-icon"><Menu size={22} /></span>
           <span className="bottom-nav-label">More</span>
         </button>
       </nav>

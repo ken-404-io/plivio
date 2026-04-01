@@ -1966,7 +1966,7 @@ img { display: block; max-width: 100%; }
   flex-shrink: 0;
 }
 
-/* ─── Topbar (notification bell row) ─────────────────────────────────────────── */
+/* ─── Topbar ──────────────────────────────────────────────────────────────────── */
 .topbar {
   display: flex;
   justify-content: flex-end;
@@ -1986,6 +1986,76 @@ img { display: block; max-width: 100%; }
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Mobile-only topbar elements (hidden on desktop) */
+.topbar-mobile-left {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.topbar-avatar-wrap {
+  display: block;
+  flex-shrink: 0;
+}
+.topbar-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+}
+.topbar-avatar--initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+}
+.topbar-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1.5px solid var(--accent-border);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: capitalize;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.topbar-stats {
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+.topbar-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-heading);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.topbar-stat-pill:hover { background: var(--accent-light); }
+.topbar-stat-pill--streak { color: #f97316; }
+.topbar-stat-pill--streak svg { flex-shrink: 0; }
+.topbar-stat-pill--balance .topbar-stat-currency {
+  font-size: 10px;
+  opacity: 0.7;
 }
 
 /* ─── Notification bell ───────────────────────────────────────────────────────── */
@@ -2398,9 +2468,11 @@ img { display: block; max-width: 100%; }
   /* Page inner padding on mobile */
   .page { gap: 14px; padding: 0 16px; }
 
-  /* Topbar on mobile: show brand, compact padding */
-  .topbar { padding: 14px 16px 0; }
-  .topbar-brand { display: block; }
+  /* Topbar on mobile: rich header */
+  .topbar { padding: 12px 16px 8px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .topbar-brand { display: none; }
+  .topbar-mobile-left { display: flex; }
+  .topbar-stats { display: flex; }
 
   /* Page title smaller on mobile */
   .page-title { font-size: 20px; }
