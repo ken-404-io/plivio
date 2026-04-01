@@ -6,6 +6,7 @@ import BottomNav         from './BottomNav.tsx';
 import NotificationBell  from '../common/NotificationBell.tsx';
 import OnboardingModal, { hasCompletedOnboarding } from '../common/OnboardingModal.tsx';
 import { useAuth }       from '../../store/authStore.tsx';
+import { usePushNotifications } from '../../hooks/usePushNotifications.ts';
 
 interface LayoutProps {
   isAdmin?: boolean;
@@ -14,6 +15,7 @@ interface LayoutProps {
 export default function Layout({ isAdmin = false }: LayoutProps) {
   const { user } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  usePushNotifications(user?.id);
 
   // Show onboarding once per user, only for non-admin accounts
   useEffect(() => {

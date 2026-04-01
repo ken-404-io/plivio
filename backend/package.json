@@ -29,7 +29,8 @@
     "speakeasy": "^2.0.0",
     "tsx": "^4.19.4",
     "typescript": "^5.7.3",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
@@ -43,6 +44,7 @@
     "@types/pg": "^8.20.0",
     "@types/qrcode": "^1.5.5",
     "@types/speakeasy": "^2.0.10",
+    "@types/web-push": "^3.6.4",
     "nodemon": "^3.1.14"
   }
 }
