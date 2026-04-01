@@ -3,6 +3,7 @@ import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { KycStatus } from '../../types/index.ts';
+import { ClipboardList, Clock, CheckCircle2, XCircle, FileText, Camera } from 'lucide-react';
 
 const ID_TYPES = [
   { value: 'passport',        label: 'Passport' },
@@ -22,11 +23,11 @@ interface KycStatusData {
   rejection_reason: string | null;
 }
 
-const STATUS_CONFIG: Record<KycStatus, { label: string; cls: string; icon: string }> = {
-  none:     { label: 'Not submitted', cls: '',               icon: '📋' },
-  pending:  { label: 'Under review',  cls: 'badge--warning', icon: '⏳' },
-  approved: { label: 'Approved',      cls: 'badge--success', icon: '✅' },
-  rejected: { label: 'Rejected',      cls: 'badge--error',   icon: '❌' },
+const STATUS_CONFIG: Record<KycStatus, { label: string; cls: string; Icon: React.ElementType }> = {
+  none:     { label: 'Not submitted', cls: '',               Icon: ClipboardList  },
+  pending:  { label: 'Under review',  cls: 'badge--warning', Icon: Clock         },
+  approved: { label: 'Approved',      cls: 'badge--success', Icon: CheckCircle2  },
+  rejected: { label: 'Rejected',      cls: 'badge--error',   Icon: XCircle       },
 };
 
 export default function Kyc() {
@@ -102,7 +103,7 @@ export default function Kyc() {
 
       {/* Status banner */}
       <div className="kyc-status-banner">
-        <span className="kyc-status-banner-icon">{cfg.icon}</span>
+        <span className="kyc-status-banner-icon"><cfg.Icon size={22} /></span>
         <div className="kyc-status-banner-body">
           <p className="kyc-status-banner-title">
             Verification status: <span className={`badge ${cfg.cls}`}>{cfg.label}</span>
@@ -122,12 +123,12 @@ export default function Kyc() {
       )}
       {currentStatus === 'approved' && (
         <div className="alert alert--success">
-          ✅ Identity verified. You can now withdraw your earnings.
+          Identity verified. You can now withdraw your earnings.
         </div>
       )}
       {currentStatus === 'pending' && (
         <div className="alert alert--info">
-          ⏳ Your documents are under review. This typically takes 1–3 business days.
+          Your documents are under review. This typically takes 1–3 business days.
         </div>
       )}
 
@@ -172,7 +173,7 @@ export default function Kyc() {
                 >
                   {idFront ? (
                     <>
-                      <span style={{ fontSize: 24 }}>📄</span>
+                      <FileText size={24} />
                       <p className="kyc-upload-filename">{idFront.name}</p>
                       <span className="kyc-upload-change">Tap to change</span>
                     </>
@@ -205,7 +206,7 @@ export default function Kyc() {
                 >
                   {idSelfie ? (
                     <>
-                      <span style={{ fontSize: 24 }}>🤳</span>
+                      <Camera size={24} />
                       <p className="kyc-upload-filename">{idSelfie.name}</p>
                       <span className="kyc-upload-change">Tap to change</span>
                     </>

@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api.ts';
 import type { EarningsResponse, Earning } from '../../types/index.ts';
+import {
+  ShieldCheck,
+  Play,
+  MousePointerClick,
+  ClipboardList,
+  Users,
+  Zap,
+} from 'lucide-react';
 
 const STATUS_LABEL: Record<string, string> = {
   pending:  'Pending',
@@ -8,18 +16,22 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: 'Rejected',
 };
 
-const TYPE_ICON: Record<string, string> = {
-  captcha:  '🔐',
-  video:    '▶️',
-  ad_click: '👆',
-  survey:   '📝',
-  referral: '👥',
-};
+function EarningTypeIcon({ type }: { type: string }) {
+  const size = 16;
+  if (type === 'captcha')  return <ShieldCheck size={size} />;
+  if (type === 'video')    return <Play size={size} />;
+  if (type === 'ad_click') return <MousePointerClick size={size} />;
+  if (type === 'survey')   return <ClipboardList size={size} />;
+  if (type === 'referral') return <Users size={size} />;
+  return <Zap size={size} />;
+}
 
 function EarningCard({ row }: { row: Earning }) {
   return (
     <div className="earning-row">
-      <div className="earning-row-icon">{TYPE_ICON[row.type] ?? '⚡'}</div>
+      <div className="earning-row-icon">
+        <EarningTypeIcon type={row.type} />
+      </div>
       <div className="earning-row-body">
         <p className="earning-row-title">{row.title}</p>
         <div className="earning-row-meta">
@@ -58,10 +70,8 @@ export default function Earnings() {
     <div className="page">
       <header className="page-header">
         <div>
-          <h1 className="page-title">Earnings History</h1>
-          {total > 0 && (
-            <p className="page-subtitle">{total} transaction{total !== 1 ? 's' : ''} total</p>
-          )}
+          <h1 className="page-title">Earnings</h1>
+          <p className="page-subtitle">{total} total transaction{total !== 1 ? 's' : ''}</p>
         </div>
       </header>
 
@@ -69,35 +79,32 @@ export default function Earnings() {
         <div className="page-loading"><div className="spinner" /></div>
       ) : data.data.length === 0 ? (
         <div className="empty-state">
-          <p>No earnings recorded yet.</p>
-          <p className="text-muted" style={{ marginTop: 6, fontSize: 13 }}>Complete tasks to start earning.</p>
+          <p>No earnings yet. Complete tasks to start earning.</p>
         </div>
       ) : (
-        <>
-          <div className="earnings-list">
-            {data.data.map((row) => <EarningCard key={row.id} row={row} />)}
-          </div>
+        <div className="earnings-list">
+          {data.data.map((row) => <EarningCard key={row.id} row={row} />)}
+        </div>
+      )}
 
-          {totalPages > 1 && (
-            <div className="pagination">
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                ← Prev
-              </button>
-              <span className="pagination-info">Page {page} of {totalPages}</span>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                Next →
-              </button>
-            </div>
-          )}
-        </>
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button
+            className="btn btn-ghost btn-sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Previous
+          </button>
+          <span className="pagination-info">{page} / {totalPages}</span>
+          <button
+            className="btn btn-ghost btn-sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </button>
+        </div>
       )}
     </div>
   );

@@ -1,25 +1,40 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
+import {
+  LayoutDashboard,
+  CheckSquare,
+  DollarSign,
+  ArrowUpCircle,
+  Star,
+  UserPlus,
+  BadgeCheck,
+  User,
+  Settings,
+  Coins,
+} from 'lucide-react';
+
+type LucideIcon = React.ElementType;
 
 interface NavItem {
   to:    string;
   label: string;
-  icon:  string;
+  Icon:  LucideIcon;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { to: '/tasks',     label: 'Tasks',     icon: '✓' },
-  { to: '/earnings',  label: 'Earnings',  icon: '₱' },
-  { to: '/withdraw',  label: 'Withdraw',  icon: '↑' },
-  { to: '/plans',     label: 'Plans',     icon: '★' },
-  { to: '/referrals', label: 'Referrals', icon: '↗' },
-  { to: '/kyc',       label: 'Verify ID', icon: '🪪' },
-  { to: '/profile',   label: 'Profile',   icon: '◉' },
+  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/tasks',     label: 'Tasks',     Icon: CheckSquare     },
+  { to: '/earnings',  label: 'Earnings',  Icon: DollarSign      },
+  { to: '/withdraw',  label: 'Withdraw',  Icon: ArrowUpCircle   },
+  { to: '/coins',     label: 'Coins',     Icon: Coins           },
+  { to: '/plans',     label: 'Plans',     Icon: Star            },
+  { to: '/referrals', label: 'Referrals', Icon: UserPlus        },
+  { to: '/kyc',       label: 'Verify ID', Icon: BadgeCheck      },
+  { to: '/profile',   label: 'Profile',   Icon: User            },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
-  { to: '/admin', label: 'Admin Panel', icon: '⚙' },
+  { to: '/admin', label: 'Admin Panel', Icon: Settings },
 ];
 
 interface SidebarProps {
@@ -38,13 +53,13 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       </div>
 
       <nav className="sidebar-nav" aria-label="Main navigation">
-        {items.map(({ to, label, icon }) => (
+        {items.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) => `nav-item${isActive ? ' nav-item--active' : ''}`}
           >
-            <span className="nav-icon" aria-hidden="true">{icon}</span>
+            <span className="nav-icon" aria-hidden="true"><Icon size={18} /></span>
             <span className="nav-label">{label}</span>
           </NavLink>
         ))}

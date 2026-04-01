@@ -4,19 +4,33 @@ import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import TaskModal from './TaskModal.tsx';
 import type { Task, TaskListResponse } from '../../types/index.ts';
+import {
+  ShieldCheck,
+  Play,
+  MousePointerClick,
+  ClipboardList,
+  Users,
+  Zap,
+  Clock,
+  CheckCircle2,
+  PartyPopper,
+  MailX,
+} from 'lucide-react';
 
-// ─── Task type meta (label + icon + colour class) ─────────────────────────────
+// ─── Task type meta ───────────────────────────────────────────────────────────
 
-const TYPE_META: Record<string, { label: string; icon: string; cls: string }> = {
-  captcha:  { label: 'Captcha',    icon: '🔐', cls: 'type--captcha'  },
-  video:    { label: 'Watch Video', icon: '▶️', cls: 'type--video'    },
-  ad_click: { label: 'Ad Click',   icon: '👆', cls: 'type--adclick'  },
-  survey:   { label: 'Survey',     icon: '📝', cls: 'type--survey'   },
-  referral: { label: 'Referral',   icon: '👥', cls: 'type--referral' },
+type TaskIcon = React.ReactElement;
+
+const TYPE_META: Record<string, { label: string; Icon: () => TaskIcon; cls: string }> = {
+  captcha:  { label: 'Captcha',     Icon: () => <ShieldCheck size={18} />,        cls: 'type--captcha'  },
+  video:    { label: 'Watch Video', Icon: () => <Play size={18} />,               cls: 'type--video'    },
+  ad_click: { label: 'Ad Click',    Icon: () => <MousePointerClick size={18} />,  cls: 'type--adclick'  },
+  survey:   { label: 'Survey',      Icon: () => <ClipboardList size={18} />,      cls: 'type--survey'   },
+  referral: { label: 'Referral',    Icon: () => <Users size={18} />,              cls: 'type--referral' },
 };
 
 function typeMeta(type: string) {
-  return TYPE_META[type] ?? { label: type, icon: '⚡', cls: '' };
+  return TYPE_META[type] ?? { label: type, Icon: () => <Zap size={18} />, cls: '' };
 }
 
 // ─── Duration / hint helper ───────────────────────────────────────────────────
@@ -49,12 +63,10 @@ function TaskCard({ task, variant, onStart, atLimit }: TaskCardProps) {
 
   return (
     <div className={`task-card2 task-card2--${variant}`}>
-      {/* Icon */}
       <div className={`task-card2-icon ${meta.cls}`} aria-hidden="true">
-        {meta.icon}
+        <meta.Icon />
       </div>
 
-      {/* Body */}
       <div className="task-card2-body">
         <div className="task-card2-meta">
           <span className={`task-type-badge ${meta.cls}`}>{meta.label}</span>
@@ -68,14 +80,16 @@ function TaskCard({ task, variant, onStart, atLimit }: TaskCardProps) {
         <p className="task-card2-title">{task.title}</p>
       </div>
 
-      {/* Right: reward + action */}
       <div className="task-card2-right">
         <span className="task-card2-reward">
           +₱{Number(task.reward_amount).toFixed(2)}
         </span>
 
         {variant === 'done' ? (
-          <span className="task-card2-done-badge">✓ Done</span>
+          <span className="task-card2-done-badge">
+            <CheckCircle2 size={14} />
+            Done
+          </span>
         ) : (
           <button
             className={`btn btn-sm ${variant === 'progress' ? 'btn-warning' : 'btn-primary'}`}
@@ -141,7 +155,6 @@ export default function Tasks() {
     <>
       <div className="page">
 
-        {/* ── Header ── */}
         <header className="page-header">
           <div>
             <h1 className="page-title">Tasks</h1>
@@ -191,7 +204,8 @@ export default function Tasks() {
         {inProgress.length > 0 && (
           <section className="tasks-section">
             <h2 className="tasks-section-title tasks-section-title--warning">
-              ⏳ In Progress
+              <Clock size={16} />
+              In Progress
             </h2>
             <div className="task-list">
               {inProgress.map((task) => (
@@ -215,12 +229,12 @@ export default function Tasks() {
             <div className="tasks-empty">
               {(taskData?.tasks?.length ?? 0) === 0 ? (
                 <>
-                  <span className="tasks-empty-icon">📭</span>
+                  <MailX size={36} className="tasks-empty-icon" />
                   <p>No tasks available right now. Check back soon.</p>
                 </>
               ) : (
                 <>
-                  <span className="tasks-empty-icon">🎉</span>
+                  <PartyPopper size={36} className="tasks-empty-icon" />
                   <p>All tasks completed for today. Great work!</p>
                   <p className="text-muted">Come back tomorrow for more tasks.</p>
                 </>
@@ -245,7 +259,8 @@ export default function Tasks() {
         {completed.length > 0 && (
           <section className="tasks-section">
             <h2 className="tasks-section-title tasks-section-title--muted">
-              ✓ Completed Today
+              <CheckCircle2 size={16} />
+              Completed Today
             </h2>
             <div className="task-list task-list--dim">
               {completed.map((task) => (

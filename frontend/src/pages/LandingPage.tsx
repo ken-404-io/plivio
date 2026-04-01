@@ -1,6 +1,22 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
+import {
+  Zap,
+  Sun,
+  Moon,
+  Menu,
+  X,
+  UserPlus,
+  CheckCircle2,
+  Wallet,
+  Building2,
+  Building,
+  Lock,
+  FileText,
+  CreditCard,
+  ShieldCheck,
+} from 'lucide-react';
 import './LandingPage.css';
 
 export default function LandingPage() {
@@ -19,7 +35,7 @@ export default function LandingPage() {
       <header className="lp-nav">
         <div className="lp-nav-inner">
           <a href="/" className="lp-logo">
-            <span className="lp-logo-bolt">⚡</span>
+            <span className="lp-logo-bolt"><Zap size={20} /></span>
             <span className="lp-logo-text">Plivio</span>
           </a>
 
@@ -39,7 +55,7 @@ export default function LandingPage() {
               onClick={toggleTheme}
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
-              {theme === 'dark' ? '☀' : '☾'}
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <button
               className="lp-menu-btn"
@@ -47,7 +63,7 @@ export default function LandingPage() {
               aria-label="Toggle menu"
               aria-expanded={menuOpen}
             >
-              <span /><span /><span />
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
@@ -125,19 +141,16 @@ export default function LandingPage() {
                 <feGaussianBlur stdDeviation="8" />
               </filter>
             </defs>
-            {/* Shadow/glow bolt */}
             <polygon
               points="175,10 80,270 155,270 125,490 230,200 148,200 210,10"
               fill="url(#boltGrad2)"
               filter="url(#boltBlur)"
               transform="translate(5,5)"
             />
-            {/* Main bolt */}
             <polygon
               points="175,10 80,270 155,270 125,490 230,200 148,200 210,10"
               fill="url(#boltGrad)"
             />
-            {/* Highlight */}
             <polygon
               points="175,10 140,140 165,140 155,270 180,175 160,175 190,10"
               fill="rgba(255,255,255,0.25)"
@@ -160,7 +173,7 @@ export default function LandingPage() {
           <div className="lp-steps">
             <div className="lp-step">
               <div className="lp-step-num">01</div>
-              <div className="lp-step-icon">👤</div>
+              <div className="lp-step-icon"><UserPlus size={28} /></div>
               <h3 className="lp-step-title">Create Free Account</h3>
               <p className="lp-step-desc">
                 Sign up with your email in under 60 seconds. No fees, no credit card.
@@ -172,7 +185,7 @@ export default function LandingPage() {
 
             <div className="lp-step">
               <div className="lp-step-num">02</div>
-              <div className="lp-step-icon">✅</div>
+              <div className="lp-step-icon"><CheckCircle2 size={28} /></div>
               <h3 className="lp-step-title">Complete Tasks</h3>
               <p className="lp-step-desc">
                 Watch videos, solve captchas, answer surveys, and click ads.
@@ -184,7 +197,7 @@ export default function LandingPage() {
 
             <div className="lp-step">
               <div className="lp-step-num">03</div>
-              <div className="lp-step-icon">💸</div>
+              <div className="lp-step-icon"><Wallet size={28} /></div>
               <h3 className="lp-step-title">Withdraw Earnings</h3>
               <p className="lp-step-desc">
                 Cash out to GCash or PayPal once you reach ₱50.
@@ -193,7 +206,6 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Visual demo strip */}
           <div className="lp-demo-strip">
             <div className="lp-demo-visual">
               <div className="lp-demo-bolt-wrap" aria-hidden="true">
@@ -249,7 +261,7 @@ export default function LandingPage() {
               <ul className="lp-plan-features">
                 <li><span className="lp-check">✓</span> Basic tasks access</li>
                 <li><span className="lp-check">✓</span> ₱20/day earning limit</li>
-                <li><span className="lp-check">✓</span> GCash & PayPal withdrawal</li>
+                <li><span className="lp-check">✓</span> GCash &amp; PayPal withdrawal</li>
                 <li><span className="lp-check">✓</span> Referral bonuses</li>
               </ul>
               <Link to="/register" className="lp-plan-btn lp-plan-btn--outline">
@@ -304,7 +316,7 @@ export default function LandingPage() {
       <section className="lp-section lp-certs-section" id="certifications">
         <div className="lp-section-inner">
           <div className="lp-section-header">
-            <h2 className="lp-section-title">Legally Registered & Compliant</h2>
+            <h2 className="lp-section-title">Legally Registered &amp; Compliant</h2>
             <p className="lp-section-subtitle">
               Plivio is a duly registered and regulated online earning platform in the Philippines
             </p>
@@ -312,7 +324,7 @@ export default function LandingPage() {
 
           <div className="lp-certs-grid">
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">🏛️</div>
+              <div className="lp-cert-icon"><Building2 size={26} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">SEC Registered</h4>
                 <p className="lp-cert-sub">Securities and Exchange Commission</p>
@@ -325,7 +337,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">🏢</div>
+              <div className="lp-cert-icon"><Building size={26} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">DTI Registered</h4>
                 <p className="lp-cert-sub">Department of Trade and Industry</p>
@@ -338,7 +350,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">🔒</div>
+              <div className="lp-cert-icon"><Lock size={26} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">NPC Compliant</h4>
                 <p className="lp-cert-sub">National Privacy Commission</p>
@@ -351,7 +363,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">📋</div>
+              <div className="lp-cert-icon"><FileText size={26} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">BIR Registered</h4>
                 <p className="lp-cert-sub">Bureau of Internal Revenue</p>
@@ -364,7 +376,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">💳</div>
+              <div className="lp-cert-icon"><CreditCard size={26} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">BSP Guidelines</h4>
                 <p className="lp-cert-sub">Bangko Sentral ng Pilipinas</p>
@@ -377,7 +389,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-cert-card">
-              <div className="lp-cert-icon">🛡️</div>
+              <div className="lp-cert-icon"><ShieldCheck size={26} /></div>
               <div className="lp-cert-body">
                 <h4 className="lp-cert-title">DICT Aligned</h4>
                 <p className="lp-cert-sub">Dept. of Information &amp; Communications Technology</p>
@@ -403,7 +415,7 @@ export default function LandingPage() {
       {/* ─── CTA Banner ────────────────────────────────────────────────── */}
       <section className="lp-cta-banner">
         <div className="lp-cta-inner">
-          <div className="lp-cta-bolt" aria-hidden="true">⚡</div>
+          <div className="lp-cta-bolt" aria-hidden="true"><Zap size={32} /></div>
           <h2 className="lp-cta-title">Ready to Start Earning?</h2>
           <p className="lp-cta-sub">
             Join thousands of Filipinos already earning with Plivio.
@@ -419,7 +431,7 @@ export default function LandingPage() {
       <footer className="lp-footer">
         <div className="lp-footer-inner">
           <div className="lp-footer-brand">
-            <span className="lp-logo-bolt">⚡</span>
+            <span className="lp-logo-bolt"><Zap size={18} /></span>
             <span className="lp-logo-text">Plivio</span>
             <p className="lp-footer-tagline">Get Paid To · Philippines</p>
           </div>
