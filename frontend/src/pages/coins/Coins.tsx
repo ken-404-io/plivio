@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
+import BackButton from '../../components/common/BackButton.tsx';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { CoinsResponse, CoinTransaction } from '../../types/index.ts';
 import {
@@ -191,6 +192,7 @@ export default function Coins() {
       <div className="page">
         <header className="page-header">
           <div>
+            <BackButton />
             <h1 className="page-title">Plivio Coins</h1>
             <p className="page-subtitle">1 coin = ₱1 · Convert to GCash</p>
           </div>
