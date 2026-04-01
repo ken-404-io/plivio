@@ -2286,6 +2286,128 @@ img { display: block; max-width: 100%; }
   flex-shrink: 0;
 }
 
+/* ─── Onboarding modal ───────────────────────────────────────────────────────── */
+.onboard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+.onboard-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px 24px 24px;
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.onboard-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s;
+}
+.onboard-close:hover { color: var(--text-heading); }
+
+/* Step dots */
+.onboard-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.onboard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.2s, width 0.2s;
+}
+.onboard-dot--active { background: var(--accent); width: 20px; border-radius: 99px; }
+.onboard-dot--done   { background: var(--accent-border); }
+
+/* Title + body */
+.onboard-content { display: flex; flex-direction: column; gap: 12px; }
+.onboard-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-heading);
+  text-align: center;
+}
+.onboard-body { min-height: 140px; }
+
+/* Welcome step */
+.onboard-welcome { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.onboard-welcome-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.onboard-welcome-desc { font-size: 15px; color: var(--text); line-height: 1.6; }
+
+/* How it works step */
+.onboard-how { display: flex; flex-direction: column; gap: 14px; }
+.onboard-how-item { display: flex; align-items: flex-start; gap: 12px; }
+.onboard-how-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-light);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.onboard-how-title { font-size: 14px; font-weight: 600; color: var(--text-heading); }
+.onboard-how-desc  { font-size: 13px; color: var(--text-muted); margin-top: 2px; line-height: 1.5; }
+
+/* Coins step */
+.onboard-coins-info { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.onboard-coins-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.onboard-coins-icon  { color: var(--accent); }
+.onboard-coins-rate  { font-size: 18px; font-weight: 700; color: var(--text-heading); }
+.onboard-coins-desc  { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+/* Email step */
+.onboard-email { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.onboard-email-icon  { color: var(--accent); }
+.onboard-email-desc  { font-size: 14px; color: var(--text); line-height: 1.6; }
+.onboard-email-sent  { font-size: 13px; color: #22c55e; font-weight: 500; }
+
+/* Actions */
+.onboard-actions { display: flex; flex-direction: column; gap: 8px; }
+.onboard-skip { color: var(--text-muted); align-self: center; }
+
 /* ─── Topbar ──────────────────────────────────────────────────────────────────── */
 .topbar {
   display: flex;
