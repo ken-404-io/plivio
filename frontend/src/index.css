@@ -1040,6 +1040,7 @@ img { display: block; max-width: 100%; }
 .mb-4         { margin-bottom: 16px; }
 .action-cell  { display: flex; gap: 8px; }
 .link         { color: var(--accent); text-decoration: none; }
+.link--sm     { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
 .link:hover   { text-decoration: underline; }
 
 /* ─── Badge variants ─────────────────────────────────────────────────────────── */
@@ -1987,14 +1988,13 @@ img { display: block; max-width: 100%; }
 
 /* ─── Dashboard v2 ────────────────────────────────────────────────────────────── */
 
-/* Hero cards grid */
-.dash-hero-grid {
+/* ── Dashboard stat cards ── */
+.dash-stats-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 14px;
 }
-.dash-hero-card {
+.dash-stat-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2003,101 +2003,220 @@ img { display: block; max-width: 100%; }
   flex-direction: column;
   gap: 4px;
 }
-.dash-hero-card--balance {
+.dash-stat-card--accent {
   background: linear-gradient(135deg, var(--accent-dark), var(--accent));
   border-color: transparent;
 }
-.dash-hero-card--balance .dash-hero-label { color: rgba(255,255,255,0.75); }
-.dash-hero-card--balance .dash-hero-value { color: #fff; }
-.dash-hero-label {
-  font-size: 12px;
+.dash-stat-card--accent .dash-stat-label { color: rgba(255,255,255,0.75); }
+.dash-stat-card--accent .dash-stat-value { color: #fff; }
+.dash-stat-card--accent .dash-stat-sub   { color: rgba(255,255,255,0.65); }
+.dash-stat-card--accent .dash-stat-cta   { color: rgba(255,255,255,0.9); }
+.dash-stat-label {
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
+  font-weight: 600;
 }
-.dash-hero-value {
-  font-size: 24px;
+.dash-stat-value {
+  font-size: 22px;
   font-weight: 700;
   color: var(--text-heading);
   line-height: 1.1;
 }
-.dash-hero-limit { font-size: 14px; font-weight: 400; color: var(--text-muted); }
-.dash-hero-cta {
-  margin-top: 6px;
-  align-self: flex-start;
-  color: rgba(255,255,255,0.9) !important;
+.dash-stat-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.dash-stat-cta {
+  margin-top: 8px;
   font-size: 12px;
-  padding: 4px 0;
+  font-weight: 600;
+  align-self: flex-start;
+  text-decoration: none;
+  color: var(--accent);
 }
 
-/* Task quick-stats bar */
-.dash-task-bar {
-  display: flex;
-  align-items: center;
+/* Daily earnings progress bar */
+.dash-progress-wrap { margin-top: 6px; }
+.dash-progress-bar {
+  height: 4px;
+  background: var(--bg-elevated);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.dash-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+/* ── Today's Goal card ── */
+.dash-goal-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px 0;
-  margin-bottom: 14px;
-  text-decoration: none;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.dash-task-stat {
+.dash-goal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dash-goal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dash-goal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+.dash-goal-flame       { color: var(--text-muted); }
+.dash-goal-flame--active { color: #f97316; }
+.dash-goal-done-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(34,197,94,0.12);
+  border: 1px solid rgba(34,197,94,0.3);
+  color: #22c55e;
+  font-size: 11px;
+  font-weight: 600;
+}
+.dash-goal-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.dash-goal-coins:hover { background: var(--accent-border); }
+.dash-goal-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dash-goal-progress-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.dash-goal-progress-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+.dash-goal-bar {
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.dash-goal-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+.dash-goal-fill--done { background: #22c55e; }
+.dash-goal-stats {
+  display: flex;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.dash-goal-stat {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  text-decoration: none;
-  color: inherit;
 }
-.dash-task-stat-num {
-  font-size: 20px;
+.dash-goal-stat-value {
+  font-size: 18px;
   font-weight: 700;
   color: var(--text-heading);
   line-height: 1;
 }
-.dash-task-stat-num--accent { color: var(--accent); }
-.dash-task-stat-lbl {
-  font-size: 11px;
+.dash-goal-stat-label {
+  font-size: 10px;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  text-align: center;
 }
-.dash-task-stat-divider {
+.dash-goal-stat-divider {
   width: 1px;
-  height: 32px;
+  height: 28px;
   background: var(--border);
+  flex-shrink: 0;
 }
 
-/* CTA banner */
-.dash-cta-banner {
+/* ── Quick actions ── */
+.dash-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.dash-quick-action {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
-  background: linear-gradient(135deg, var(--accent-dark), var(--accent));
-  border-radius: var(--radius);
-  margin-bottom: 14px;
+  gap: 12px;
+  padding: 13px 16px;
   text-decoration: none;
-  color: #fff;
-  transition: opacity 0.15s;
+  color: inherit;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
 }
-.dash-cta-banner:hover { opacity: 0.9; }
-.dash-cta-banner-text { flex: 1; }
-.dash-cta-banner-title {
-  font-size: 15px;
-  font-weight: 700;
-  display: block;
+.dash-quick-action:last-child { border-bottom: none; }
+.dash-quick-action:hover { background: var(--bg-elevated); }
+.dash-quick-action-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-light);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.dash-cta-banner-sub {
+.dash-quick-action-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dash-quick-action-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+.dash-quick-action-desc {
   font-size: 12px;
-  opacity: 0.8;
-  display: block;
-  margin-top: 2px;
+  color: var(--text-muted);
 }
-.dash-cta-banner-arrow { font-size: 20px; font-weight: 700; }
+.dash-quick-action-chevron { color: var(--text-muted); flex-shrink: 0; }
 
-/* KYC warning banner */
+/* ── KYC warning banner ── */
 .dash-kyc-banner {
   display: flex;
   align-items: center;
@@ -2106,16 +2225,16 @@ img { display: block; max-width: 100%; }
   background: rgba(245,158,11,0.08);
   border: 1px solid rgba(245,158,11,0.3);
   border-radius: var(--radius);
-  margin-bottom: 14px;
   text-decoration: none;
   color: inherit;
   transition: background 0.15s;
 }
 .dash-kyc-banner:hover { background: rgba(245,158,11,0.14); }
-.dash-kyc-icon { font-size: 28px; flex-shrink: 0; }
+.dash-kyc-icon  { color: var(--warning); flex-shrink: 0; }
+.dash-kyc-body  { flex: 1; }
 .dash-kyc-title { font-size: 14px; font-weight: 600; color: var(--warning); }
 .dash-kyc-sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-.dash-kyc-arrow { margin-left: auto; color: var(--warning); font-size: 18px; font-weight: 700; }
+.dash-kyc-chevron { color: var(--warning); flex-shrink: 0; }
 
 /* Recent earnings list (replaces table on mobile) */
 .earnings-list {
@@ -2725,9 +2844,8 @@ img { display: block; max-width: 100%; }
   .kyc-upload-grid { grid-template-columns: 1fr; }
 
   /* Dashboard hero full-width on narrow screens */
-  .dash-hero-grid { grid-template-columns: 1fr; }
-  .dash-hero-value { font-size: 26px; }
-  .dash-hero-card { padding: 16px; }
+  .dash-stats-row { grid-template-columns: 1fr; }
+  .dash-stat-value { font-size: 20px; }
 
   /* Task cards: tighter padding on mobile */
   .task-card2 { padding: 12px 14px; gap: 10px; }
