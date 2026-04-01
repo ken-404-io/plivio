@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Mail, Check } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from './Toast.tsx';
 
@@ -28,7 +29,7 @@ export default function EmailVerificationBanner({ email }: Props) {
 
   return (
     <div className="email-verify-banner" role="alert">
-      <span className="email-verify-icon" aria-hidden="true">✉</span>
+      <span className="email-verify-icon" aria-hidden="true"><Mail size={18} /></span>
       <span className="email-verify-text">
         Please verify your email address{' '}
         <strong>{email}</strong> to unlock all features.
@@ -38,7 +39,7 @@ export default function EmailVerificationBanner({ email }: Props) {
         onClick={() => { void resend(); }}
         disabled={sending || sent}
       >
-        {sent ? 'Email sent ✓' : sending ? 'Sending…' : 'Resend email'}
+        {sent ? <><Check size={14} /> Email sent</> : sending ? 'Sending…' : 'Resend email'}
       </button>
     </div>
   );

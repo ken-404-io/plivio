@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,11 +28,11 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-const ICONS: Record<ToastType, string> = {
-  success: '✓',
-  error:   '✕',
-  warning: '⚠',
-  info:    'ℹ',
+const ICONS: Record<ToastType, React.ReactElement> = {
+  success: <CheckCircle2 size={16} />,
+  error:   <XCircle      size={16} />,
+  warning: <AlertTriangle size={16} />,
+  info:    <Info          size={16} />,
 };
 
 const AUTO_DISMISS_MS = 4000;
@@ -73,7 +74,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 onClick={() => dismiss(t.id)}
                 aria-label="Dismiss"
               >
-                ✕
+                <X size={14} />
               </button>
             </div>
           ))}

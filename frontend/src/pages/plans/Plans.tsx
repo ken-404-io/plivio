@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
@@ -109,7 +110,7 @@ export default function Plans() {
                 <ul className="plan-features">
                   {plan.features.map((f) => (
                     <li key={f}>
-                      <span className="feature-check" aria-hidden="true">✓</span>
+                      <span className="feature-check" aria-hidden="true"><Check size={14} /></span>
                       {f}
                     </li>
                   ))}
