@@ -13,11 +13,15 @@ interface AdNetworkInput {
 
 export async function getStats(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const [users, tasks, withdrawals, earnings] = await Promise.all([
+    const [users, tasks, withdrawals, earnings, newUsersToday, tasksToday, pendingKyc, coins] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM users WHERE is_banned = FALSE'),
       pool.query('SELECT COUNT(*) FROM tasks WHERE is_active = TRUE'),
       pool.query(`SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total FROM withdrawals WHERE status = 'pending'`),
       pool.query(`SELECT COALESCE(SUM(reward_earned), 0) AS total FROM task_completions WHERE status = 'approved'`),
+      pool.query(`SELECT COUNT(*) FROM users WHERE created_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`),
+      pool.query(`SELECT COUNT(*) FROM task_completions WHERE status = 'approved' AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`),
+      pool.query(`SELECT COUNT(*) FROM kyc_submissions WHERE status = 'pending'`),
+      pool.query(`SELECT COALESCE(SUM(amount), 0) AS total FROM coin_transactions WHERE type = 'earn'`),
     ]);
 
     type Row = Record<string, string>;
@@ -29,6 +33,10 @@ export async function getStats(_req: Request, res: Response, next: NextFunction)
         pending_withdrawals:      Number((withdrawals.rows[0] as Row).count),
         pending_withdrawal_total: Number((withdrawals.rows[0] as Row).total),
         total_approved_earnings:  Number((earnings.rows[0] as Row).total),
+        new_users_today:          Number((newUsersToday.rows[0] as Row).count),
+        completed_tasks_today:    Number((tasksToday.rows[0] as Row).count),
+        pending_kyc:              Number((pendingKyc.rows[0] as Row).count),
+        total_coins_distributed:  Number((coins.rows[0] as Row).total),
       },
     });
   } catch (err) { next(err); }

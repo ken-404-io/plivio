@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Users, ListTodo, Clock, TrendingUp, UserPlus, CheckSquare, ShieldCheck, Coins } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { AdminUser, AdminTask, AdminWithdrawal, AdminStats, AdNetwork, AdminKycSubmission } from '../../types/index.ts';
@@ -25,6 +26,71 @@ interface TaskForm {
   min_plan:      string;
 }
 
+// ─── KYC image loader with auth ───────────────────────────────────────────────
+function KycImage({ kycId, field, alt }: { kycId: string; field: 'id_front' | 'id_selfie'; alt: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const urlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get(`/kyc/document/${field}?kyc_id=${kycId}`, { responseType: 'blob' })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(data as Blob);
+        urlRef.current = url;
+        setSrc(url);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+    };
+  }, [kycId, field]);
+
+  if (!src) return <div className="kyc-img-placeholder">Loading…</div>;
+  return (
+    <a href={src} target="_blank" rel="noreferrer" className="kyc-img-link">
+      <img src={src} alt={alt} className="kyc-img-thumb" />
+    </a>
+  );
+}
+
+// ─── Rejection modal ───────────────────────────────────────────────────────────
+interface RejectModalProps {
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+}
+
+function RejectModal({ onConfirm, onCancel }: RejectModalProps) {
+  const [reason, setReason] = useState('');
+  return (
+    <div className="reject-modal-overlay" onClick={onCancel}>
+      <div className="reject-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="reject-modal-title">Rejection Reason</h3>
+        <p className="reject-modal-hint">This message will be shown to the user.</p>
+        <textarea
+          className="form-input reject-modal-textarea"
+          placeholder="e.g. ID photo is blurry, please resubmit…"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={3}
+          autoFocus
+        />
+        <div className="reject-modal-actions">
+          <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+          <button
+            className="btn btn-danger btn-sm"
+            disabled={!reason.trim()}
+            onClick={() => { if (reason.trim()) onConfirm(reason.trim()); }}
+          >
+            Reject KYC
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const toast = useToast();
 
@@ -35,6 +101,11 @@ export default function AdminDashboard() {
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
   const [kycList,     setKycList]     = useState<AdminKycSubmission[]>([]);
   const [loading,     setLoading]     = useState(true);
+
+  // KYC — which card has images expanded
+  const [expandedKyc,  setExpandedKyc]  = useState<string | null>(null);
+  // KYC — rejection modal target
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
 
   const [taskForm, setTaskForm] = useState<TaskForm>({
     title: '', type: 'captcha', reward_amount: '', min_plan: 'free',
@@ -161,8 +232,9 @@ export default function AdminDashboard() {
 
   async function reviewKyc(id: string, action: 'approve' | 'reject', reason?: string) {
     try {
-      await api.put(`/admin/kyc/${id}`, { action, reason });
+      await api.put(`/admin/kyc/${id}`, { action, rejection_reason: reason });
       setKycList((prev) => prev.filter((k) => k.id !== id));
+      setExpandedKyc(null);
       toast.success(`KYC ${action}d.`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
@@ -174,6 +246,16 @@ export default function AdminDashboard() {
 
   return (
     <div className="page">
+      {rejectTarget && (
+        <RejectModal
+          onConfirm={(reason) => {
+            void reviewKyc(rejectTarget, 'reject', reason);
+            setRejectTarget(null);
+          }}
+          onCancel={() => setRejectTarget(null)}
+        />
+      )}
+
       <header className="page-header">
         <h1 className="page-title">Admin Panel</h1>
       </header>
@@ -186,31 +268,69 @@ export default function AdminDashboard() {
             onClick={() => setTab(t)}
           >
             {t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'kyc' && stats && stats.pending_kyc > 0 && (
+              <span className="tab-badge">{stats.pending_kyc}</span>
+            )}
+            {t === 'withdrawals' && stats && stats.pending_withdrawals > 0 && (
+              <span className="tab-badge">{stats.pending_withdrawals}</span>
+            )}
           </button>
         ))}
       </div>
 
       {/* ── Overview ── */}
       {tab === 'overview' && stats && (
-        <div className="stats-grid">
-          <div className="stat-card">
-            <span className="stat-label">Total Users</span>
-            <span className="stat-value">{stats.total_users.toLocaleString()}</span>
+        <>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--purple"><Users size={18} /></div>
+              <span className="stat-label">Total Users</span>
+              <span className="stat-value">{stats.total_users.toLocaleString()}</span>
+              {stats.new_users_today > 0 && (
+                <span className="stat-sub stat-sub--positive">+{stats.new_users_today} today</span>
+              )}
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--blue"><ListTodo size={18} /></div>
+              <span className="stat-label">Active Tasks</span>
+              <span className="stat-value">{stats.active_tasks}</span>
+              {stats.completed_tasks_today > 0 && (
+                <span className="stat-sub">{stats.completed_tasks_today} done today</span>
+              )}
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--orange"><Clock size={18} /></div>
+              <span className="stat-label">Pending Withdrawals</span>
+              <span className="stat-value">{stats.pending_withdrawals}</span>
+              <span className="stat-sub">₱{Number(stats.pending_withdrawal_total).toFixed(2)} total</span>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--green"><TrendingUp size={18} /></div>
+              <span className="stat-label">Total Approved Earnings</span>
+              <span className="stat-value">₱{Number(stats.total_approved_earnings).toFixed(2)}</span>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--teal"><UserPlus size={18} /></div>
+              <span className="stat-label">New Users Today</span>
+              <span className="stat-value">{stats.new_users_today}</span>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--indigo"><CheckSquare size={18} /></div>
+              <span className="stat-label">Tasks Done Today</span>
+              <span className="stat-value">{stats.completed_tasks_today}</span>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--red"><ShieldCheck size={18} /></div>
+              <span className="stat-label">Pending KYC</span>
+              <span className="stat-value">{stats.pending_kyc}</span>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--yellow"><Coins size={18} /></div>
+              <span className="stat-label">Coins Distributed</span>
+              <span className="stat-value">{Number(stats.total_coins_distributed).toLocaleString()}</span>
+            </div>
           </div>
-          <div className="stat-card">
-            <span className="stat-label">Active Tasks</span>
-            <span className="stat-value">{stats.active_tasks}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Pending Withdrawals</span>
-            <span className="stat-value">{stats.pending_withdrawals}</span>
-            <span className="stat-sub">₱{Number(stats.pending_withdrawal_total).toFixed(2)} total</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Total Approved Earnings</span>
-            <span className="stat-value">₱{Number(stats.total_approved_earnings).toFixed(2)}</span>
-          </div>
-        </div>
+        </>
       )}
 
       {/* ── Users ── */}
@@ -463,7 +583,7 @@ export default function AdminDashboard() {
           {kycList.length === 0 ? (
             <div className="empty-state"><p>No pending KYC submissions.</p></div>
           ) : kycList.map((k) => (
-            <div key={k.id} className="admin-card">
+            <div key={k.id} className="admin-card kyc-card">
               <div className="admin-card-body">
                 <div className="admin-card-main">
                   <span className="admin-card-title">{k.username}</span>
@@ -480,6 +600,28 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+
+              {/* Image preview toggle */}
+              <button
+                className="btn btn-sm btn-ghost kyc-preview-toggle"
+                onClick={() => setExpandedKyc(expandedKyc === k.id ? null : k.id)}
+              >
+                {expandedKyc === k.id ? 'Hide Documents' : 'View Documents'}
+              </button>
+
+              {expandedKyc === k.id && (
+                <div className="kyc-images-row">
+                  <div className="kyc-img-wrap">
+                    <span className="kyc-img-label">ID Front</span>
+                    <KycImage kycId={k.id} field="id_front" alt="ID front" />
+                  </div>
+                  <div className="kyc-img-wrap">
+                    <span className="kyc-img-label">Selfie with ID</span>
+                    <KycImage kycId={k.id} field="id_selfie" alt="Selfie with ID" />
+                  </div>
+                </div>
+              )}
+
               <div className="admin-card-actions">
                 <button
                   className="btn btn-sm btn-primary"
@@ -488,11 +630,8 @@ export default function AdminDashboard() {
                   Approve
                 </button>
                 <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => {
-                    const reason = window.prompt('Rejection reason (shown to user):');
-                    if (reason !== null) void reviewKyc(k.id, 'reject', reason);
-                  }}
+                  className="btn btn-sm btn-ghost btn-danger"
+                  onClick={() => setRejectTarget(k.id)}
                 >
                   Reject
                 </button>
