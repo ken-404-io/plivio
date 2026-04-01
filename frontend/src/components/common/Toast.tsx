@@ -28,12 +28,14 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-const ICONS: Record<ToastType, React.ReactElement> = {
-  success: <CheckCircle2 size={16} />,
-  error:   <XCircle      size={16} />,
-  warning: <AlertTriangle size={16} />,
-  info:    <Info          size={16} />,
-};
+const ICON_SIZE = 16;
+
+function ToastIcon({ type }: { type: ToastType }) {
+  if (type === 'success') return <CheckCircle2  size={ICON_SIZE} />;
+  if (type === 'error')   return <XCircle       size={ICON_SIZE} />;
+  if (type === 'warning') return <AlertTriangle size={ICON_SIZE} />;
+  return                         <Info          size={ICON_SIZE} />;
+}
 
 const AUTO_DISMISS_MS = 4000;
 
@@ -67,7 +69,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         <div className="toast-stack" role="region" aria-label="Notifications" aria-live="polite">
           {toasts.map((t) => (
             <div key={t.id} className={`toast toast--${t.type}`}>
-              <span className="toast-icon" aria-hidden="true">{ICONS[t.type]}</span>
+              <span className="toast-icon" aria-hidden="true"><ToastIcon type={t.type} /></span>
               <span className="toast-message">{t.message}</span>
               <button
                 className="toast-close"

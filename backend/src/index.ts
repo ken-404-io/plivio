@@ -21,6 +21,7 @@ import adminRoutes        from './routes/admin.ts';
 import notificationRoutes from './routes/notifications.ts';
 import kycRoutes          from './routes/kyc.ts';
 import contactRoutes      from './routes/contact.ts';
+import coinsRoutes        from './routes/coins.ts';
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -69,6 +70,7 @@ app.use('/api/admin',         adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/kyc',           kycRoutes);
 app.use('/api/contact',       contactRoutes);
+app.use('/api/coins',         coinsRoutes);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ success: false, error: 'Endpoint not found' });

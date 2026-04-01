@@ -1,36 +1,40 @@
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../store/authStore.tsx';
 import {
   LayoutDashboard,
-  ListChecks,
-  Banknote,
-  ArrowUpFromLine,
+  CheckSquare,
+  DollarSign,
+  ArrowUpCircle,
   Star,
   UserPlus,
-  ShieldCheck,
-  UserCircle,
+  BadgeCheck,
+  User,
   Settings,
+  Coins,
 } from 'lucide-react';
-import { useAuth } from '../../store/authStore.tsx';
+
+type LucideIcon = React.ElementType;
 
 interface NavItem {
   to:    string;
   label: string;
-  icon:  React.ReactNode;
+  Icon:  LucideIcon;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard   size={18} /> },
-  { to: '/tasks',     label: 'Tasks',     icon: <ListChecks        size={18} /> },
-  { to: '/earnings',  label: 'Earnings',  icon: <Banknote          size={18} /> },
-  { to: '/withdraw',  label: 'Withdraw',  icon: <ArrowUpFromLine   size={18} /> },
-  { to: '/plans',     label: 'Plans',     icon: <Star              size={18} /> },
-  { to: '/referrals', label: 'Referrals', icon: <UserPlus          size={18} /> },
-  { to: '/kyc',       label: 'Verify ID', icon: <ShieldCheck       size={18} /> },
-  { to: '/profile',   label: 'Profile',   icon: <UserCircle        size={18} /> },
+  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/tasks',     label: 'Tasks',     Icon: CheckSquare     },
+  { to: '/earnings',  label: 'Earnings',  Icon: DollarSign      },
+  { to: '/withdraw',  label: 'Withdraw',  Icon: ArrowUpCircle   },
+  { to: '/coins',     label: 'Coins',     Icon: Coins           },
+  { to: '/plans',     label: 'Plans',     Icon: Star            },
+  { to: '/referrals', label: 'Referrals', Icon: UserPlus        },
+  { to: '/kyc',       label: 'Verify ID', Icon: BadgeCheck      },
+  { to: '/profile',   label: 'Profile',   Icon: User            },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
-  { to: '/admin', label: 'Admin Panel', icon: <Settings size={18} /> },
+  { to: '/admin', label: 'Admin Panel', Icon: Settings },
 ];
 
 interface SidebarProps {
@@ -49,13 +53,13 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       </div>
 
       <nav className="sidebar-nav" aria-label="Main navigation">
-        {items.map(({ to, label, icon }) => (
+        {items.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) => `nav-item${isActive ? ' nav-item--active' : ''}`}
           >
-            <span className="nav-icon" aria-hidden="true">{icon}</span>
+            <span className="nav-icon" aria-hidden="true"><Icon size={18} /></span>
             <span className="nav-label">{label}</span>
           </NavLink>
         ))}

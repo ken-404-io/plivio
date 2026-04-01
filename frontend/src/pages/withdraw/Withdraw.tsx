@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Smartphone, CreditCard, Banknote } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { Withdrawal } from '../../types/index.ts';
+import { Smartphone, CreditCard, Banknote } from 'lucide-react';
 
 const STATUS_LABEL: Record<string, string> = {
   pending:    'Pending',
@@ -13,10 +13,11 @@ const STATUS_LABEL: Record<string, string> = {
   rejected:   'Rejected',
 };
 
-const METHOD_ICON: Record<string, React.ReactElement> = {
-  gcash:  <Smartphone size={20} />,
-  paypal: <CreditCard size={20} />,
-};
+function MethodIcon({ method }: { method: string }) {
+  if (method === 'gcash')  return <Smartphone size={18} />;
+  if (method === 'paypal') return <CreditCard  size={18} />;
+  return <Banknote size={18} />;
+}
 
 export default function Withdraw() {
   const { user, fetchMe } = useAuth();
@@ -115,7 +116,7 @@ export default function Withdraw() {
                   onChange={() => setForm((f) => ({ ...f, method: m }))}
                   className="sr-only"
                 />
-                <span className="withdraw-method-icon">{METHOD_ICON[m]}</span>
+                <span className="withdraw-method-icon"><MethodIcon method={m} /></span>
                 <span className="withdraw-method-label">{m.toUpperCase()}</span>
               </label>
             ))}
@@ -163,7 +164,7 @@ export default function Withdraw() {
             {history.map((w) => (
               <div key={w.id} className="earning-row">
                 <div className="earning-row-icon">
-                  {METHOD_ICON[w.method] ?? <Banknote size={20} />}
+                  <MethodIcon method={w.method} />
                 </div>
                 <div className="earning-row-body">
                   <p className="earning-row-title">{w.method.toUpperCase()} Withdrawal</p>

@@ -1,23 +1,32 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Lock, Play, MousePointerClick, ClipboardList, Users,
-  Zap, ShieldCheck,
-} from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import type { TaskListResponse, Earning } from '../../types/index.ts';
 import EmailVerificationBanner from '../../components/common/EmailVerificationBanner.tsx';
+import {
+  ShieldCheck,
+  Play,
+  MousePointerClick,
+  ClipboardList,
+  Users,
+  Zap,
+  BadgeCheck,
+  Flame,
+  Coins,
+} from 'lucide-react';
 
 const PLAN_LABEL: Record<string, string> = { free: 'Free', premium: 'Premium', elite: 'Elite' };
 
-const EARNING_TYPE_ICON: Record<string, React.ReactElement> = {
-  captcha:  <Lock              size={18} />,
-  video:    <Play              size={18} />,
-  ad_click: <MousePointerClick size={18} />,
-  survey:   <ClipboardList     size={18} />,
-  referral: <Users             size={18} />,
-};
+function EarningTypeIcon({ type }: { type: string }) {
+  const size = 16;
+  if (type === 'captcha')  return <ShieldCheck size={size} />;
+  if (type === 'video')    return <Play size={size} />;
+  if (type === 'ad_click') return <MousePointerClick size={size} />;
+  if (type === 'survey')   return <ClipboardList size={size} />;
+  if (type === 'referral') return <Users size={size} />;
+  return <Zap size={size} />;
+}
 
 export default function Dashboard() {
   const { user, fetchMe } = useAuth();
@@ -57,6 +66,9 @@ export default function Dashboard() {
 
   const availableCount = taskData?.tasks?.filter((t) => !t.completed_today && !t.in_progress_today).length ?? 0;
   const completedCount = taskData?.tasks?.filter((t) => t.completed_today).length ?? 0;
+
+  const streak = user?.streak_count ?? 0;
+  const coins  = Number(user?.coins ?? 0);
 
   return (
     <div className="page">
@@ -102,6 +114,24 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ── Streak + Coins row ── */}
+      <div className="dash-streak-coins-row">
+        <Link to="/coins" className="dash-mini-card">
+          <Flame size={18} className={streak > 0 ? 'dash-mini-icon--flame' : 'dash-mini-icon'} />
+          <div className="dash-mini-body">
+            <span className="dash-mini-value">{streak}</span>
+            <span className="dash-mini-label">Day Streak</span>
+          </div>
+        </Link>
+        <Link to="/coins" className="dash-mini-card">
+          <Coins size={18} className="dash-mini-icon--coins" />
+          <div className="dash-mini-body">
+            <span className="dash-mini-value">{coins.toLocaleString()}</span>
+            <span className="dash-mini-label">Coins</span>
+          </div>
+        </Link>
+      </div>
+
       {/* ── Task quick-stats ── */}
       <div className="dash-task-bar">
         <Link to="/tasks" className="dash-task-stat">
@@ -136,7 +166,7 @@ export default function Dashboard() {
       {/* ── KYC warning ── */}
       {user?.kyc_status === 'none' && (
         <Link to="/kyc" className="dash-kyc-banner">
-          <span className="dash-kyc-icon"><ShieldCheck size={22} /></span>
+          <BadgeCheck size={20} className="dash-kyc-icon" />
           <div>
             <p className="dash-kyc-title">Verify your identity to enable withdrawals</p>
             <p className="dash-kyc-sub">Takes only 2 minutes — tap to start</p>
@@ -161,7 +191,7 @@ export default function Dashboard() {
             {earnings?.map((e) => (
               <div key={e.id} className="earning-row">
                 <div className="earning-row-icon">
-                  {EARNING_TYPE_ICON[e.type] ?? <Zap size={18} />}
+                  <EarningTypeIcon type={e.type} />
                 </div>
                 <div className="earning-row-body">
                   <p className="earning-row-title">{e.title}</p>

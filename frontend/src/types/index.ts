@@ -11,6 +11,11 @@ export interface User {
   email: string;
   plan: PlanType;
   balance: string | number;
+  coins: string | number;
+  streak_count: number;
+  last_streak_date: string | null;
+  streak_broken_at: string | null;
+  streak_before_break: number;
   referral_code: string;
   is_verified: boolean;
   is_email_verified: boolean;
@@ -21,6 +26,24 @@ export interface User {
   created_at: string;
   active_sub_plan?: PlanType;
   sub_expires_at?: string;
+}
+
+export interface CoinTransaction {
+  id: string;
+  type: 'streak_bonus' | 'streak_recovery' | 'conversion' | 'task_reward';
+  amount: number;
+  description: string;
+  created_at: string;
+}
+
+export interface CoinsResponse {
+  success: boolean;
+  coins: number;
+  streak_count: number;
+  last_streak_date: string | null;
+  streak_broken_at: string | null;
+  streak_before_break: number;
+  can_recover: boolean;
 }
 
 export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected';
