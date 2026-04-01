@@ -1,0 +1,18 @@
+{
+  "name": "Plivio — Get Paid To",
+  "short_name": "Plivio",
+  "description": "Complete tasks and earn real money, paid directly to GCash.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0f0e14",
+  "theme_color": "#aa3bff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

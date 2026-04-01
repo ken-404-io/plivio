@@ -1,9 +1,12 @@
+import { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { Flame } from 'lucide-react';
 import Sidebar           from './Sidebar.tsx';
 import BottomNav         from './BottomNav.tsx';
 import NotificationBell  from '../common/NotificationBell.tsx';
+import OnboardingModal, { hasCompletedOnboarding } from '../common/OnboardingModal.tsx';
 import { useAuth }       from '../../store/authStore.tsx';
+import { usePushNotifications } from '../../hooks/usePushNotifications.ts';
 
 interface LayoutProps {
   isAdmin?: boolean;
@@ -11,6 +14,15 @@ interface LayoutProps {
 
 export default function Layout({ isAdmin = false }: LayoutProps) {
   const { user } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  usePushNotifications(user?.id);
+
+  // Show onboarding once per user, only for non-admin accounts
+  useEffect(() => {
+    if (user && !isAdmin && !hasCompletedOnboarding(user.id)) {
+      setShowOnboarding(true);
+    }
+  }, [user, isAdmin]);
 
   const balance = Number(user?.balance ?? 0).toLocaleString('en-PH', {
     minimumFractionDigits: 2,
@@ -66,6 +78,17 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
 
       {/* Mobile: bottom tab bar */}
       <BottomNav isAdmin={isAdmin} />
+
+      {/* Onboarding — shown once per user */}
+      {showOnboarding && user && (
+        <OnboardingModal
+          userId={user.id}
+          username={user.username}
+          isEmailVerified={user.is_email_verified}
+          email={user.email}
+          onDone={() => setShowOnboarding(false)}
+        />
+      )}
     </div>
   );
 }
