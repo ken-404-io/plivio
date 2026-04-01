@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Play, Megaphone, X } from 'lucide-react';
 import api from '../../services/api.ts';
 import type { Task, StartTaskResponse, SubmitTaskResponse, SurveyQuestion } from '../../types/index.ts';
 
@@ -74,12 +75,12 @@ function VideoAdPanel({
         <div className={`task-modal-media ${isVideo ? 'task-modal-media--video' : 'task-modal-media--ad'}`}>
           {isVideo ? (
             <>
-              <div className="task-modal-media-icon">▶</div>
+              <div className="task-modal-media-icon"><Play size={36} /></div>
               <p className="task-modal-media-label">Video playing…</p>
             </>
           ) : (
             <>
-              <div className="task-modal-media-icon">📢</div>
+              <div className="task-modal-media-icon"><Megaphone size={36} /></div>
               <p className="task-modal-media-label">Viewing advertisement…</p>
             </>
           )}
@@ -297,7 +298,7 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
             <span className="badge">{task.type.replace('_', ' ')}</span>
             <h2 className="task-modal-title">{task.title}</h2>
           </div>
-          <button className="task-modal-close" onClick={handleClose} aria-label="Close">✕</button>
+          <button className="task-modal-close" onClick={handleClose} aria-label="Close"><X size={18} /></button>
         </div>
 
         <div className="task-modal-reward">

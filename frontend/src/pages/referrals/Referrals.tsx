@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { User, Check } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import type { PlanType } from '../../types/index.ts';
@@ -86,7 +87,7 @@ export default function Referrals() {
                 onClick={() => copy(user?.referral_code ?? '', 'code')}
                 disabled={!user?.referral_code}
               >
-                {copied === 'code' ? '✓ Copied' : 'Copy'}
+                {copied === 'code' ? <><Check size={13} /> Copied</> : 'Copy'}
               </button>
             </div>
           </div>
@@ -99,7 +100,7 @@ export default function Referrals() {
                 className={`btn btn-sm ${copied === 'link' ? 'btn-outline' : 'btn-ghost'}`}
                 onClick={() => copy(referralLink, 'link')}
               >
-                {copied === 'link' ? '✓ Copied' : 'Copy link'}
+                {copied === 'link' ? <><Check size={13} /> Copied</> : 'Copy link'}
               </button>
             </div>
           </div>
@@ -126,7 +127,7 @@ export default function Referrals() {
           <div className="earnings-list">
             {referrals.map((r) => (
               <div key={r.username} className="earning-row">
-                <div className="earning-row-icon">👤</div>
+                <div className="earning-row-icon"><User size={18} /></div>
                 <div className="earning-row-body">
                   <p className="earning-row-title">{r.username}</p>
                   <div className="earning-row-meta">

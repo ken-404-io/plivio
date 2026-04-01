@@ -16,6 +16,7 @@ import {
   FileText,
   CreditCard,
   ShieldCheck,
+  Check,
 } from 'lucide-react';
 import './LandingPage.css';
 
@@ -259,10 +260,10 @@ export default function LandingPage() {
                 <span className="lp-price-period">/month</span>
               </div>
               <ul className="lp-plan-features">
-                <li><span className="lp-check">✓</span> Basic tasks access</li>
-                <li><span className="lp-check">✓</span> ₱20/day earning limit</li>
-                <li><span className="lp-check">✓</span> GCash &amp; PayPal withdrawal</li>
-                <li><span className="lp-check">✓</span> Referral bonuses</li>
+                <li><span className="lp-check"><Check size={14} /></span> Basic tasks access</li>
+                <li><span className="lp-check"><Check size={14} /></span> ₱20/day earning limit</li>
+                <li><span className="lp-check"><Check size={14} /></span> GCash &amp; PayPal withdrawal</li>
+                <li><span className="lp-check"><Check size={14} /></span> Referral bonuses</li>
               </ul>
               <Link to="/register" className="lp-plan-btn lp-plan-btn--outline">
                 Get Started Free
@@ -278,11 +279,11 @@ export default function LandingPage() {
                 <span className="lp-price-period">/month</span>
               </div>
               <ul className="lp-plan-features">
-                <li><span className="lp-check">✓</span> All task types</li>
-                <li><span className="lp-check">✓</span> ₱100/day earning limit</li>
-                <li><span className="lp-check">✓</span> Exclusive premium tasks</li>
-                <li><span className="lp-check">✓</span> No ads</li>
-                <li><span className="lp-check">✓</span> Priority support</li>
+                <li><span className="lp-check"><Check size={14} /></span> All task types</li>
+                <li><span className="lp-check"><Check size={14} /></span> ₱100/day earning limit</li>
+                <li><span className="lp-check"><Check size={14} /></span> Exclusive premium tasks</li>
+                <li><span className="lp-check"><Check size={14} /></span> No ads</li>
+                <li><span className="lp-check"><Check size={14} /></span> Priority support</li>
               </ul>
               <Link to="/register" className="lp-plan-btn lp-plan-btn--primary">
                 Upgrade to Premium
@@ -297,12 +298,12 @@ export default function LandingPage() {
                 <span className="lp-price-period">/month</span>
               </div>
               <ul className="lp-plan-features">
-                <li><span className="lp-check">✓</span> All task types</li>
-                <li><span className="lp-check lp-check--gold">✓</span> <strong>Unlimited</strong> daily earnings</li>
-                <li><span className="lp-check">✓</span> Exclusive elite tasks</li>
-                <li><span className="lp-check">✓</span> No ads</li>
-                <li><span className="lp-check">✓</span> Early access to new tasks</li>
-                <li><span className="lp-check">✓</span> VIP support</li>
+                <li><span className="lp-check"><Check size={14} /></span> All task types</li>
+                <li><span className="lp-check lp-check--gold"><Check size={14} /></span> <strong>Unlimited</strong> daily earnings</li>
+                <li><span className="lp-check"><Check size={14} /></span> Exclusive elite tasks</li>
+                <li><span className="lp-check"><Check size={14} /></span> No ads</li>
+                <li><span className="lp-check"><Check size={14} /></span> Early access to new tasks</li>
+                <li><span className="lp-check"><Check size={14} /></span> VIP support</li>
               </ul>
               <Link to="/register" className="lp-plan-btn lp-plan-btn--outline">
                 Go Elite
