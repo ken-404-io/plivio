@@ -1,4 +1,5 @@
 import { useState, useRef, type FormEvent, type ChangeEvent } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
@@ -177,6 +178,23 @@ function TwoFaSection({ has2fa, onToggled }: TwoFaSectionProps) {
   );
 }
 
+// ─── Password strength helper ─────────────────────────────────────────────────
+
+type StrengthLevel = 0 | 1 | 2 | 3 | 4;
+const STRENGTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Strong'] as const;
+const STRENGTH_COLORS = ['', '#ef4444', '#f59e0b', '#eab308', '#22c55e'] as const;
+
+function getStrength(pw: string): StrengthLevel {
+  if (!pw) return 0;
+  let score = 0;
+  if (pw.length >= 8)  score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return Math.min(score, 4) as StrengthLevel;
+}
+
 // ─── Change Password Section ──────────────────────────────────────────────────
 
 function ChangePasswordSection() {
@@ -187,7 +205,13 @@ function ChangePasswordSection() {
     new_password:     '',
     confirm_password: '',
   });
-  const [busy, setBusy] = useState(false);
+  const [busy,    setBusy]    = useState(false);
+  const [showCur, setShowCur] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showCon, setShowCon] = useState(false);
+
+  const strength = getStrength(form.new_password);
+  const mismatch = form.confirm_password.length > 0 && form.new_password !== form.confirm_password;
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
@@ -196,7 +220,6 @@ function ChangePasswordSection() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-
     if (form.new_password !== form.confirm_password) {
       toast.error('New passwords do not match.');
       return;
@@ -205,7 +228,6 @@ function ChangePasswordSection() {
       toast.error('New password must be at least 8 characters.');
       return;
     }
-
     setBusy(true);
     try {
       await api.put('/users/me/password', {
@@ -228,56 +250,118 @@ function ChangePasswordSection() {
         <div>
           <h3 className="security-item-title">Change Password</h3>
           <p className="security-item-desc">
-            Use a strong password that you don't use anywhere else.
+            Use a strong, unique password you don't use anywhere else.
           </p>
         </div>
       </div>
 
       <form onSubmit={(e) => { void handleSubmit(e); }} className="password-form" noValidate>
+        {/* Current password */}
         <div className="form-group">
           <label className="form-label" htmlFor="current_password">Current password</label>
-          <input
-            id="current_password"
-            name="current_password"
-            type="password"
-            className="form-input"
-            value={form.current_password}
-            onChange={handleChange}
-            autoComplete="current-password"
-            required
-          />
+          <div className="pw-input-wrap">
+            <input
+              id="current_password"
+              name="current_password"
+              type={showCur ? 'text' : 'password'}
+              className="form-input"
+              value={form.current_password}
+              onChange={handleChange}
+              autoComplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              className="pw-toggle"
+              onClick={() => setShowCur((v) => !v)}
+              aria-label={showCur ? 'Hide password' : 'Show password'}
+            >
+              {showCur ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
         </div>
+
+        {/* New password + strength meter */}
         <div className="form-group">
           <label className="form-label" htmlFor="new_password">New password</label>
-          <input
-            id="new_password"
-            name="new_password"
-            type="password"
-            className="form-input"
-            value={form.new_password}
-            onChange={handleChange}
-            autoComplete="new-password"
-            minLength={8}
-            required
-          />
+          <div className="pw-input-wrap">
+            <input
+              id="new_password"
+              name="new_password"
+              type={showNew ? 'text' : 'password'}
+              className="form-input"
+              value={form.new_password}
+              onChange={handleChange}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+            <button
+              type="button"
+              className="pw-toggle"
+              onClick={() => setShowNew((v) => !v)}
+              aria-label={showNew ? 'Hide password' : 'Show password'}
+            >
+              {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+
+          {/* Strength bar */}
+          {form.new_password.length > 0 && (
+            <div className="pw-strength">
+              <div className="pw-strength-track">
+                {[1, 2, 3, 4].map((seg) => (
+                  <div
+                    key={seg}
+                    className="pw-strength-seg"
+                    style={{
+                      background: strength >= seg
+                        ? STRENGTH_COLORS[strength]
+                        : 'var(--border)',
+                      transition: 'background 0.2s',
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="pw-strength-label" style={{ color: STRENGTH_COLORS[strength] }}>
+                {STRENGTH_LABELS[strength]}
+              </span>
+            </div>
+          )}
         </div>
+
+        {/* Confirm password */}
         <div className="form-group">
           <label className="form-label" htmlFor="confirm_password">Confirm new password</label>
-          <input
-            id="confirm_password"
-            name="confirm_password"
-            type="password"
-            className="form-input"
-            value={form.confirm_password}
-            onChange={handleChange}
-            autoComplete="new-password"
-            required
-          />
+          <div className="pw-input-wrap">
+            <input
+              id="confirm_password"
+              name="confirm_password"
+              type={showCon ? 'text' : 'password'}
+              className={`form-input${mismatch ? ' form-input--error' : ''}`}
+              value={form.confirm_password}
+              onChange={handleChange}
+              autoComplete="new-password"
+              required
+            />
+            <button
+              type="button"
+              className="pw-toggle"
+              onClick={() => setShowCon((v) => !v)}
+              aria-label={showCon ? 'Hide password' : 'Show password'}
+            >
+              {showCon ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {mismatch && (
+            <p className="form-error-hint">Passwords don't match.</p>
+          )}
         </div>
+
         <button
           type="submit"
           className="btn btn-primary"
-          disabled={busy || !form.current_password || !form.new_password || !form.confirm_password}
+          disabled={busy || !form.current_password || !form.new_password || !form.confirm_password || mismatch}
         >
           {busy ? 'Updating…' : 'Update password'}
         </button>
