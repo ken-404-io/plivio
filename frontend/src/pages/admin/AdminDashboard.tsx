@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
-import { Users, ListTodo, Clock, TrendingUp, UserPlus, CheckSquare, ShieldCheck, Coins } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Users, ListTodo, Clock, TrendingUp, UserPlus, CheckSquare, ShieldCheck, Coins, Bell, Send, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { AdminUser, AdminTask, AdminWithdrawal, AdminStats, AdNetwork, AdminKycSubmission } from '../../types/index.ts';
@@ -91,16 +91,97 @@ function RejectModal({ onConfirm, onCancel }: RejectModalProps) {
   );
 }
 
+// ─── Notify user modal ────────────────────────────────────────────────────────
+interface NotifyModalProps {
+  username: string;
+  onSend:   (title: string, message: string, link: string) => Promise<void>;
+  onCancel: () => void;
+}
+
+function NotifyModal({ username, onSend, onCancel }: NotifyModalProps) {
+  const [form, setForm]   = useState({ title: '', message: '', link: '' });
+  const [busy, setBusy]   = useState(false);
+
+  async function handle(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title.trim() || !form.message.trim()) return;
+    setBusy(true);
+    await onSend(form.title, form.message, form.link);
+    setBusy(false);
+  }
+
+  return (
+    <div className="reject-modal-overlay" onClick={onCancel}>
+      <div className="reject-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <h3 className="reject-modal-title">
+          <Bell size={16} style={{ marginRight: 6 }} />
+          Notify {username}
+        </h3>
+        <form onSubmit={(e) => { void handle(e); }}>
+          <input
+            className="form-input"
+            placeholder="Title"
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            maxLength={200}
+            required
+            autoFocus
+            style={{ marginBottom: 8 }}
+          />
+          <textarea
+            className="form-input reject-modal-textarea"
+            placeholder="Message"
+            value={form.message}
+            onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+            maxLength={2000}
+            rows={3}
+            required
+            style={{ marginBottom: 8 }}
+          />
+          <input
+            className="form-input"
+            placeholder="Link (optional, e.g. /kyc)"
+            value={form.link}
+            onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
+            maxLength={500}
+            style={{ marginBottom: 12 }}
+          />
+          <div className="reject-modal-actions">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              disabled={busy || !form.title.trim() || !form.message.trim()}
+            >
+              <Send size={14} />
+              {busy ? 'Sending…' : 'Send'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const toast = useToast();
 
   const [tab,         setTab]         = useState<Tab>('overview');
   const [stats,       setStats]       = useState<AdminStats | null>(null);
   const [users,       setUsers]       = useState<AdminUser[]>([]);
+  const [usersMeta,   setUsersMeta]   = useState({ page: 1, total: 0, limit: 25 });
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch,  setUserSearch]  = useState('');
+  const [userPage,    setUserPage]    = useState(1);
   const [tasks,       setTasks]       = useState<AdminTask[]>([]);
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
   const [kycList,     setKycList]     = useState<AdminKycSubmission[]>([]);
   const [loading,     setLoading]     = useState(true);
+
+  // Notify — target user + broadcast form
+  const [notifyTarget,     setNotifyTarget]     = useState<{ id: string; username: string } | null>(null);
+  const [broadcasting,     setBroadcasting]     = useState(false);
+  const [broadcastForm,    setBroadcastForm]    = useState({ title: '', message: '' });
 
   // KYC — which card has images expanded
   const [expandedKyc,     setExpandedKyc]     = useState<string | null>(null);
@@ -109,22 +190,23 @@ export default function AdminDashboard() {
   // Withdrawal — rejection modal target
   const [wdRejectTarget,  setWdRejectTarget]  = useState<string | null>(null);
 
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [taskForm, setTaskForm] = useState<TaskForm>({
     title: '', type: 'captcha', reward_amount: '', min_plan: 'free',
   });
 
+  // Load non-user data once on mount
   useEffect(() => {
     async function load() {
       try {
-        const [statsRes, usersRes, tasksRes, wdRes, kycRes] = await Promise.all([
+        const [statsRes, tasksRes, wdRes, kycRes] = await Promise.all([
           api.get<{ stats: AdminStats }>('/admin/stats'),
-          api.get<{ data: AdminUser[] }>('/admin/users'),
           api.get<{ tasks: AdminTask[] }>('/admin/tasks'),
           api.get<{ withdrawals: AdminWithdrawal[] }>('/admin/withdrawals'),
           api.get<{ submissions: AdminKycSubmission[] }>('/admin/kyc'),
         ]);
         setStats(statsRes.data.stats);
-        setUsers(usersRes.data.data);
         setTasks(tasksRes.data.tasks);
         setWithdrawals(wdRes.data.withdrawals);
         setKycList(kycRes.data.submissions);
@@ -138,6 +220,37 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load users with search + pagination
+  const loadUsers = useCallback(async (search: string, page: number) => {
+    setUsersLoading(true);
+    try {
+      const { data } = await api.get<{
+        data: AdminUser[];
+        meta: { page: number; total: number; limit: number };
+      }>('/admin/users', { params: { search: search || undefined, page, limit: 25 } });
+      setUsers(data.data);
+      setUsersMeta(data.meta);
+    } catch {
+      toast.error('Failed to load users.');
+    } finally {
+      setUsersLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Initial user load + re-load on page change
+  useEffect(() => { void loadUsers(userSearch, userPage); }, [loadUsers, userPage]);
+
+  // Debounced search — reset to page 1 on new query
+  function handleUserSearch(value: string) {
+    setUserSearch(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setUserPage(1);
+      void loadUsers(value, 1);
+    }, 400);
+  }
+
   async function toggleBan(userId: string, isBanned: boolean) {
     try {
       await api.put(`/admin/users/${userId}`, { is_banned: String(!isBanned) });
@@ -146,6 +259,33 @@ export default function AdminDashboard() {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       toast.error(msg ?? 'Action failed.');
+    }
+  }
+
+  async function sendNotification(userId: string, title: string, message: string, link: string) {
+    try {
+      await api.post('/admin/notify', { user_id: userId, title, message, link: link || undefined });
+      toast.success('Notification sent.');
+      setNotifyTarget(null);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      toast.error(msg ?? 'Failed to send notification.');
+    }
+  }
+
+  async function sendBroadcast(e: React.FormEvent) {
+    e.preventDefault();
+    if (!broadcastForm.title.trim() || !broadcastForm.message.trim()) return;
+    setBroadcasting(true);
+    try {
+      const { data } = await api.post<{ sent_to: number }>('/admin/notify-all', broadcastForm);
+      toast.success(`Broadcast sent to ${data.sent_to} users.`);
+      setBroadcastForm({ title: '', message: '' });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      toast.error(msg ?? 'Broadcast failed.');
+    } finally {
+      setBroadcasting(false);
     }
   }
 
@@ -268,6 +408,14 @@ export default function AdminDashboard() {
         />
       )}
 
+      {notifyTarget && (
+        <NotifyModal
+          username={notifyTarget.username}
+          onSend={(title, message, link) => sendNotification(notifyTarget.id, title, message, link)}
+          onCancel={() => setNotifyTarget(null)}
+        />
+      )}
+
       <header className="page-header">
         <h1 className="page-title">Admin Panel</h1>
       </header>
@@ -342,40 +490,122 @@ export default function AdminDashboard() {
               <span className="stat-value">{Number(stats.total_coins_distributed).toLocaleString()}</span>
             </div>
           </div>
+
+          {/* Broadcast notification panel */}
+          <section className="card" style={{ marginTop: 20 }}>
+            <div className="card-title-row">
+              <Bell size={18} />
+              <h2 className="card-title">Broadcast Notification</h2>
+            </div>
+            <p className="text-muted" style={{ fontSize: 13, marginBottom: 12 }}>
+              Send an in-app notification to all active (non-banned) users.
+            </p>
+            <form onSubmit={(e) => { void sendBroadcast(e); }} className="admin-broadcast-form">
+              <input
+                className="form-input"
+                placeholder="Title"
+                value={broadcastForm.title}
+                onChange={(e) => setBroadcastForm((f) => ({ ...f, title: e.target.value }))}
+                maxLength={200}
+                required
+              />
+              <textarea
+                className="form-input"
+                placeholder="Message"
+                value={broadcastForm.message}
+                onChange={(e) => setBroadcastForm((f) => ({ ...f, message: e.target.value }))}
+                maxLength={2000}
+                rows={3}
+                required
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={broadcasting || !broadcastForm.title.trim() || !broadcastForm.message.trim()}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                <Send size={15} />
+                {broadcasting ? 'Sending…' : 'Send to all users'}
+              </button>
+            </form>
+          </section>
         </>
       )}
 
       {/* ── Users ── */}
       {tab === 'users' && (
-        <div className="admin-list">
-          {users.length === 0 ? (
-            <div className="empty-state"><p>No users found.</p></div>
-          ) : users.map((u) => (
-            <div key={u.id} className="admin-card">
-              <div className="admin-card-body">
-                <div className="admin-card-main">
-                  <span className="admin-card-title">{u.username}</span>
-                  <span className="admin-card-sub">{u.email}</span>
+        <>
+          {/* Search bar */}
+          <div className="admin-search-wrap">
+            <span className="admin-search-icon"><Search size={16} /></span>
+            <input
+              className="form-input admin-search-input"
+              placeholder="Search by username or email…"
+              value={userSearch}
+              onChange={(e) => handleUserSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="admin-list" style={{ opacity: usersLoading ? 0.6 : 1, transition: 'opacity 0.15s' }}>
+            {users.length === 0 && !usersLoading ? (
+              <div className="empty-state"><p>No users found.</p></div>
+            ) : users.map((u) => (
+              <div key={u.id} className="admin-card">
+                <div className="admin-card-body">
+                  <div className="admin-card-main">
+                    <span className="admin-card-title">{u.username}</span>
+                    <span className="admin-card-sub">{u.email}</span>
+                  </div>
+                  <div className="admin-card-meta">
+                    <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan.toUpperCase()}</span>
+                    <span className="admin-card-balance">₱{Number(u.balance).toFixed(2)}</span>
+                    <span className={`status-dot status-dot--${u.is_banned ? 'rejected' : 'approved'}`}>
+                      {u.is_banned ? 'Banned' : 'Active'}
+                    </span>
+                  </div>
                 </div>
-                <div className="admin-card-meta">
-                  <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan.toUpperCase()}</span>
-                  <span className="admin-card-balance">₱{Number(u.balance).toFixed(2)}</span>
-                  <span className={`status-dot status-dot--${u.is_banned ? 'rejected' : 'approved'}`}>
-                    {u.is_banned ? 'Banned' : 'Active'}
-                  </span>
+                <div className="admin-card-actions">
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
+                    title="Send notification"
+                  >
+                    <Bell size={14} />
+                  </button>
+                  <button
+                    className={`btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => { void toggleBan(u.id, u.is_banned); }}
+                  >
+                    {u.is_banned ? 'Unban' : 'Ban'}
+                  </button>
                 </div>
               </div>
-              <div className="admin-card-actions">
-                <button
-                  className={`btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-ghost'}`}
-                  onClick={() => { void toggleBan(u.id, u.is_banned); }}
-                >
-                  {u.is_banned ? 'Unban' : 'Ban'}
-                </button>
-              </div>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {usersMeta.total > usersMeta.limit && (
+            <div className="admin-pagination">
+              <button
+                className="btn btn-sm btn-ghost"
+                disabled={userPage <= 1}
+                onClick={() => setUserPage((p) => p - 1)}
+              >
+                <ChevronLeft size={16} /> Prev
+              </button>
+              <span className="admin-pagination-info">
+                Page {usersMeta.page} · {usersMeta.total} users
+              </span>
+              <button
+                className="btn btn-sm btn-ghost"
+                disabled={userPage * usersMeta.limit >= usersMeta.total}
+                onClick={() => setUserPage((p) => p + 1)}
+              >
+                Next <ChevronRight size={16} />
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {/* ── Tasks ── */}

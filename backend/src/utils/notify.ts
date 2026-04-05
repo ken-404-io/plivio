@@ -13,7 +13,8 @@ export type NotificationType =
   | 'referral_bonus'
   | 'kyc_approved'
   | 'kyc_rejected'
-  | 'email_verified';
+  | 'email_verified'
+  | 'admin_message';
 
 export async function createNotification(
   userId:  string,

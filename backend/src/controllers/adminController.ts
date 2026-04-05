@@ -94,6 +94,52 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
   } catch (err) { next(err); }
 }
 
+// ─── Admin notification send / broadcast ─────────────────────────────────────
+
+/** POST /admin/notify  — send a custom in-app notification to one user */
+export async function notifyUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { user_id, title, message, link } = req.body as Record<string, string>;
+    if (!user_id || !title?.trim() || !message?.trim()) {
+      throw new ValidationError('user_id, title and message are required');
+    }
+    const { rows } = await pool.query('SELECT id FROM users WHERE id = $1', [user_id]);
+    if (rows.length === 0) throw new NotFoundError('User not found');
+
+    await createNotification(user_id, 'admin_message', title.trim(), message.trim(), link ?? undefined);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+}
+
+/** POST /admin/notify-all  — broadcast a notification to every non-banned user */
+export async function broadcastNotification(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { title, message, link } = req.body as Record<string, string>;
+    if (!title?.trim() || !message?.trim()) {
+      throw new ValidationError('title and message are required');
+    }
+
+    const { rows } = await pool.query(
+      `SELECT id FROM users WHERE is_banned = FALSE`,
+    );
+
+    // Insert all notifications in a single batch query for efficiency
+    if (rows.length > 0) {
+      const ids = (rows as { id: string }[]).map((r) => r.id);
+      const placeholders = ids.map((_, i) =>
+        `($${i * 5 + 1}, 'admin_message', $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`
+      ).join(', ');
+      const values = ids.flatMap((id) => [id, title.trim(), message.trim(), link ?? null, false]);
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, link, is_read) VALUES ${placeholders}`,
+        values,
+      );
+    }
+
+    res.json({ success: true, sent_to: rows.length });
+  } catch (err) { next(err); }
+}
+
 export async function listAllTasks(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { rows } = await pool.query('SELECT * FROM tasks ORDER BY created_at DESC');
