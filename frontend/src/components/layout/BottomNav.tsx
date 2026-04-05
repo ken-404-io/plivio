@@ -11,9 +11,9 @@ import {
   Star,
   UserPlus,
   BadgeCheck,
-  User,
   X,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 
@@ -61,7 +61,7 @@ interface BottomNavProps {
 export default function BottomNav({ isAdmin = false }: BottomNavProps) {
   const [showMenu, setShowMenu] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   if (isAdmin) {
     const item = ADMIN_ITEMS[0];
@@ -171,6 +171,21 @@ export default function BottomNav({ isAdmin = false }: BottomNavProps) {
                 </div>
               </div>
             ))}
+
+            {/* Sign out */}
+            <div className="menu-group">
+              <div className="menu-group-card">
+                <button
+                  className="menu-row menu-row--danger"
+                  onClick={() => { void logout(); }}
+                >
+                  <span className="menu-row-icon menu-row-icon--danger"><LogOut size={20} /></span>
+                  <div className="menu-row-body">
+                    <span className="menu-row-label">Sign Out</span>
+                  </div>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
