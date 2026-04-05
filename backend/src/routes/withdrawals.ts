@@ -1,20 +1,13 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.ts';
-import { validateBody } from '../middleware/validate.ts';
-import { requestWithdrawal, listWithdrawals } from '../controllers/withdrawalController.ts';
+import { requestWithdrawal, listWithdrawals, cancelWithdrawal } from '../controllers/withdrawalController.ts';
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get('/', listWithdrawals);
-
-router.post('/',
-  validateBody({
-    amount: { required: true, type: 'number', min: 50, max: 5000 },
-    method: { required: true, enum: ['gcash', 'paypal'] },
-  }),
-  requestWithdrawal
-);
+router.get('/',     listWithdrawals);
+router.post('/',    requestWithdrawal);
+router.delete('/:id', cancelWithdrawal);
 
 export default router;
