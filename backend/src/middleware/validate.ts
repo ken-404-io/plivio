@@ -1,6 +1,26 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../utils/errors.ts';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Middleware that validates a UUID route parameter by name.
+ * Rejects early with 400 before the request reaches the controller,
+ * preventing DB queries with malformed input.
+ *
+ * Usage: router.put('/:id', validateParam('id'), handler)
+ */
+export function validateParam(paramName: string) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    const value = (req.params as Record<string, string>)[paramName];
+    if (!value || !UUID_RE.test(value)) {
+      next(new ValidationError(`Invalid ${paramName}`));
+      return;
+    }
+    next();
+  };
+}
+
 type FieldType = 'email' | 'username' | 'int' | 'number' | 'string';
 
 interface FieldRules {

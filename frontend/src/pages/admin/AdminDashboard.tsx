@@ -103,9 +103,11 @@ export default function AdminDashboard() {
   const [loading,     setLoading]     = useState(true);
 
   // KYC — which card has images expanded
-  const [expandedKyc,  setExpandedKyc]  = useState<string | null>(null);
+  const [expandedKyc,     setExpandedKyc]     = useState<string | null>(null);
   // KYC — rejection modal target
-  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
+  const [rejectTarget,    setRejectTarget]    = useState<string | null>(null);
+  // Withdrawal — rejection modal target
+  const [wdRejectTarget,  setWdRejectTarget]  = useState<string | null>(null);
 
   const [taskForm, setTaskForm] = useState<TaskForm>({
     title: '', type: 'captcha', reward_amount: '', min_plan: 'free',
@@ -219,11 +221,11 @@ export default function AdminDashboard() {
     }
   }
 
-  async function processWithdrawal(id: string, action: 'approve' | 'reject') {
+  async function processWithdrawal(id: string, action: 'approve' | 'reject', rejection_reason?: string) {
     try {
-      await api.put(`/admin/withdrawals/${id}`, { action });
+      await api.put(`/admin/withdrawals/${id}`, { action, rejection_reason });
       setWithdrawals((prev) => prev.filter((w) => w.id !== id));
-      toast.success(`Withdrawal ${action}d.`);
+      toast.success(`Withdrawal ${action === 'approve' ? 'approved' : 'rejected'}.`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       toast.error(msg ?? 'Action failed.');
@@ -253,6 +255,16 @@ export default function AdminDashboard() {
             setRejectTarget(null);
           }}
           onCancel={() => setRejectTarget(null)}
+        />
+      )}
+
+      {wdRejectTarget && (
+        <RejectModal
+          onConfirm={(reason) => {
+            void processWithdrawal(wdRejectTarget, 'reject', reason);
+            setWdRejectTarget(null);
+          }}
+          onCancel={() => setWdRejectTarget(null)}
         />
       )}
 
@@ -552,9 +564,19 @@ export default function AdminDashboard() {
               <div className="admin-card-body">
                 <div className="admin-card-main">
                   <span className="admin-card-title">{w.username}</span>
-                  <span className="admin-card-sub">
-                    {w.method.toUpperCase()} · {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </span>
+                  <span className="admin-card-sub">{w.email}</span>
+                  <div className="admin-card-meta" style={{ marginTop: 6 }}>
+                    <span className="badge">{w.method.toUpperCase()}</span>
+                    <span className="text-muted" style={{ fontSize: 12 }}>
+                      {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                  {/* Payment destination — critical info for admin */}
+                  <div className="wd-payment-info">
+                    <span className="wd-payment-label">Send to:</span>
+                    <span className="wd-payment-name">{w.account_name}</span>
+                    <span className="wd-payment-number">{w.account_number}</span>
+                  </div>
                 </div>
                 <span className="admin-card-amount">₱{Number(w.amount).toFixed(2)}</span>
               </div>
@@ -566,8 +588,8 @@ export default function AdminDashboard() {
                   Approve
                 </button>
                 <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => { void processWithdrawal(w.id, 'reject'); }}
+                  className="btn btn-sm btn-ghost btn-danger"
+                  onClick={() => setWdRejectTarget(w.id)}
                 >
                   Reject
                 </button>

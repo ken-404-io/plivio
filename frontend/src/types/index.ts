@@ -1,7 +1,7 @@
 export type PlanType = 'free' | 'premium' | 'elite';
 export type TaskType = 'captcha' | 'video' | 'ad_click' | 'survey' | 'referral';
 export type CompletionStatus = 'pending' | 'approved' | 'rejected';
-export type WithdrawalStatus = 'pending' | 'processing' | 'paid' | 'rejected';
+export type WithdrawalStatus = 'pending' | 'processing' | 'paid' | 'rejected' | 'cancelled';
 export type WithdrawalMethod = 'gcash' | 'paypal';
 export type Theme = 'dark' | 'light';
 
@@ -149,6 +149,9 @@ export interface Withdrawal {
   amount: string | number;
   method: WithdrawalMethod;
   status: WithdrawalStatus;
+  account_name: string;
+  account_number: string;
+  rejection_reason: string | null;
   requested_at: string;
   processed_at?: string;
 }
@@ -210,6 +213,8 @@ export interface AdminWithdrawal {
   amount: string | number;
   method: WithdrawalMethod;
   status: WithdrawalStatus;
+  account_name: string;
+  account_number: string;
   requested_at: string;
   username: string;
   email: string;

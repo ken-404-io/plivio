@@ -151,7 +151,9 @@ export async function listPendingWithdrawals(req: Request, res: Response, next: 
   try {
     const status = (req.query.status as string) || 'pending';
     const { rows } = await pool.query(
-      `SELECT w.id, w.amount, w.method, w.status, w.requested_at, w.processed_at,
+      `SELECT w.id, w.amount, w.method, w.status,
+              w.account_name, w.account_number,
+              w.requested_at, w.processed_at,
               u.username, u.email
        FROM withdrawals w JOIN users u ON u.id = w.user_id
        WHERE w.status = $1 ORDER BY w.requested_at ASC`,
@@ -165,9 +167,12 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
   const client = await pool.connect();
   try {
     const { id }     = req.params as Record<string, string>;
-    const { action } = req.body as { action: 'approve' | 'reject' };
+    const { action, rejection_reason } = req.body as { action: 'approve' | 'reject'; rejection_reason?: string };
 
     if (!['approve', 'reject'].includes(action)) throw new ValidationError('action must be approve or reject');
+    if (action === 'reject' && !rejection_reason?.trim()) {
+      throw new ValidationError('rejection_reason is required when rejecting');
+    }
 
     await client.query('BEGIN');
 
@@ -178,7 +183,10 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
     if (withdrawal.status !== 'pending') throw new ValidationError('Withdrawal is not in pending state');
 
     const newStatus = action === 'approve' ? 'paid' : 'rejected';
-    await client.query(`UPDATE withdrawals SET status = $1, processed_at = NOW() WHERE id = $2`, [newStatus, id]);
+    await client.query(
+      `UPDATE withdrawals SET status = $1, rejection_reason = $2, processed_at = NOW() WHERE id = $3`,
+      [newStatus, action === 'reject' ? (rejection_reason ?? null) : null, id],
+    );
 
     if (action === 'reject') {
       await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [withdrawal.amount, withdrawal.user_id]);
