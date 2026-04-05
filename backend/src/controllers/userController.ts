@@ -331,11 +331,31 @@ export async function getReferrals(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { rows } = await pool.query(
-      `SELECT u.username, u.plan, u.created_at
-       FROM users u WHERE u.referred_by = $1 ORDER BY u.created_at DESC`,
-      [req.user!.id],
-    );
-    res.json({ success: true, referrals: rows });
+    const userId = req.user!.id;
+
+    // Referred users list + total referral earnings in parallel
+    const [listResult, earningsResult] = await Promise.all([
+      pool.query(
+        `SELECT u.username, u.plan, u.created_at
+         FROM users u
+         WHERE u.referred_by = $1
+         ORDER BY u.created_at DESC`,
+        [userId],
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(reward_earned), 0) AS total
+         FROM task_completions
+         WHERE user_id = $1 AND type = 'referral' AND status = 'approved'`,
+        [userId],
+      ),
+    ]);
+
+    const totalEarned = Number((earningsResult.rows[0] as { total: string }).total);
+
+    res.json({
+      success:       true,
+      referrals:     listResult.rows,
+      total_earned:  totalEarned,
+    });
   } catch (err) { next(err); }
 }
