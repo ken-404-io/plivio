@@ -326,6 +326,8 @@ img { display: block; max-width: 100%; }
   }
   .menu-row:hover { background: var(--bg-elevated); }
   .menu-row--bordered { border-bottom: 1px solid var(--border); }
+  .menu-row--danger .menu-row-label { color: var(--error); }
+  .menu-row-icon--danger { background: rgba(239,68,68,.12); color: var(--error); }
 
   .menu-row-icon {
     width: 36px;
