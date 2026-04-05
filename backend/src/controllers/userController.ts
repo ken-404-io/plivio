@@ -239,29 +239,86 @@ export async function getEarnings(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const userId = req.user!.id;
     const page   = Math.max(1, Number(req.query.page)  || 1);
     const limit  = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     const offset = (page - 1) * limit;
 
-    const { rows } = await pool.query(
-      `SELECT tc.id, t.title, t.type, tc.reward_earned, tc.status, tc.completed_at
-       FROM task_completions tc
-       JOIN tasks t ON t.id = tc.task_id
-       WHERE tc.user_id = $1
-       ORDER BY tc.completed_at DESC
-       LIMIT $2 OFFSET $3`,
-      [req.user!.id, limit, offset],
-    );
+    // Optional filter params — validated against allowed values
+    const ALLOWED_STATUSES = new Set(['pending', 'approved', 'rejected']);
+    const ALLOWED_TYPES    = new Set(['captcha', 'video', 'ad_click', 'survey', 'referral']);
+    const filterStatus = ALLOWED_STATUSES.has(req.query.status as string)
+      ? (req.query.status as string) : null;
+    const filterType   = ALLOWED_TYPES.has(req.query.type as string)
+      ? (req.query.type as string) : null;
 
-    const countResult = await pool.query(
-      'SELECT COUNT(*) FROM task_completions WHERE user_id = $1',
-      [req.user!.id],
-    );
+    // Fetch paginated list + summary stats in parallel
+    const [listResult, countResult, summaryResult] = await Promise.all([
+      pool.query(
+        `SELECT tc.id, t.title, t.type, tc.reward_earned, tc.status, tc.completed_at
+         FROM task_completions tc
+         JOIN tasks t ON t.id = tc.task_id
+         WHERE tc.user_id = $1
+           AND ($2::text IS NULL OR tc.status = $2)
+           AND ($3::text IS NULL OR t.type   = $3)
+         ORDER BY tc.completed_at DESC
+         LIMIT $4 OFFSET $5`,
+        [userId, filterStatus, filterType, limit, offset],
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM task_completions tc
+         JOIN tasks t ON t.id = tc.task_id
+         WHERE tc.user_id = $1
+           AND ($2::text IS NULL OR tc.status = $2)
+           AND ($3::text IS NULL OR t.type   = $3)`,
+        [userId, filterStatus, filterType],
+      ),
+      pool.query(
+        `SELECT
+           COALESCE(SUM(reward_earned), 0)                                          AS total_earned,
+           COALESCE(SUM(reward_earned) FILTER (WHERE status = 'approved'), 0)       AS approved_amount,
+           COALESCE(SUM(reward_earned) FILTER (WHERE status = 'pending'),  0)       AS pending_amount,
+           COALESCE(SUM(reward_earned) FILTER (
+             WHERE status = 'approved'
+               AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
+           ), 0) AS today_earned,
+           COUNT(*)                                                                  AS total_count,
+           COUNT(*) FILTER (WHERE status = 'approved')                              AS approved_count,
+           COUNT(*) FILTER (WHERE status = 'pending')                               AS pending_count
+         FROM task_completions
+         WHERE user_id = $1`,
+        [userId],
+      ),
+    ]);
+
+    type SummaryRow = {
+      total_earned:    string;
+      approved_amount: string;
+      pending_amount:  string;
+      today_earned:    string;
+      total_count:     string;
+      approved_count:  string;
+      pending_count:   string;
+    };
+    const s = summaryResult.rows[0] as SummaryRow;
 
     res.json({
       success: true,
-      data:    rows,
-      meta: { page, limit, total: Number((countResult.rows[0] as { count: string }).count) },
+      data:    listResult.rows,
+      meta: {
+        page,
+        limit,
+        total: Number((countResult.rows[0] as { count: string }).count),
+      },
+      summary: {
+        total_earned:    Number(s.total_earned),
+        approved_amount: Number(s.approved_amount),
+        pending_amount:  Number(s.pending_amount),
+        today_earned:    Number(s.today_earned),
+        total_count:     Number(s.total_count),
+        approved_count:  Number(s.approved_count),
+        pending_count:   Number(s.pending_count),
+      },
     });
   } catch (err) { next(err); }
 }

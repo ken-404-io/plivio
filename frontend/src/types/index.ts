@@ -134,9 +134,20 @@ export interface Earning {
   completed_at: string;
 }
 
+export interface EarningsSummary {
+  total_earned:    number;
+  approved_amount: number;
+  pending_amount:  number;
+  today_earned:    number;
+  total_count:     number;
+  approved_count:  number;
+  pending_count:   number;
+}
+
 export interface EarningsResponse {
   success: boolean;
   data: Earning[];
+  summary?: EarningsSummary;
   meta: {
     page: number;
     limit: number;
