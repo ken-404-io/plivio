@@ -1,10 +1,18 @@
-import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type ChangeEvent, type FormEvent } from 'react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import BackButton from '../../components/common/BackButton.tsx';
 import { useToast } from '../../components/common/Toast.tsx';
 import type { KycStatus } from '../../types/index.ts';
-import { ClipboardList, Clock, CheckCircle2, XCircle, FileText, Camera } from 'lucide-react';
+import { ClipboardList, Clock, CheckCircle2, XCircle, Camera, Upload } from 'lucide-react';
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+function fmtSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const ID_TYPES = [
   { value: 'passport',        label: 'Passport' },
@@ -35,12 +43,14 @@ export default function Kyc() {
   const { user, fetchMe } = useAuth();
   const toast             = useToast();
 
-  const [kycData,    setKycData]    = useState<KycStatusData | null>(null);
-  const [loading,    setLoading]    = useState(true);
-  const [idType,     setIdType]     = useState<string>(ID_TYPES[0].value);
-  const [idFront,    setIdFront]    = useState<File | null>(null);
-  const [idSelfie,   setIdSelfie]   = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [kycData,       setKycData]       = useState<KycStatusData | null>(null);
+  const [loading,       setLoading]       = useState(true);
+  const [idType,        setIdType]        = useState<string>(ID_TYPES[0].value);
+  const [idFront,       setIdFront]       = useState<File | null>(null);
+  const [idSelfie,      setIdSelfie]      = useState<File | null>(null);
+  const [frontPreview,  setFrontPreview]  = useState<string | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+  const [submitting,    setSubmitting]    = useState(false);
 
   const frontRef  = useRef<HTMLInputElement>(null);
   const selfieRef = useRef<HTMLInputElement>(null);
@@ -52,11 +62,38 @@ export default function Kyc() {
       .finally(() => setLoading(false));
   }, []);
 
+  const setFile = useCallback((
+    field: 'front' | 'selfie',
+    file: File | null,
+    prevPreview: string | null,
+    setPreview: (url: string | null) => void,
+    setFileFn: (f: File | null) => void,
+  ) => {
+    // Revoke old object URL to avoid memory leaks
+    if (prevPreview) URL.revokeObjectURL(prevPreview);
+    if (!file) { setFileFn(null); setPreview(null); return; }
+    if (file.size > MAX_FILE_BYTES) {
+      toast.error(`${field === 'front' ? 'ID photo' : 'Selfie'} must be under 5 MB.`);
+      setFileFn(null); setPreview(null); return;
+    }
+    setFileFn(file);
+    if (file.type.startsWith('image/')) {
+      setPreview(URL.createObjectURL(file));
+    } else {
+      setPreview(null); // PDF — no visual preview
+    }
+  }, [toast]);
+
   function handleFileChange(field: 'front' | 'selfie') {
     return (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0] ?? null;
-      if (field === 'front')  setIdFront(file);
-      if (field === 'selfie') setIdSelfie(file);
+      if (field === 'front') {
+        setFile('front',  file, frontPreview,  setFrontPreview,  setIdFront);
+      } else {
+        setFile('selfie', file, selfiePreview, setSelfiePreview, setIdSelfie);
+      }
+      // Reset input so same file can be re-selected after clearing
+      e.target.value = '';
     };
   }
 
@@ -72,10 +109,12 @@ export default function Kyc() {
     setSubmitting(true);
     try {
       await api.post('/kyc', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success("KYC submitted! We'll review it within 1\u20133 business days.");
+      toast.success("KYC submitted! We'll review it within 1–3 business days.");
       setKycData({ status: 'pending', id_type: idType, submitted_at: new Date().toISOString(), reviewed_at: null, rejection_reason: null });
       setIdFront(null);
       setIdSelfie(null);
+      if (frontPreview)  { URL.revokeObjectURL(frontPreview);  setFrontPreview(null);  }
+      if (selfiePreview) { URL.revokeObjectURL(selfiePreview); setSelfiePreview(null); }
       if (frontRef.current)  frontRef.current.value  = '';
       if (selfieRef.current) selfieRef.current.value = '';
       await fetchMe();
@@ -173,25 +212,28 @@ export default function Kyc() {
                   role="button" tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') frontRef.current?.click(); }}
                 >
+                  {frontPreview ? (
+                    <img src={frontPreview} alt="ID front preview" className="kyc-preview-img" />
+                  ) : idFront ? (
+                    <Upload size={24} />
+                  ) : (
+                    <Upload size={28} />
+                  )}
                   {idFront ? (
                     <>
-                      <FileText size={24} />
                       <p className="kyc-upload-filename">{idFront.name}</p>
+                      <p className="kyc-upload-filesize">{fmtSize(idFront.size)}</p>
                       <span className="kyc-upload-change">Tap to change</span>
                     </>
                   ) : (
                     <>
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
-                          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
                       <p style={{ fontWeight: 600, fontSize: 13 }}>Upload ID front</p>
-                      <p style={{ fontSize: 11, opacity: 0.7 }}>Tap to select file</p>
+                      <p style={{ fontSize: 11, opacity: 0.7 }}>JPEG, PNG or PDF · max 5 MB</p>
                     </>
                   )}
                 </div>
                 <input ref={frontRef} type="file" accept="image/jpeg,image/png,application/pdf"
-                  className="kyc-file-input" onChange={handleFileChange('front')} required />
+                  className="kyc-file-input" onChange={handleFileChange('front')} />
               </div>
 
               {/* Selfie */}
@@ -206,25 +248,28 @@ export default function Kyc() {
                   role="button" tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') selfieRef.current?.click(); }}
                 >
+                  {selfiePreview ? (
+                    <img src={selfiePreview} alt="Selfie preview" className="kyc-preview-img" />
+                  ) : idSelfie ? (
+                    <Camera size={24} />
+                  ) : (
+                    <Camera size={28} />
+                  )}
                   {idSelfie ? (
                     <>
-                      <Camera size={24} />
                       <p className="kyc-upload-filename">{idSelfie.name}</p>
+                      <p className="kyc-upload-filesize">{fmtSize(idSelfie.size)}</p>
                       <span className="kyc-upload-change">Tap to change</span>
                     </>
                   ) : (
                     <>
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
-                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
                       <p style={{ fontWeight: 600, fontSize: 13 }}>Upload selfie</p>
-                      <p style={{ fontSize: 11, opacity: 0.7 }}>Holding your ID</p>
+                      <p style={{ fontSize: 11, opacity: 0.7 }}>Holding your ID · max 5 MB</p>
                     </>
                   )}
                 </div>
                 <input ref={selfieRef} type="file" accept="image/jpeg,image/png,application/pdf"
-                  className="kyc-file-input" onChange={handleFileChange('selfie')} required />
+                  className="kyc-file-input" onChange={handleFileChange('selfie')} />
               </div>
             </div>
 
