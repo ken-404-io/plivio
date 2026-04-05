@@ -27,6 +27,11 @@ import pushRoutes         from './routes/push.ts';
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Trust the first hop reverse proxy (Nginx, Cloudflare, Railway, Render, etc.)
+// so that req.ip resolves to the real client IP rather than the proxy IP.
+// Without this, all rate limiting is keyed on the proxy's IP — effectively disabled.
+app.set('trust proxy', 1);
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {

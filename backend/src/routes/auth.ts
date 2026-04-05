@@ -39,7 +39,9 @@ router.post('/register',
   register,
 );
 
+// Strict brute-force protection: 10 attempts per 15 min per IP
 router.post('/login',
+  rateLimiter({ max: 10, windowMs: 15 * 60_000, keyPrefix: 'login' }),
   validateBody({
     email:    { required: true, type: 'email' },
     password: { required: true, minLength: 1 },
