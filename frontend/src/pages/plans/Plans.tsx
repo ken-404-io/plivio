@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
@@ -7,6 +7,35 @@ import { useToast } from '../../components/common/Toast.tsx';
 import type { Subscription, PlansResponse, PlanInfo } from '../../types/index.ts';
 
 const PLAN_ORDER = ['free', 'premium', 'elite'];
+
+// ─── Feature comparison rows ──────────────────────────────────────────────────
+
+type CellVal = string | boolean;
+
+interface CompareRow {
+  label:   string;
+  free:    CellVal;
+  premium: CellVal;
+  elite:   CellVal;
+}
+
+const COMPARE_ROWS: CompareRow[] = [
+  { label: 'Daily limit',      free: '₱20',        premium: '₱100',     elite: 'Unlimited' },
+  { label: 'Task types',       free: 'Basic',       premium: 'All',      elite: 'All'       },
+  { label: 'Exclusive tasks',  free: false,         premium: true,       elite: true        },
+  { label: 'Ad-free',          free: false,         premium: true,       elite: true        },
+  { label: 'Early access',     free: false,         premium: false,      elite: true        },
+  { label: 'Support',          free: 'Standard',    premium: 'Priority', elite: 'VIP'       },
+];
+
+function Cell({ value }: { value: CellVal }) {
+  if (typeof value === 'boolean') {
+    return value
+      ? <span className="compare-check"><Check size={15} /></span>
+      : <span className="compare-x"><X size={15} /></span>;
+  }
+  return <span className="compare-text">{value}</span>;
+}
 
 export default function Plans() {
   const { user, fetchMe } = useAuth();
@@ -83,6 +112,7 @@ export default function Plans() {
         </div>
       </header>
 
+      {/* ── Plan cards ── */}
       <div className="plans-scroll-wrap">
         <div className="plans-grid">
           {sortedPlans.map(([key, plan]) => {
@@ -91,8 +121,12 @@ export default function Plans() {
             const featured  = key === 'premium';
 
             return (
-              <div key={key} className={`plan-card${featured ? ' plan-card--featured' : ''}`}>
+              <div
+                key={key}
+                className={`plan-card${featured ? ' plan-card--featured' : ''}${isCurrent ? ' plan-card--current' : ''}`}
+              >
                 {featured && <div className="plan-badge-top">Most Popular</div>}
+                {isCurrent && !featured && <div className="plan-badge-top plan-badge-top--current">Your Plan</div>}
 
                 <div className="plan-header">
                   <h2 className="plan-name">{plan.name}</h2>
@@ -140,6 +174,41 @@ export default function Plans() {
           })}
         </div>
       </div>
+
+      {/* ── Feature comparison table ── */}
+      <section className="card compare-table-wrap">
+        <h2 className="card-title" style={{ marginBottom: 16 }}>Compare Plans</h2>
+        <div className="compare-table">
+          {/* Header row */}
+          <div className="compare-row compare-row--header">
+            <div className="compare-cell compare-cell--label" />
+            {sortedPlans.map(([key, plan]) => (
+              <div
+                key={key}
+                className={`compare-cell compare-cell--head${user?.plan === key ? ' compare-cell--active' : ''}`}
+              >
+                {plan.name}
+                {user?.plan === key && <span className="compare-current-dot" />}
+              </div>
+            ))}
+          </div>
+
+          {/* Data rows */}
+          {COMPARE_ROWS.map((row) => (
+            <div key={row.label} className="compare-row">
+              <div className="compare-cell compare-cell--label">{row.label}</div>
+              {sortedPlans.map(([key]) => (
+                <div
+                  key={key}
+                  className={`compare-cell${user?.plan === key ? ' compare-cell--active' : ''}`}
+                >
+                  <Cell value={row[key as 'free' | 'premium' | 'elite']} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

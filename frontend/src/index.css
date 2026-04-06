@@ -951,6 +951,9 @@ img { display: block; max-width: 100%; }
   border-color: var(--accent-border);
   background: linear-gradient(135deg, var(--bg-surface) 0%, var(--accent-light) 100%);
 }
+.plan-card--current {
+  border-color: var(--success);
+}
 
 .plan-badge-top {
   position: absolute;
@@ -965,6 +968,64 @@ img { display: block; max-width: 100%; }
   border-radius: 20px;
   white-space: nowrap;
 }
+.plan-badge-top--current {
+  background: var(--success);
+}
+
+/* ─── Feature comparison table ───────────────────────────────────────────────── */
+.compare-table-wrap {
+  margin-top: 24px;
+  overflow-x: auto;
+}
+.compare-table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+.compare-row {
+  display: table-row;
+}
+.compare-row + .compare-row .compare-cell {
+  border-top: 1px solid var(--border-light);
+}
+.compare-row--header .compare-cell {
+  padding-bottom: 12px;
+}
+.compare-cell {
+  display: table-cell;
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 14px;
+  vertical-align: middle;
+}
+.compare-cell--label {
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  width: 38%;
+}
+.compare-cell--head {
+  font-weight: 700;
+  color: var(--text-heading);
+  font-size: 14px;
+  position: relative;
+}
+.compare-cell--active {
+  background: var(--accent-light);
+}
+.compare-current-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--success);
+  border-radius: 50%;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.compare-check { color: var(--success); display: inline-flex; align-items: center; }
+.compare-x     { color: var(--text-muted); display: inline-flex; align-items: center; opacity: 0.5; }
+.compare-text  { color: var(--text); font-size: 13px; }
 
 .plan-header { display: flex; flex-direction: column; gap: 8px; }
 .plan-name   { font-size: 18px; font-weight: 700; color: var(--text-heading); }
