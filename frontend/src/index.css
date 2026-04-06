@@ -3615,6 +3615,13 @@ a, button, [role="button"], [tabindex] {
 
   /* Dashboard goal stats: smaller value on narrow screens */
   .dash-goal-stat-value { font-size: 16px; }
+
+  /* Earnings summary bar: tighten padding on mobile */
+  .earnings-summary-item { padding: 0 10px; gap: 8px; }
+  .earnings-summary-icon { width: 30px; height: 30px; }
+  .earnings-summary-label { font-size: 10px; }
+  .earnings-summary-value { font-size: 15px; }
+  .earnings-summary-divider { height: 36px; }
 }
 
 /* ─── Withdraw page ───────────────────────────────────────────────────────────── */
