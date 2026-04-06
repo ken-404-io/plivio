@@ -14,6 +14,7 @@ import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { NotFoundError, ValidationError, ForbiddenError } from '../utils/errors.ts';
 import { createNotification } from '../utils/notify.ts';
+import { sendPushToUser }    from '../controllers/pushController.ts';
 import { KYC_DIR } from '../middleware/upload.ts';
 
 const VALID_ID_TYPES = new Set([
@@ -219,21 +220,15 @@ export async function reviewKyc(
 
     // In-app notification
     if (action === 'approve') {
-      await createNotification(
-        user_id,
-        'kyc_approved',
-        'KYC Approved ✓',
-        'Your identity has been verified. You can now request withdrawals.',
-        '/withdraw',
-      );
+      const title = 'KYC Approved ✓';
+      const body  = 'Your identity has been verified. You can now request withdrawals.';
+      await createNotification(user_id, 'kyc_approved', title, body, '/withdraw');
+      void sendPushToUser(user_id, title, body, '/withdraw');
     } else {
-      await createNotification(
-        user_id,
-        'kyc_rejected',
-        'KYC Rejected',
-        `Your KYC was rejected: ${rejection_reason ?? ''}. Please resubmit with clearer documents.`,
-        '/kyc',
-      );
+      const title = 'KYC Rejected';
+      const body  = `Your KYC was rejected: ${rejection_reason ?? ''}. Please resubmit with clearer documents.`;
+      await createNotification(user_id, 'kyc_rejected', title, body, '/kyc');
+      void sendPushToUser(user_id, title, body, '/kyc');
     }
 
     res.json({ success: true, status: newStatus });

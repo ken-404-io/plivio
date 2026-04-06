@@ -149,7 +149,7 @@ export default function OnboardingModal({
               onClick={async () => {
                 setResending(true);
                 try {
-                  await api.post('/auth/resend-verification');
+                  await api.post('/auth/verify-email/send');
                   setResendSent(true);
                 } catch {
                   // silent — user can try again later
