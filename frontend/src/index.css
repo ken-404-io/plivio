@@ -79,6 +79,9 @@ body {
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  /* Prevent text size adjustment on orientation change (iOS) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 #root { min-height: 100svh; }
@@ -87,6 +90,30 @@ a:hover { text-decoration: underline; }
 button { cursor: pointer; font-family: inherit; font-size: inherit; }
 input, select, textarea { font-family: inherit; font-size: inherit; }
 img { display: block; max-width: 100%; }
+
+/* Remove iOS tap flash on interactive elements */
+a, button, [role="button"], [tabindex] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── Loading skeleton animation ─────────────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 25%,
+    var(--border)      50%,
+    var(--bg-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+  color: transparent !important;
+  user-select: none;
+}
 
 /* ─── App Shell ─────────────────────────────────────────────────────────────── */
 .app-shell {
@@ -139,8 +166,9 @@ img { display: block; max-width: 100%; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 8px 4px 10px;
+    gap: 3px;
+    padding: 10px 4px 12px;
+    min-height: 60px;
     color: var(--text-muted);
     text-decoration: none;
     transition: color 0.15s;
@@ -150,31 +178,35 @@ img { display: block; max-width: 100%; }
   .bottom-nav-item:hover { color: var(--text); text-decoration: none; }
   .bottom-nav-item--active { color: var(--accent); }
 
-  /* Active indicator bar at top of each nav item */
+  /* Active: pill highlight behind the icon */
   .bottom-nav-item--active::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 25%;
-    right: 25%;
-    height: 2px;
-    background: var(--accent);
-    border-radius: 0 0 3px 3px;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 30px;
+    background: var(--accent-light);
+    border-radius: 20px;
+    z-index: 0;
   }
+  .bottom-nav-icon,
+  .bottom-nav-label { position: relative; z-index: 1; }
 
   .bottom-nav-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
   }
   .bottom-nav-icon svg { width: 22px; height: 22px; }
 
   .bottom-nav-label {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.1px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -198,13 +230,18 @@ img { display: block; max-width: 100%; }
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    animation: menuSlideUp 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  @keyframes menuSlideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
   }
 
   .menu-screen-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
+    padding: max(16px, env(safe-area-inset-top)) 20px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
     flex-shrink: 0;
@@ -218,15 +255,19 @@ img { display: block; max-width: 100%; }
   }
 
   .menu-screen-close {
-    background: none;
+    background: var(--bg-elevated);
     border: none;
     color: var(--text-muted);
     cursor: pointer;
-    padding: 6px;
+    padding: 10px;
+    min-width: 44px;
+    min-height: 44px;
     display: flex;
     align-items: center;
+    justify-content: center;
     border-radius: var(--radius-sm);
   }
+  .menu-screen-close:active { background: var(--border); }
 
   .menu-screen-body {
     flex: 1;
@@ -297,11 +338,10 @@ img { display: block; max-width: 100%; }
   /* Nav groups */
   .menu-group { display: flex; flex-direction: column; gap: 6px; }
   .menu-group-title {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     padding: 0 4px;
   }
   .menu-group-card {
@@ -316,7 +356,8 @@ img { display: block; max-width: 100%; }
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 14px 16px;
+    padding: 15px 16px;
+    min-height: 56px;
     background: none;
     border: none;
     width: 100%;
@@ -783,9 +824,13 @@ img { display: block; max-width: 100%; }
 
 .page-loading {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   min-height: 300px;
+  color: var(--text-muted);
+  font-size: 14px;
 }
 
 .screen-center {
@@ -1149,7 +1194,8 @@ img { display: block; max-width: 100%; }
   white-space: nowrap;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn:not(:disabled):hover { opacity: 0.9; }
+.btn:not(:disabled):hover  { opacity: 0.9; }
+.btn:not(:disabled):active { opacity: 0.75; transform: scale(0.97); }
 
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-ghost   { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); }
@@ -1188,9 +1234,9 @@ img { display: block; max-width: 100%; }
   display: inline-block;
   padding: 2px 8px;
   border-radius: 20px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
 }
 .plan-badge--free    { background: rgba(100,100,100,0.2); color: var(--text-muted); }
 .plan-badge--premium { background: rgba(59,130,246,0.15); color: var(--info); }
@@ -2393,11 +2439,11 @@ img { display: block; max-width: 100%; }
   margin-bottom: 4px;
 }
 .task-type-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 2px 7px;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
   border-radius: 20px;
   background: var(--bg-elevated);
   color: var(--text-muted);
@@ -3458,11 +3504,31 @@ img { display: block; max-width: 100%; }
   /* Page inner padding on mobile */
   .page { gap: 14px; padding: 0 16px; }
 
-  /* Topbar on mobile: rich header */
-  .topbar { padding: 12px 16px 8px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  /* Topbar on mobile: rich header with notch support */
+  .topbar {
+    padding: max(12px, env(safe-area-inset-top)) 16px 10px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    /* Sticky so it stays visible while scrolling */
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
   .topbar-brand { display: none; }
   .topbar-mobile-left { display: flex; }
   .topbar-stats { display: flex; }
+
+  /* Slightly larger avatar for easier tap */
+  .topbar-avatar { width: 38px; height: 38px; }
+  .topbar-avatar-wrap { min-width: 44px; min-height: 44px; display: flex; align-items: center; }
+
+  /* Larger notif bell */
+  .notif-bell-btn { width: 42px; height: 42px; }
+
+  /* Page: top padding so first element breathes below the sticky topbar */
+  .page { gap: 14px; padding: 16px 16px 0; }
 
   /* Page title smaller on mobile */
   .page-title { font-size: 20px; }
@@ -3965,23 +4031,24 @@ img { display: block; max-width: 100%; }
 }
 .streak-days-row {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   justify-content: space-between;
-  margin-top: 2px;
+  margin-top: 6px;
 }
 .streak-day-dot {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: 700;
   flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
 }
 .streak-day-dot--done  { background: var(--accent); border-color: var(--accent); color: #fff; }
 .streak-day-dot--bonus { background: var(--bg-elevated); border-color: #f59e0b; color: #f59e0b; }

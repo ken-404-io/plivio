@@ -410,7 +410,7 @@ export default function AdminDashboard() {
     }
   }
 
-  if (loading) return <div className="page-loading"><div className="spinner" /></div>;
+  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
 
   return (
     <div className="page">

@@ -167,7 +167,7 @@ export default function Tasks() {
     }
   }
 
-  if (loading) return <div className="page-loading"><div className="spinner" /></div>;
+  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
 
   const available  = taskData?.tasks?.filter((t) => !t.completed_today && !t.in_progress_today) ?? [];
   const inProgress = taskData?.tasks?.filter((t) => t.in_progress_today)                        ?? [];
