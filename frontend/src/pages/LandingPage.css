@@ -37,9 +37,10 @@
   flex-shrink: 0;
 }
 
-.lp-logo-bolt {
-  font-size: 22px;
-  filter: drop-shadow(0 0 8px #39d35380);
+.lp-logo-mark {
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 0 6px rgba(201,162,74,0.5));
 }
 
 .lp-logo-text {
@@ -784,7 +785,7 @@
   min-width: 180px;
 }
 
-.lp-footer-brand .lp-logo-bolt { font-size: 28px; }
+.lp-footer-brand .lp-logo-mark { width: 28px; height: 28px; }
 .lp-footer-brand .lp-logo-text { font-size: 20px; font-weight: 800; color: var(--text-heading); }
 
 .lp-footer-tagline {

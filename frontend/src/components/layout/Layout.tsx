@@ -53,8 +53,11 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
             </Link>
           </div>
 
-          {/* Desktop-only: brand text */}
-          <span className="topbar-brand">Plivio</span>
+          {/* Centre: logo mark (mobile) + brand text (desktop) */}
+          <div className="topbar-center">
+            <img src="/logo-mark.svg" alt="Plivio" className="topbar-logo-mark" aria-hidden="true" />
+            <span className="topbar-brand">Plivio</span>
+          </div>
 
           {/* Right side */}
           <div className="topbar-right">
