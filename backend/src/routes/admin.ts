@@ -7,6 +7,8 @@ import {
   getStats,
   listUsers,
   updateUser,
+  notifyUser,
+  broadcastNotification,
   listAllTasks,
   createTask,
   updateTask,
@@ -30,6 +32,24 @@ router.use(
 );
 
 router.get('/stats', getStats);
+
+router.post('/notify',
+  validateBody({
+    user_id: { required: true },
+    title:   { required: true, minLength: 1, maxLength: 200 },
+    message: { required: true, minLength: 1, maxLength: 2000 },
+    link:    {},
+  }),
+  notifyUser,
+);
+router.post('/notify-all',
+  validateBody({
+    title:   { required: true, minLength: 1, maxLength: 200 },
+    message: { required: true, minLength: 1, maxLength: 2000 },
+    link:    {},
+  }),
+  broadcastNotification,
+);
 
 router.get('/users', listUsers);
 router.put('/users/:id',
