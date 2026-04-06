@@ -3543,7 +3543,6 @@ a, button, [role="button"], [tabindex] {
     padding: max(12px, env(safe-area-inset-top)) 16px 10px;
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
-    /* Sticky so it stays visible while scrolling */
     position: sticky;
     top: 0;
     z-index: 50;
@@ -3553,8 +3552,14 @@ a, button, [role="button"], [tabindex] {
   .topbar-brand { display: none; }
   .topbar-mobile-left { display: flex; }
   .topbar-stats { display: flex; }
-  /* Logo mark centred in topbar on mobile */
-  .topbar-center { justify-content: center; }
+  /* Logo mark truly centred via absolute positioning */
+  .topbar-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    flex: unset;
+    justify-content: center;
+  }
   .topbar-logo-mark { display: block; }
 
   /* Slightly larger avatar for easier tap */
@@ -3630,15 +3635,19 @@ a, button, [role="button"], [tabindex] {
   .tasks-progress-card { padding: 14px 16px; }
   .tasks-progress-value { font-size: 16px; }
 
-  /* Plans scroll on mobile */
-  .plans-scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px; }
-  .plans-grid { min-width: 680px; }
+  /* Plans: single column stacked cards on mobile — no horizontal scroll needed */
+  .plans-scroll-wrap { overflow: visible; margin: 0; padding: 0; }
+  .plans-grid { min-width: unset; grid-template-columns: 1fr; gap: 14px; }
+  .plan-card { padding: 20px 18px; }
+  .plan-card--featured { transform: none; }
 
-  /* Withdraw balance card */
-  .withdraw-balance-card { flex-direction: column; gap: 4px; align-items: flex-start; }
+  /* Withdraw balance card: stack vertically */
+  .withdraw-balance-card { flex-direction: column; gap: 6px; align-items: flex-start; padding: 16px 18px; }
+  .withdraw-balance-value { font-size: 26px; }
 
   /* Referrals stats compact */
   .ref-stats-row { padding: 12px 0; }
+  .ref-stat-num { font-size: 18px; }
 
   /* Dashboard goal stats: smaller value on narrow screens */
   .dash-goal-stat-value { font-size: 16px; }
@@ -3649,6 +3658,21 @@ a, button, [role="button"], [tabindex] {
   .earnings-summary-label { font-size: 10px; }
   .earnings-summary-value { font-size: 15px; }
   .earnings-summary-divider { height: 36px; }
+
+  /* Profile sections: tighter on mobile */
+  .profile-sections { gap: 12px; }
+
+  /* Admin stat cards: 2-col grid on mobile */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { padding: 14px 12px; }
+  .stat-value { font-size: 22px; }
+
+  /* Admin user-manage panel: stack rows vertically */
+  .admin-user-manage-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+
+  /* Streak days row: tighten for narrow phones */
+  .streak-days-row { gap: 4px; }
+  .streak-day-dot { width: 32px; height: 32px; font-size: 10px; }
 }
 
 /* ─── Withdraw page ───────────────────────────────────────────────────────────── */
