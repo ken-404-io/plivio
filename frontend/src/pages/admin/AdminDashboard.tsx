@@ -183,6 +183,10 @@ export default function AdminDashboard() {
   const [broadcasting,     setBroadcasting]     = useState(false);
   const [broadcastForm,    setBroadcastForm]    = useState({ title: '', message: '' });
 
+  // Expand user management row
+  const [expandedUser,  setExpandedUser]  = useState<string | null>(null);
+  const [adjustDraft,   setAdjustDraft]   = useState<Record<string, { delta: string; plan: string }>>({});
+
   // KYC — which card has images expanded
   const [expandedKyc,     setExpandedKyc]     = useState<string | null>(null);
   // KYC — rejection modal target
@@ -259,6 +263,28 @@ export default function AdminDashboard() {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       toast.error(msg ?? 'Action failed.');
+    }
+  }
+
+  async function applyUserAdjustment(userId: string) {
+    const draft = adjustDraft[userId];
+    if (!draft) return;
+
+    const payload: Record<string, unknown> = {};
+    const delta = parseFloat(draft.delta);
+    if (draft.delta.trim() !== '' && !isNaN(delta)) payload.balance_adjustment = delta;
+    if (draft.plan) payload.plan = draft.plan;
+    if (Object.keys(payload).length === 0) { toast.error('No changes to apply.'); return; }
+
+    try {
+      const { data } = await api.put<{ user: AdminUser }>(`/admin/users/${userId}`, payload);
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, ...data.user } : u));
+      setAdjustDraft((prev) => { const n = { ...prev }; delete n[userId]; return n; });
+      setExpandedUser(null);
+      toast.success('User updated.');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      toast.error(msg ?? 'Update failed.');
     }
   }
 
@@ -549,38 +575,108 @@ export default function AdminDashboard() {
           <div className="admin-list" style={{ opacity: usersLoading ? 0.6 : 1, transition: 'opacity 0.15s' }}>
             {users.length === 0 && !usersLoading ? (
               <div className="empty-state"><p>No users found.</p></div>
-            ) : users.map((u) => (
-              <div key={u.id} className="admin-card">
-                <div className="admin-card-body">
-                  <div className="admin-card-main">
-                    <span className="admin-card-title">{u.username}</span>
-                    <span className="admin-card-sub">{u.email}</span>
+            ) : users.map((u) => {
+              const isExpanded = expandedUser === u.id;
+              const draft = adjustDraft[u.id] ?? { delta: '', plan: '' };
+              return (
+                <div key={u.id} className={`admin-card${isExpanded ? ' admin-card--expanded' : ''}`}>
+                  <div className="admin-card-body">
+                    <div className="admin-card-main">
+                      <span className="admin-card-title">{u.username}</span>
+                      <span className="admin-card-sub">{u.email}</span>
+                    </div>
+                    <div className="admin-card-meta">
+                      <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan.toUpperCase()}</span>
+                      <span className="admin-card-balance">₱{Number(u.balance).toFixed(2)}</span>
+                      <span className={`status-dot status-dot--${u.is_banned ? 'rejected' : 'approved'}`}>
+                        {u.is_banned ? 'Banned' : 'Active'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="admin-card-meta">
-                    <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan.toUpperCase()}</span>
-                    <span className="admin-card-balance">₱{Number(u.balance).toFixed(2)}</span>
-                    <span className={`status-dot status-dot--${u.is_banned ? 'rejected' : 'approved'}`}>
-                      {u.is_banned ? 'Banned' : 'Active'}
-                    </span>
+                  <div className="admin-card-actions">
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
+                      title="Send notification"
+                    >
+                      <Bell size={14} />
+                    </button>
+                    <button
+                      className={`btn btn-sm btn-ghost${isExpanded ? ' btn-ghost--active' : ''}`}
+                      onClick={() => setExpandedUser(isExpanded ? null : u.id)}
+                      title="Manage user"
+                    >
+                      Manage
+                    </button>
+                    <button
+                      className={`btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={() => { void toggleBan(u.id, u.is_banned); }}
+                    >
+                      {u.is_banned ? 'Unban' : 'Ban'}
+                    </button>
                   </div>
+
+                  {/* Expandable management panel */}
+                  {isExpanded && (
+                    <div className="admin-user-manage">
+                      <div className="admin-user-manage-row">
+                        <label className="admin-user-manage-label">Balance adjustment</label>
+                        <div className="admin-user-manage-input-wrap">
+                          <span className="admin-user-manage-prefix">₱</span>
+                          <input
+                            type="number"
+                            className="form-input admin-user-manage-input"
+                            placeholder="e.g. 50 or -10"
+                            step="0.01"
+                            value={draft.delta}
+                            onChange={(e) => setAdjustDraft((prev) => ({
+                              ...prev,
+                              [u.id]: { ...draft, delta: e.target.value },
+                            }))}
+                          />
+                        </div>
+                        <span className="admin-user-manage-hint text-muted">
+                          Current: ₱{Number(u.balance).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="admin-user-manage-row">
+                        <label className="admin-user-manage-label">Set plan</label>
+                        <select
+                          className="form-input admin-user-manage-select"
+                          value={draft.plan}
+                          onChange={(e) => setAdjustDraft((prev) => ({
+                            ...prev,
+                            [u.id]: { ...draft, plan: e.target.value },
+                          }))}
+                        >
+                          <option value="">— no change —</option>
+                          <option value="free">Free</option>
+                          <option value="premium">Premium</option>
+                          <option value="elite">Elite</option>
+                        </select>
+                      </div>
+
+                      <div className="admin-user-manage-actions">
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => { setExpandedUser(null); setAdjustDraft((p) => { const n = {...p}; delete n[u.id]; return n; }); }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => { void applyUserAdjustment(u.id); }}
+                          disabled={!draft.delta && !draft.plan}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="admin-card-actions">
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
-                    title="Send notification"
-                  >
-                    <Bell size={14} />
-                  </button>
-                  <button
-                    className={`btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-ghost'}`}
-                    onClick={() => { void toggleBan(u.id, u.is_banned); }}
-                  >
-                    {u.is_banned ? 'Unban' : 'Ban'}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Pagination */}

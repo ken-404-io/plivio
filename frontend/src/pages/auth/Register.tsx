@@ -3,6 +3,22 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
 import type { AxiosError } from 'axios';
 
+// ─── Password strength ────────────────────────────────────────────────────────
+type StrengthLevel = 0 | 1 | 2 | 3 | 4;
+const STRENGTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Strong'] as const;
+const STRENGTH_COLORS = ['', '#ef4444', '#f59e0b', '#eab308', '#22c55e'] as const;
+
+function getStrength(pw: string): StrengthLevel {
+  if (!pw) return 0;
+  let score = 0;
+  if (pw.length >= 8)  score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return Math.min(score, 4) as StrengthLevel;
+}
+
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
 function EyeIcon({ visible }: { visible: boolean }) {
@@ -137,6 +153,25 @@ export default function Register() {
                 <EyeIcon visible={showPass} />
               </button>
             </div>
+            {form.password.length > 0 && (() => {
+              const s = getStrength(form.password);
+              return (
+                <div className="pw-strength">
+                  <div className="pw-strength-track">
+                    {[1, 2, 3, 4].map((seg) => (
+                      <div
+                        key={seg}
+                        className="pw-strength-seg"
+                        style={{ background: s >= seg ? STRENGTH_COLORS[s] : 'var(--border)', transition: 'background 0.2s' }}
+                      />
+                    ))}
+                  </div>
+                  <span className="pw-strength-label" style={{ color: STRENGTH_COLORS[s] }}>
+                    {STRENGTH_LABELS[s]}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="form-group">

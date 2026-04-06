@@ -55,8 +55,10 @@ router.get('/users', listUsers);
 router.put('/users/:id',
   validateParam('id'),
   validateBody({
-    is_banned:   { type: 'string', enum: ['true', 'false'] },
-    is_verified: { type: 'string', enum: ['true', 'false'] },
+    is_banned:          { type: 'string', enum: ['true', 'false'] },
+    is_verified:        { type: 'string', enum: ['true', 'false'] },
+    plan:               { type: 'string', enum: ['free', 'premium', 'elite'] },
+    balance_adjustment: { type: 'number' },
   }),
   updateUser,
 );
