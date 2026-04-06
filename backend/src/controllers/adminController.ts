@@ -3,6 +3,7 @@ import pool from '../config/db.ts';
 import { NotFoundError, ValidationError } from '../utils/errors.ts';
 import { sendWithdrawalStatusEmail } from '../services/email.ts';
 import { createNotification } from '../utils/notify.ts';
+import { sendPushToUser }    from '../controllers/pushController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
 interface AdNetworkInput {
@@ -273,16 +274,20 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
       const u = userRows[0] as { email: string; username: string };
       void sendWithdrawalStatusEmail(u.email, u.username, Number(withdrawal.amount), newStatus as 'paid' | 'rejected');
 
-      const isPaid = newStatus === 'paid';
+      const isPaid  = newStatus === 'paid';
+      const wdTitle = isPaid ? 'Withdrawal Approved' : 'Withdrawal Rejected';
+      const wdBody  = isPaid
+        ? `Your withdrawal of ₱${Number(withdrawal.amount).toFixed(2)} has been approved and is on its way.`
+        : `Your withdrawal of ₱${Number(withdrawal.amount).toFixed(2)} was rejected. Your balance has been refunded.`;
+
       void createNotification(
         withdrawal.user_id as string,
         isPaid ? 'withdrawal_paid' : 'withdrawal_rejected',
-        isPaid ? 'Withdrawal Approved' : 'Withdrawal Rejected',
-        isPaid
-          ? `Your withdrawal of ₱${Number(withdrawal.amount).toFixed(2)} has been approved and is on its way.`
-          : `Your withdrawal of ₱${Number(withdrawal.amount).toFixed(2)} was rejected. Your balance has been refunded.`,
+        wdTitle,
+        wdBody,
         '/withdraw',
       );
+      void sendPushToUser(withdrawal.user_id as string, wdTitle, wdBody, '/withdraw');
     }
 
     res.json({ success: true, status: newStatus });
