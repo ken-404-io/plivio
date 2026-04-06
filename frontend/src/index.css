@@ -3673,6 +3673,10 @@ a, button, [role="button"], [tabindex] {
   /* Streak days row: tighten for narrow phones */
   .streak-days-row { gap: 4px; }
   .streak-day-dot { width: 32px; height: 32px; font-size: 10px; }
+
+  /* Tasks stat row: smaller numbers on mobile */
+  .tasks-stat-num { font-size: 18px; }
+  .tasks-stats-row { padding: 10px 0; }
 }
 
 /* ─── Withdraw page ───────────────────────────────────────────────────────────── */

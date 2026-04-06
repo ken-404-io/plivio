@@ -1015,7 +1015,9 @@
 
   /* Testimonials 1-col on mobile */
   .lp-testimonials-grid { grid-template-columns: 1fr; }
-  .lp-trust-row { flex-wrap: wrap; gap: 12px; }
+  /* Trust badges: 2-per-row on very small screens */
+  .lp-trust-row { gap: 8px 16px; }
+  .lp-trust-item { font-size: 12px; }
 }
 
 /* ─── Scroll-reveal animations ──────────────────────────────────────────────── */
@@ -1113,8 +1115,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 32px;
+  gap: 20px;
   padding: 24px 0 0;
+  flex-wrap: wrap;
 }
 
 .lp-trust-item {
