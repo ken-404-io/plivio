@@ -1916,6 +1916,65 @@ img { display: block; max-width: 100%; }
   max-width: 480px;
 }
 
+/* ─── Admin user management panel ────────────────────────────────────────────── */
+.admin-card--expanded {
+  border-color: var(--accent-border);
+}
+.btn-ghost--active {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+.admin-user-manage {
+  border-top: 1px solid var(--border-light);
+  padding: 14px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admin-user-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.admin-user-manage-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 130px;
+}
+.admin-user-manage-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.admin-user-manage-prefix {
+  position: absolute;
+  left: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.admin-user-manage-input {
+  width: 130px !important;
+  padding-left: 22px !important;
+  height: 34px !important;
+  font-size: 13px !important;
+}
+.admin-user-manage-select {
+  width: 130px !important;
+  height: 34px !important;
+  font-size: 13px !important;
+  padding: 0 8px !important;
+}
+.admin-user-manage-hint {
+  font-size: 11px;
+}
+.admin-user-manage-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .admin-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);

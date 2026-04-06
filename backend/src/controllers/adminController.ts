@@ -70,10 +70,14 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
   } catch (err) { next(err); }
 }
 
+const VALID_PLANS = ['free', 'premium', 'elite'] as const;
+
 export async function updateUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { id }                  = req.params as Record<string, string>;
-    const { is_banned, is_verified } = req.body as Record<string, string | undefined>;
+    const { id } = req.params as Record<string, string>;
+    const body   = req.body as Record<string, string | undefined>;
+
+    const { is_banned, is_verified, plan, balance_adjustment } = body;
 
     const setClauses: string[] = [];
     const values: unknown[]    = [];
@@ -81,12 +85,30 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
     if (is_banned   !== undefined) { values.push(is_banned);   setClauses.push(`is_banned = $${values.length}`); }
     if (is_verified !== undefined) { values.push(is_verified); setClauses.push(`is_verified = $${values.length}`); }
 
+    if (plan !== undefined) {
+      if (!VALID_PLANS.includes(plan as typeof VALID_PLANS[number])) {
+        throw new ValidationError('Invalid plan value');
+      }
+      values.push(plan);
+      setClauses.push(`plan = $${values.length}`);
+    }
+
+    // balance_adjustment: a signed delta (positive = credit, negative = debit, floor at 0)
+    if (balance_adjustment !== undefined) {
+      const delta = parseFloat(balance_adjustment);
+      if (isNaN(delta) || Math.abs(delta) > 100_000) throw new ValidationError('Invalid balance adjustment');
+      // Use GREATEST to prevent balance going negative
+      values.push(delta);
+      setClauses.push(`balance = GREATEST(0, balance + $${values.length})`);
+    }
+
     if (setClauses.length === 0) throw new ValidationError('No valid fields to update');
 
     values.push(id);
     const { rows } = await pool.query(
-      `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING id, username, email, is_banned, is_verified`,
-      values
+      `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${values.length}
+       RETURNING id, username, email, plan, balance, is_banned, is_verified`,
+      values,
     );
 
     if (rows.length === 0) throw new NotFoundError('User not found');
