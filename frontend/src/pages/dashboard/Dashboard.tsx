@@ -111,7 +111,7 @@ export default function Dashboard() {
   }, [load, fetchMe]);
 
   if (loading) {
-    return <div className="page-loading"><div className="spinner" /></div>;
+    return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
   }
 
   // Derived values

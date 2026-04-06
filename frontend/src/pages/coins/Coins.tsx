@@ -171,7 +171,7 @@ export default function Coins() {
     }
   }
 
-  if (loading) return <div className="page-loading"><div className="spinner" /></div>;
+  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
 
   const coins       = Number(info?.coins ?? user?.coins ?? 0);
   const streak      = info?.streak_count ?? 0;

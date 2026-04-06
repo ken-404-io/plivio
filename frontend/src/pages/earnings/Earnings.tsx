@@ -188,7 +188,7 @@ export default function Earnings() {
 
       {/* List */}
       {loading ? (
-        <div className="page-loading"><div className="spinner" /></div>
+        <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>
       ) : rows.length === 0 ? (
         <div className="empty-state">
           <p>

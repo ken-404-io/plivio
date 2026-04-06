@@ -130,7 +130,7 @@ export default function Kyc() {
   const canSubmit = currentStatus === 'none' || currentStatus === 'rejected';
   const cfg       = STATUS_CONFIG[currentStatus];
 
-  if (loading) return <div className="page-loading"><div className="spinner" /></div>;
+  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
 
   return (
     <div className="page">

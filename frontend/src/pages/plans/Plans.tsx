@@ -93,7 +93,7 @@ export default function Plans() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <div className="page-loading"><div className="spinner" /></div>;
+  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
 
   const sortedPlans = PLAN_ORDER
     .filter((k) => k in plans)
