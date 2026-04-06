@@ -17,7 +17,7 @@ const TESTIMONIALS = [
     name:     'Maria Santos',
     location: 'Quezon City',
     initials: 'MS',
-    color:    '#aa3bff',
+    color:    '#c9a24a',
     stars:    5,
     text:     'I\'ve been using Plivio for 3 months and already earned over ₱4,000. It\'s legit — money hits my GCash within 24 hours every time!',
   },
@@ -104,7 +104,7 @@ export default function LandingPage() {
       <header className="lp-nav">
         <div className="lp-nav-inner">
           <a href="/" className="lp-logo">
-            <span className="lp-logo-bolt"><Zap size={20} /></span>
+            <img src="/logo-mark.svg" alt="" className="lp-logo-mark" aria-hidden="true" />
             <span className="lp-logo-text">Plivio</span>
           </a>
 
@@ -465,7 +465,7 @@ export default function LandingPage() {
       <footer className="lp-footer">
         <div className="lp-footer-inner">
           <div className="lp-footer-brand">
-            <span className="lp-logo-bolt"><Zap size={18} /></span>
+            <img src="/logo-mark.svg" alt="" className="lp-logo-mark" aria-hidden="true" />
             <span className="lp-logo-text">Plivio</span>
             <p className="lp-footer-tagline">Get Paid To · Philippines</p>
           </div>

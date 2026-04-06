@@ -49,8 +49,11 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <span className="brand-name">Plivio</span>
-        <span className="brand-tagline">Get Paid To</span>
+        <img src="/logo-mark.svg" alt="" className="sidebar-logo-mark" aria-hidden="true" />
+        <div>
+          <span className="brand-name">Plivio</span>
+          <span className="brand-tagline">Get Paid To</span>
+        </div>
       </div>
 
       <nav className="sidebar-nav" aria-label="Main navigation">
