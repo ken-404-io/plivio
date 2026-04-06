@@ -235,7 +235,9 @@ export default function Referrals() {
                   </div>
                 </div>
                 <div className="ref-user-reward">
-                  <span className="earning-row-amount">+₱10</span>
+                  <span className="earning-row-amount">
+                    +₱{r.plan !== 'free' ? '25' : '10'}
+                  </span>
                 </div>
               </div>
             ))}
