@@ -1020,7 +1020,6 @@ a, button, [role="button"], [tabindex] {
 /* ─── Feature comparison table ───────────────────────────────────────────────── */
 .compare-table-wrap {
   margin-top: 24px;
-  overflow-x: auto;
 }
 .compare-table {
   display: table;
@@ -1071,6 +1070,14 @@ a, button, [role="button"], [tabindex] {
 .compare-check { color: var(--success); display: inline-flex; align-items: center; }
 .compare-x     { color: var(--text-muted); display: inline-flex; align-items: center; opacity: 0.5; }
 .compare-text  { color: var(--text); font-size: 13px; }
+
+/* On mobile, allow horizontal scroll rather than wrapping */
+@media (max-width: 540px) {
+  .compare-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px 4px; }
+  .compare-table { min-width: 380px; }
+  .compare-cell { padding: 10px 10px; font-size: 13px; }
+  .compare-cell--label { font-size: 12px; }
+}
 
 .plan-header { display: flex; flex-direction: column; gap: 8px; }
 .plan-name   { font-size: 18px; font-weight: 700; color: var(--text-heading); }
@@ -2030,6 +2037,7 @@ a, button, [role="button"], [tabindex] {
   flex-direction: column;
   gap: 10px;
 }
+.kyc-card { /* uses admin-card base; no additional styles needed */ }
 
 .admin-card-body {
   display: flex;
@@ -4028,6 +4036,7 @@ a, button, [role="button"], [tabindex] {
 .coins-hero-label { font-size: 12px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.05em; }
 .coins-hero-value { font-size: 32px; font-weight: 800; line-height: 1; }
 .coins-hero-sub   { font-size: 12px; opacity: 0.75; }
+.coins-hero-rate  { margin-top: 2px; }
 .coins-rate-badge {
   background: rgba(255,255,255,0.18);
   border-radius: 20px;
@@ -4219,6 +4228,14 @@ a, button, [role="button"], [tabindex] {
 .earning-row-amount--debit { color: var(--error) !important; }
 
 /* ─── Streak recovery modal ──────────────────────────────────────────────────── */
+/* Base card for modals — used in conjunction with specific modal classes */
+.modal-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
 .recovery-modal {
   background: var(--bg-surface);
   border: 1px solid var(--border);
