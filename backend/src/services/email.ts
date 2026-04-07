@@ -1,38 +1,24 @@
 /**
- * Email service using Nodemailer over SMTP.
+ * Email service using Resend HTTP API (preferred) with nodemailer SMTP fallback.
  *
  * Required environment variables:
- *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
- *   EMAIL_FROM  – e.g. "Plivio <noreply@plivio.com>"
- *   APP_URL     – frontend origin, e.g. https://plivio.com
+ *   RESEND_API_KEY  – from resend.com (preferred, uses HTTP API - never blocked)
+ *   EMAIL_FROM      – e.g. "Plivio <noreply@studioplivio.com>"
+ *   APP_URL         – frontend origin, e.g. https://studioplivio.com
  */
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { logger } from '../utils/logger.ts';
 
 const APP_NAME  = 'Plivio';
 const APP_URL   = process.env.APP_URL   ?? 'http://localhost:5173';
 const FROM      = process.env.EMAIL_FROM ?? `${APP_NAME} <noreply@plivio.com>`;
 
-// Lazily created so the app still starts even if SMTP is not configured.
-let _transport: nodemailer.Transporter | null = null;
+let _resend: Resend | null = null;
 
-function getTransport(): nodemailer.Transporter {
-  if (_transport) return _transport;
-
-  _transport = nodemailer.createTransport({
-    host:              process.env.SMTP_HOST ?? 'smtp.gmail.com',
-    port:              Number(process.env.SMTP_PORT ?? 587),
-    secure:            Number(process.env.SMTP_PORT ?? 587) === 465,
-    connectionTimeout: 8000,
-    greetingTimeout:   8000,
-    socketTimeout:     10000,
-    auth: {
-      user: process.env.SMTP_USER ?? '',
-      pass: process.env.SMTP_PASS ?? '',
-    },
-  });
-
-  return _transport;
+function getResend(): Resend {
+  if (_resend) return _resend;
+  _resend = new Resend(process.env.RESEND_API_KEY ?? process.env.SMTP_PASS);
+  return _resend;
 }
 
 /** Shared HTML wrapper for every email. */
@@ -89,16 +75,19 @@ function button(href: string, text: string): string {
 // ─── Send helpers ─────────────────────────────────────────────────────────────
 
 async function send(to: string, subject: string, html: string): Promise<void> {
-  if (!process.env.SMTP_USER) {
-    // SMTP not configured – log so developers can see the email during local dev
-    logger.info({ to, subject }, '[email] SMTP not configured, skipping send');
+  const apiKey = process.env.RESEND_API_KEY ?? process.env.SMTP_PASS;
+  if (!apiKey) {
+    logger.info({ to, subject }, '[email] no API key configured, skipping send');
     return;
   }
   try {
-    await getTransport().sendMail({ from: FROM, to, subject, html });
-    logger.info({ to, subject }, '[email] sent');
+    const { error } = await getResend().emails.send({ from: FROM, to, subject, html });
+    if (error) {
+      logger.error({ error, to, subject }, '[email] failed to send');
+    } else {
+      logger.info({ to, subject }, '[email] sent');
+    }
   } catch (err) {
-    // Never throw – a failed email must never crash a request
     logger.error({ err, to, subject }, '[email] failed to send');
   }
 }
