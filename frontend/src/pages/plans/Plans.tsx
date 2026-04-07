@@ -45,7 +45,10 @@ export default function Plans() {
   const [sub,         setSub]         = useState<Subscription | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [subscribing, setSubscribing] = useState('');
-  const [activeTab,   setActiveTab]   = useState<string>(user?.plan ?? 'premium');
+  // Default to 'premium' for free users so the upgrade CTA is immediately visible
+  const [activeTab,   setActiveTab]   = useState<string>(
+    user?.plan && user.plan !== 'free' ? user.plan : 'premium',
+  );
 
   useEffect(() => {
     Promise.all([
