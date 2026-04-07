@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none">
   <defs>
-    <linearGradient id="gold" x1="8" y1="4" x2="50" y2="56" gradientUnits="userSpaceOnUse">
-      <stop offset="0%"   stop-color="#ffd76a"/>
-      <stop offset="55%"  stop-color="#c9a24a"/>
-      <stop offset="100%" stop-color="#8a6a2f"/>
+    <linearGradient id="blue" x1="8" y1="4" x2="50" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#64b5f6"/>
+      <stop offset="55%"  stop-color="#1877f2"/>
+      <stop offset="100%" stop-color="#0d5abf"/>
     </linearGradient>
   </defs>
   <path
-    fill="url(#gold)"
+    fill="url(#blue)"
     fill-rule="evenodd"
     d="
       M 28,4

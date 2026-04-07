@@ -17,7 +17,7 @@ const TESTIMONIALS = [
     name:     'Maria Santos',
     location: 'Quezon City',
     initials: 'MS',
-    color:    '#c9a24a',
+    color:    '#1877f2',
     stars:    5,
     text:     'I\'ve been using Plivio for 3 months and already earned over ₱4,000. It\'s legit — money hits my GCash within 24 hours every time!',
   },

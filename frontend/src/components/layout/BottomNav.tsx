@@ -14,6 +14,7 @@ import {
   X,
   ChevronRight,
   LogOut,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 
@@ -45,7 +46,8 @@ const MENU_GROUPS: { title?: string; items: NavItem[] }[] = [
   },
   {
     items: [
-      { to: '/referrals', label: 'Referrals',  Icon: UserPlus,      desc: 'Invite friends & earn'       },
+      { to: '/referrals', label: 'Referrals',  Icon: UserPlus,           desc: 'Invite friends & earn'       },
+      { to: '/settings',  label: 'Settings',   Icon: SlidersHorizontal,  desc: 'Appearance & preferences'   },
     ],
   },
 ];

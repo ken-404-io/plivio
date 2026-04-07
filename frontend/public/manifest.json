@@ -4,8 +4,8 @@
   "description": "Complete tasks and earn real money, paid directly to GCash.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b0b0b",
-  "theme_color": "#c9a24a",
+  "background_color": "#181818",
+  "theme_color": "#1877f2",
   "orientation": "portrait-primary",
   "icons": [
     {

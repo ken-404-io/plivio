@@ -27,6 +27,7 @@ import Referrals      from './pages/referrals/Referrals.tsx';
 import Kyc            from './pages/kyc/Kyc.tsx';
 import Coins          from './pages/coins/Coins.tsx';
 import AdminDashboard from './pages/admin/AdminDashboard.tsx';
+import Settings       from './pages/settings/Settings.tsx';
 
 export default function App() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
                   <Route path="/profile"    element={<Profile />} />
                   <Route path="/kyc"        element={<Kyc />} />
                   <Route path="/coins"      element={<Coins />} />
+                  <Route path="/settings"   element={<Settings />} />
                 </Route>
               </Route>
 
