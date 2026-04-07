@@ -38,14 +38,14 @@ const NAV_PRIMARY: NavItem[] = [
 const MENU_GROUPS: { title?: string; items: NavItem[] }[] = [
   {
     items: [
-      { to: '/earnings',  label: 'Earnings',   Icon: DollarSign,   desc: 'View your earnings history'  },
-      { to: '/withdraw',  label: 'Withdraw',   Icon: ArrowUpCircle, desc: 'Cash out your balance'      },
+      { to: '/earnings',  label: 'Earnings',   Icon: DollarSign,    desc: 'View your earnings history'  },
+      { to: '/kyc',       label: 'Verify ID',  Icon: BadgeCheck,    desc: 'Complete identity check'     },
+      { to: '/withdraw',  label: 'Withdraw',   Icon: ArrowUpCircle, desc: 'Cash out your balance'       },
     ],
   },
   {
     items: [
-      { to: '/referrals', label: 'Referrals',  Icon: UserPlus,     desc: 'Invite friends & earn'       },
-      { to: '/kyc',       label: 'Verify ID',  Icon: BadgeCheck,   desc: 'Complete identity check'     },
+      { to: '/referrals', label: 'Referrals',  Icon: UserPlus,      desc: 'Invite friends & earn'       },
     ],
   },
 ];

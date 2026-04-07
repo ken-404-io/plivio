@@ -48,17 +48,17 @@
   --accent-light:  rgba(184, 137, 46, 0.1);
   --accent-border: rgba(184, 137, 46, 0.35);
 
-  /* Warm cream / parchment backgrounds */
-  --bg:            #f7f3e8;
-  --bg-surface:    #fffdf5;
-  --bg-elevated:   #f0e8cc;
+  /* Bone White backgrounds */
+  --bg:            #f9f6ee;
+  --bg-surface:    #ffffff;
+  --bg-elevated:   #ede9df;
 
-  --text:          #5a4a20;
+  --text:          #3d3520;
   --text-heading:  #1a1200;
-  --text-muted:    #8b7a50;
+  --text-muted:    #7a6e56;
 
-  --border:        #d4bf80;
-  --border-light:  #e8d990;
+  --border:        #d8d0bc;
+  --border-light:  #e8e2d4;
 
   --success:       #16a34a;
   --warning:       #d97706;
@@ -3635,10 +3635,17 @@ a, button, [role="button"], [tabindex] {
   .tasks-progress-card { padding: 14px 16px; }
   .tasks-progress-value { font-size: 16px; }
 
-  /* Plans: single column stacked cards on mobile — no horizontal scroll needed */
+  /* Plans: tab switcher + single active card on mobile */
+  .plans-tab-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
   .plans-scroll-wrap { overflow: visible; margin: 0; padding: 0; }
   .plans-grid { min-width: unset; grid-template-columns: 1fr; gap: 14px; }
-  .plan-card { padding: 20px 18px; }
+  /* Hide cards that aren't selected; show only the active tab's card */
+  .plan-card { display: none; padding: 24px 20px; }
+  .plan-card--shown { display: flex; }
   .plan-card--featured { transform: none; }
 
   /* Withdraw balance card: stack vertically */
@@ -4062,6 +4069,41 @@ a, button, [role="button"], [tabindex] {
 
 /* ─── Plans scroll wrapper (enables swipe on mobile) ─────────────────────────── */
 .plans-scroll-wrap { width: 100%; }
+
+/* ─── Plans tab switcher (mobile only) ───────────────────────────────────────── */
+.plans-tab-row {
+  display: none; /* hidden on desktop — shown via mobile media query */
+}
+.plans-tab {
+  flex: 1;
+  padding: 10px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.plans-tab--active {
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.plans-tab--featured.plans-tab--active {
+  background: linear-gradient(135deg, var(--accent-light), rgba(201,162,74,0.2));
+}
+.plans-tab-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--success);
+  border-radius: 50%;
+  margin-left: 5px;
+  vertical-align: middle;
+}
 
 /* ─── KYC status banner ──────────────────────────────────────────────────────── */
 .kyc-status-banner {
