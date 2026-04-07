@@ -7,6 +7,7 @@ import pool from '../config/db.ts';
 import { AuthenticationError, NotFoundError, ValidationError, ConflictError, RateLimitError } from '../utils/errors.ts';
 import { sendVerificationEmail } from '../services/email.ts';
 import { AVATARS_DIR } from '../middleware/upload.ts';
+import { logger } from '../utils/logger.ts';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -320,7 +321,10 @@ export async function getEarnings(
         pending_count:   Number(s.pending_count),
       },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    logger.error({ err: (err as Error).message, userId: req.user?.id }, '❌ getEarnings SQL error');
+    next(err);
+  }
 }
 
 // ─── GET /users/me/referrals ──────────────────────────────────────────────
