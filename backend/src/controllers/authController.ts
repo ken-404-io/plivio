@@ -117,7 +117,8 @@ export async function register(req: Request, res: Response, next: NextFunction):
          VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
         [user.id as string, tokenHash],
       );
-      await sendVerificationEmail(user.email as string, user.username as string, rawToken);
+      // Fire and forget — email must never delay the registration response
+      sendVerificationEmail(user.email as string, user.username as string, rawToken).catch(() => {});
     } catch {
       // Non-fatal — account is created; user can resend from dashboard
     }
