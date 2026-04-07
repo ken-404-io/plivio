@@ -260,8 +260,8 @@ export async function getEarnings(
          FROM task_completions tc
          JOIN tasks t ON t.id = tc.task_id
          WHERE tc.user_id = $1
-           AND ($2::text IS NULL OR tc.status = $2)
-           AND ($3::text IS NULL OR t.type   = $3)
+           AND ($2::text IS NULL OR tc.status = $2::completion_status)
+           AND ($3::text IS NULL OR t.type    = $3::task_type)
          ORDER BY tc.completed_at DESC
          LIMIT $4 OFFSET $5`,
         [userId, filterStatus, filterType, limit, offset],
@@ -270,8 +270,8 @@ export async function getEarnings(
         `SELECT COUNT(*) FROM task_completions tc
          JOIN tasks t ON t.id = tc.task_id
          WHERE tc.user_id = $1
-           AND ($2::text IS NULL OR tc.status = $2)
-           AND ($3::text IS NULL OR t.type   = $3)`,
+           AND ($2::text IS NULL OR tc.status = $2::completion_status)
+           AND ($3::text IS NULL OR t.type    = $3::task_type)`,
         [userId, filterStatus, filterType],
       ),
       pool.query(

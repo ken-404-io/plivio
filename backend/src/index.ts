@@ -124,13 +124,16 @@ async function runDiagnostics(): Promise<void> {
       logger.warn({}, '⚠️  task_completions table MISSING — run docs/schema_current.sql');
     }
 
-    // 3. Smoke-test the earnings query
+    // 3. Smoke-test the earnings query including ENUM filter casts
     await pool.query(
       `SELECT tc.id, t.title, t.type, tc.reward_earned, tc.status, tc.completed_at
        FROM task_completions tc
        JOIN tasks t ON t.id = tc.task_id
        WHERE tc.user_id = '00000000-0000-0000-0000-000000000000'
+         AND ($1::text IS NULL OR tc.status = $1::completion_status)
+         AND ($2::text IS NULL OR t.type    = $2::task_type)
        LIMIT 1`,
+      [null, null],
     );
     logger.info({}, '✅ Earnings query OK');
   } catch (err) {
