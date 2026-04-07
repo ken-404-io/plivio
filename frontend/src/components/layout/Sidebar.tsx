@@ -12,6 +12,7 @@ import {
   User,
   Settings,
   Coins,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 type LucideIcon = React.ElementType;
@@ -30,8 +31,9 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/coins',     label: 'Coins',     Icon: Coins           },
   { to: '/plans',     label: 'Plans',     Icon: Star            },
   { to: '/referrals', label: 'Referrals', Icon: UserPlus        },
-  { to: '/kyc',       label: 'Verify ID', Icon: BadgeCheck      },
-  { to: '/profile',   label: 'Profile',   Icon: User            },
+  { to: '/kyc',       label: 'Verify ID', Icon: BadgeCheck         },
+  { to: '/profile',   label: 'Profile',   Icon: User               },
+  { to: '/settings',  label: 'Settings',  Icon: SlidersHorizontal  },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [

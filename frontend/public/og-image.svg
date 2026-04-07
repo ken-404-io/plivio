@@ -1,17 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
     <linearGradient id="bg-grad" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#0f0e08"/>
-      <stop offset="100%" stop-color="#0b0b0b"/>
+      <stop offset="0%" stop-color="#181818"/>
+      <stop offset="100%" stop-color="#0d1a33"/>
     </linearGradient>
-    <linearGradient id="gold" x1="0" y1="0" x2="200" y2="280" gradientUnits="userSpaceOnUse">
-      <stop offset="0%"   stop-color="#ffd76a"/>
-      <stop offset="55%"  stop-color="#c9a24a"/>
-      <stop offset="100%" stop-color="#8a6a2f"/>
-    </linearGradient>
-    <linearGradient id="pill-grad" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#c9a24a" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#c9a24a" stop-opacity="0.04"/>
+    <linearGradient id="blue" x1="0" y1="0" x2="200" y2="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#64b5f6"/>
+      <stop offset="55%"  stop-color="#1877f2"/>
+      <stop offset="100%" stop-color="#0d5abf"/>
     </linearGradient>
     <filter id="glow">
       <feGaussianBlur stdDeviation="8" result="blur"/>
@@ -23,7 +19,7 @@
   <rect width="1200" height="630" fill="url(#bg-grad)"/>
 
   <!-- Subtle grid lines -->
-  <g stroke="#c9a24a" stroke-opacity="0.04" stroke-width="1">
+  <g stroke="#1877f2" stroke-opacity="0.06" stroke-width="1">
     <line x1="0" y1="105" x2="1200" y2="105"/>
     <line x1="0" y1="210" x2="1200" y2="210"/>
     <line x1="0" y1="315" x2="1200" y2="315"/>
@@ -37,20 +33,19 @@
   </g>
 
   <!-- Glow orb behind logo -->
-  <circle cx="600" cy="220" r="180" fill="#c9a24a" fill-opacity="0.06"/>
+  <circle cx="600" cy="220" r="180" fill="#1877f2" fill-opacity="0.08"/>
 
-  <!-- Logo mark (P + arrow), centred, scaled up -->
-  <!-- Original viewBox 56×56, scaled to 140×140, centred at (600,220) → translate(530, 150) scale(2.5) -->
+  <!-- Logo mark centred, scaled 2.5× -->
   <g transform="translate(530, 150) scale(2.5)" filter="url(#glow)">
     <defs>
-      <linearGradient id="logo-gold" x1="8" y1="4" x2="50" y2="56" gradientUnits="userSpaceOnUse">
-        <stop offset="0%"   stop-color="#ffd76a"/>
-        <stop offset="55%"  stop-color="#c9a24a"/>
-        <stop offset="100%" stop-color="#8a6a2f"/>
+      <linearGradient id="logo-blue" x1="8" y1="4" x2="50" y2="56" gradientUnits="userSpaceOnUse">
+        <stop offset="0%"   stop-color="#64b5f6"/>
+        <stop offset="55%"  stop-color="#1877f2"/>
+        <stop offset="100%" stop-color="#0d5abf"/>
       </linearGradient>
     </defs>
     <path
-      fill="url(#logo-gold)"
+      fill="url(#logo-blue)"
       fill-rule="evenodd"
       d="
         M 28,4
@@ -70,7 +65,7 @@
     font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
     font-size="72"
     font-weight="700"
-    fill="#f5e6c0"
+    fill="#f0f4ff"
     text-anchor="middle"
     letter-spacing="-1"
   >Plivio</text>
@@ -81,7 +76,7 @@
     font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
     font-size="26"
     font-weight="400"
-    fill="#c9a24a"
+    fill="#1877f2"
     text-anchor="middle"
     letter-spacing="2"
   >GET PAID TO COMPLETE TASKS</text>
@@ -92,10 +87,10 @@
     font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
     font-size="20"
     font-weight="400"
-    fill="#8a7a5a"
+    fill="#6b85a8"
     text-anchor="middle"
   >Earn real money · Withdraw to GCash · Free to join</text>
 
   <!-- Bottom border accent -->
-  <rect x="0" y="620" width="1200" height="10" fill="url(#gold)"/>
+  <rect x="0" y="620" width="1200" height="10" fill="url(#blue)"/>
 </svg>
