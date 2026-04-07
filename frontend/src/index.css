@@ -3636,11 +3636,6 @@ a, button, [role="button"], [tabindex] {
   .tasks-progress-value { font-size: 16px; }
 
   /* Plans: tab switcher + single active card on mobile */
-  .plans-tab-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 4px;
-  }
   .plans-scroll-wrap { overflow: visible; margin: 0; padding: 0; }
   .plans-grid { min-width: unset; grid-template-columns: 1fr; gap: 14px; }
   /* Hide cards that aren't selected; show only the active tab's card */
@@ -4072,7 +4067,13 @@ a, button, [role="button"], [tabindex] {
 
 /* ─── Plans tab switcher (mobile only) ───────────────────────────────────────── */
 .plans-tab-row {
-  display: none; /* hidden on desktop — shown via mobile media query */
+  display: none; /* hidden on desktop */
+  gap: 8px;
+  margin-bottom: 4px;
+}
+/* Override AFTER global rule so cascade works correctly */
+@media (max-width: 768px) {
+  .plans-tab-row { display: flex; }
 }
 .plans-tab {
   flex: 1;

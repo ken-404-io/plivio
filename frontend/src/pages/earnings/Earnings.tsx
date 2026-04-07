@@ -110,19 +110,21 @@ export default function Earnings() {
   const [data,    setData]    = useState<EarningsResponse | null>(null);
   const [page,    setPage]    = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(false);
 
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter,   setTypeFilter]   = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(false);
     const params: Record<string, string | number> = { page, limit: 20 };
     if (statusFilter) params.status = statusFilter;
     if (typeFilter)   params.type   = typeFilter;
 
     api.get<EarningsResponse>('/users/me/earnings', { params })
       .then(({ data: res }) => setData(res))
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [page, statusFilter, typeFilter]);
 
@@ -189,6 +191,13 @@ export default function Earnings() {
       {/* List */}
       {loading ? (
         <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>
+      ) : error ? (
+        <div className="empty-state">
+          <p style={{ color: 'var(--error)', marginBottom: 12 }}>
+            Failed to load earnings. Please check your connection and try again.
+          </p>
+          <button className="btn btn-primary btn-sm" onClick={load}>Retry</button>
+        </div>
       ) : rows.length === 0 ? (
         <div className="empty-state">
           <p>
