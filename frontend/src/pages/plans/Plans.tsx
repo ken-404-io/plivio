@@ -45,6 +45,7 @@ export default function Plans() {
   const [sub,         setSub]         = useState<Subscription | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [subscribing, setSubscribing] = useState('');
+  const [activeTab,   setActiveTab]   = useState<string>(user?.plan ?? 'premium');
 
   useEffect(() => {
     Promise.all([
@@ -112,6 +113,20 @@ export default function Plans() {
         </div>
       </header>
 
+      {/* ── Mobile plan tab switcher ── */}
+      <div className="plans-tab-row">
+        {sortedPlans.map(([key, plan]) => (
+          <button
+            key={key}
+            className={`plans-tab${activeTab === key ? ' plans-tab--active' : ''}${key === 'premium' ? ' plans-tab--featured' : ''}`}
+            onClick={() => setActiveTab(key)}
+          >
+            {plan.name}
+            {user?.plan === key && <span className="plans-tab-dot" />}
+          </button>
+        ))}
+      </div>
+
       {/* ── Plan cards ── */}
       <div className="plans-scroll-wrap">
         <div className="plans-grid">
@@ -123,7 +138,7 @@ export default function Plans() {
             return (
               <div
                 key={key}
-                className={`plan-card${featured ? ' plan-card--featured' : ''}${isCurrent ? ' plan-card--current' : ''}`}
+                className={`plan-card${featured ? ' plan-card--featured' : ''}${isCurrent ? ' plan-card--current' : ''}${activeTab === key ? ' plan-card--shown' : ''}`}
               >
                 {featured && <div className="plan-badge-top">Most Popular</div>}
                 {isCurrent && !featured && <div className="plan-badge-top plan-badge-top--current">Your Plan</div>}
