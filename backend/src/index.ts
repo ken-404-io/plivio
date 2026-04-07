@@ -5,6 +5,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 
 import { connectDB } from './config/db.ts';
+import pool         from './config/db.ts';
 import { connectRedis } from './config/redis.ts';
 import { logger } from './utils/logger.ts';
 import { AppError } from './utils/errors.ts';
@@ -99,12 +100,52 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   res.status(status).json({ success: false, error: message });
 });
 
+async function runDiagnostics(): Promise<void> {
+  if (process.env.NODE_ENV !== 'development') return;
+  try {
+    // 1. Check critical tables exist
+    const tablesRes = await pool.query<{ tablename: string }>(
+      `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
+    );
+    const tables = tablesRes.rows.map((r) => r.tablename);
+    logger.info({ tables }, '📋 DB tables');
+
+    // 2. Check task_completions columns
+    if (tables.includes('task_completions')) {
+      const colRes = await pool.query<{ column_name: string; data_type: string }>(
+        `SELECT column_name, data_type
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'task_completions'
+         ORDER BY ordinal_position`,
+      );
+      const cols = colRes.rows.map((c) => `${c.column_name}(${c.data_type})`);
+      logger.info({ cols }, '🗂  task_completions columns');
+    } else {
+      logger.warn({}, '⚠️  task_completions table MISSING — run docs/schema_current.sql');
+    }
+
+    // 3. Smoke-test the earnings query
+    await pool.query(
+      `SELECT tc.id, t.title, t.type, tc.reward_earned, tc.status, tc.completed_at
+       FROM task_completions tc
+       JOIN tasks t ON t.id = tc.task_id
+       WHERE tc.user_id = '00000000-0000-0000-0000-000000000000'
+       LIMIT 1`,
+    );
+    logger.info({}, '✅ Earnings query OK');
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, '❌ Diagnostics FAILED — see error above');
+  }
+}
+
 async function bootstrap() {
   logger.info({}, 'Connecting to PostgreSQL…');
   await connectDB();
 
   logger.info({}, 'Connecting to Redis…');
   await connectRedis();
+
+  await runDiagnostics();
 
   app.listen(PORT, () => {
     logger.info({ port: PORT }, `Plivio API running → http://localhost:${PORT}`);
