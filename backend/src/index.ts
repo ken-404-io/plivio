@@ -87,7 +87,10 @@ app.use((_req: Request, res: Response) => {
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   const appErr = err as AppError;
   const status  = appErr.statusCode || 500;
-  const message = appErr.statusCode ? appErr.message : 'Internal server error';
+  // In development, expose the real error message so DB/query errors are visible
+  const message = appErr.statusCode
+    ? appErr.message
+    : (process.env.NODE_ENV === 'development' ? err.message : 'Internal server error');
 
   if (!appErr.statusCode) {
     logger.error({ err: err.message, path: req.path, method: req.method }, 'Unhandled error');
