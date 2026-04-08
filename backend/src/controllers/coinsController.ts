@@ -27,15 +27,19 @@ export async function getCoins(req: Request, res: Response, next: NextFunction):
       (u.streak_broken_at === today ||
         new Date(today).getTime() - new Date(u.streak_broken_at).getTime() <= 86_400_000);
 
-    // Count tasks completed today for streak progress
-    const { rows: taskRows } = await pool.query<{ count: string }>(
-      `SELECT COUNT(*) FROM task_completions
-       WHERE user_id = $1
-         AND status = 'approved'
-         AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
-      [userId],
-    );
-    const todayCompletions = Number(taskRows[0]?.count ?? 0);
+    // Count quiz questions answered today for streak progress (goal: 15)
+    let todayCompletions = 0;
+    try {
+      const { rows: qRows } = await pool.query<{ count: string }>(
+        `SELECT COUNT(*) FROM user_question_answers
+         WHERE user_id = $1
+           AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
+        [userId],
+      );
+      todayCompletions = Number(qRows[0]?.count ?? 0);
+    } catch {
+      // quiz tables not migrated yet — leave at 0
+    }
 
     res.json({
       success: true,
