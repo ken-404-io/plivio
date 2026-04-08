@@ -64,7 +64,7 @@ function VideoAdPanel({
         <div className="task-modal-ad-frame-wrap">
           <iframe
             srcDoc={iframeSrc}
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            sandbox="allow-scripts allow-popups"
             className="task-modal-ad-frame"
             title="Advertisement"
             scrolling="no"

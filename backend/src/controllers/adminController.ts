@@ -313,7 +313,15 @@ export async function updateAdNetworks(req: Request, res: Response, next: NextFu
       if (typeof n.weight !== 'number' || n.weight < 1 || n.weight > 100) {
         throw new ValidationError(`Network "${n.name}" weight must be 1–100`);
       }
-      if (!n.embed_code?.trim()) throw new ValidationError(`Network "${n.name}" must have embed_code`);
+      const code = n.embed_code?.trim() ?? '';
+      if (!code) throw new ValidationError(`Network "${n.name}" must have embed_code`);
+      // Only allow a single <script> or <iframe> tag — blocks inline event handlers and javascript: URLs
+      if (!/^(<script[\s\S]*?<\/script>|<iframe[\s\S]*?<\/iframe>)\s*$/i.test(code)) {
+        throw new ValidationError(`Network "${n.name}" embed_code must be a <script> or <iframe> tag`);
+      }
+      if (/javascript\s*:/i.test(code) || /\bon\w+\s*=/i.test(code)) {
+        throw new ValidationError(`Network "${n.name}" embed_code contains disallowed attributes`);
+      }
     }
 
     const result = await pool.query(

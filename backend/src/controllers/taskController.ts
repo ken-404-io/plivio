@@ -124,7 +124,7 @@ async function generateCaptcha(): Promise<{ question: string; answerHash: string
     answer = a * b;
   }
 
-  const answerHash = await bcrypt.hash(String(answer), 8);
+  const answerHash = await bcrypt.hash(String(answer), 12);
   return { question: `What is ${a} ${op} ${b}?`, answerHash };
 }
 
