@@ -158,9 +158,9 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
       }
     }
 
-    // Get next unanswered question (random from unanswered pool)
+    // Get next unanswered question (with its correct answer for generating choices)
     const questionRes = await pool.query(
-      `SELECT q.id, q.question, q.category
+      `SELECT q.id, q.question, q.answer, q.category
        FROM chat_questions q
        WHERE q.id NOT IN (
          SELECT question_id FROM user_question_answers WHERE user_id = $1
@@ -179,13 +179,35 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
       return;
     }
 
-    const question = questionRes.rows[0];
+    const q             = questionRes.rows[0] as { id: number; question: string; answer: string; category: string };
+    const correctAnswer = q.answer;
+
+    // Pick 1 distractor from a different question (different answer text, prefer same category)
+    const distractorRes = await pool.query(
+      `(SELECT answer FROM chat_questions
+        WHERE id != $1 AND LOWER(answer) != LOWER($2) AND category = $3
+        ORDER BY RANDOM() LIMIT 1)
+       UNION ALL
+       (SELECT answer FROM chat_questions
+        WHERE id != $1 AND LOWER(answer) != LOWER($2)
+        ORDER BY RANDOM() LIMIT 1)
+       LIMIT 1`,
+      [q.id, correctAnswer, q.category],
+    );
+    const distractor = (distractorRes.rows[0]?.answer as string | undefined) ?? 'None of the above';
+
+    // Shuffle so the correct answer isn't always in the same position
+    const choices = Math.random() > 0.5
+      ? [correctAnswer, distractor]
+      : [distractor, correctAnswer];
+
     res.json({
       success:  true,
       question: {
-        id:       question.id,
-        question: question.question,
-        category: question.category,
+        id:       q.id,
+        question: q.question,
+        category: q.category,
+        choices,
       },
     });
   } catch (err) {
