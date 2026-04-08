@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import {
-  Zap, Sun, Moon, Menu, X,
-  UserPlus, CheckCircle2, Wallet,
+  Sun, Moon, Menu, X,
+  CheckCircle2, Wallet,
   Check, Star,
+  Smartphone, Flame, Users, RefreshCw, ShieldCheck,
 } from 'lucide-react';
 import './LandingPage.css';
 
@@ -64,6 +65,45 @@ const CERTS = [
     desc:  "Platform developed in alignment with DICT's cybersecurity and digital economy frameworks under the e-Commerce Act (RA 8792).",
     badge: 'Aligned',
     color: 'purple',
+    delay: 120,
+  },
+] as const;
+
+const FEATURES = [
+  {
+    icon:  Smartphone,
+    title: 'Mobile-First',
+    desc:  'Built for Filipinos on the go. Complete tasks from any phone, anywhere in PH.',
+    delay: 0,
+  },
+  {
+    icon:  Wallet,
+    title: 'Fast GCash Payouts',
+    desc:  'Cash out to GCash or PayPal within 24 hours. Low ₱50 minimum withdrawal.',
+    delay: 60,
+  },
+  {
+    icon:  Flame,
+    title: 'Daily Streak Bonuses',
+    desc:  'Log in every day to build your streak and unlock bigger earning multipliers.',
+    delay: 120,
+  },
+  {
+    icon:  Users,
+    title: 'Refer & Earn',
+    desc:  'Earn ₱50 for every friend you invite. No cap on referrals — ever.',
+    delay: 0,
+  },
+  {
+    icon:  RefreshCw,
+    title: 'Fresh Tasks Daily',
+    desc:  'New surveys, videos, ad tasks, and offers added every day without fail.',
+    delay: 60,
+  },
+  {
+    icon:  ShieldCheck,
+    title: 'SEC & DTI Registered',
+    desc:  'Fully registered and compliant. Your money and personal data are protected.',
     delay: 120,
   },
 ] as const;
@@ -144,7 +184,7 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Scroll-reveal refs — each section gets its own observer
-  const stepsRef        = useScrollReveal();
+  const featuresRef     = useScrollReveal();
   const testimonialsRef = useScrollReveal();
   const plansRef        = useScrollReveal();
   const certsRef        = useScrollReveal();
@@ -165,7 +205,7 @@ export default function LandingPage() {
           </a>
 
           <nav className={`lp-nav-links${menuOpen ? ' lp-nav-links--open' : ''}`}>
-            <a href="#how-it-works"   onClick={() => setMenuOpen(false)}>How It Works</a>
+            <a href="#features"        onClick={() => setMenuOpen(false)}>Features</a>
             <a href="#testimonials"   onClick={() => setMenuOpen(false)}>Reviews</a>
             <a href="#plans"          onClick={() => setMenuOpen(false)}>Plans</a>
             <a href="#certifications" onClick={() => setMenuOpen(false)}>Certifications</a>
@@ -249,85 +289,64 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Lightning bolt graphic */}
+        {/* Earnings card mockup */}
         <div className="lp-hero-visual" aria-hidden="true">
-          <div className="lp-bolt-glow" />
-          <svg className="lp-bolt-svg" viewBox="0 0 300 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="boltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%"   stopColor="#60a5fa" />
-                <stop offset="50%"  stopColor="#1877f2" />
-                <stop offset="100%" stopColor="#0d5abf" />
-              </linearGradient>
-              <linearGradient id="boltGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%"   stopColor="#93c5fd" stopOpacity="0.6" />
-                <stop offset="100%" stopColor="#1877f2" stopOpacity="0.3" />
-              </linearGradient>
-              <filter id="boltBlur">
-                <feGaussianBlur stdDeviation="8" />
-              </filter>
-            </defs>
-            <polygon
-              points="175,10 80,270 155,270 125,490 230,200 148,200 210,10"
-              fill="url(#boltGrad2)"
-              filter="url(#boltBlur)"
-              transform="translate(5,5)"
-            />
-            <polygon
-              points="175,10 80,270 155,270 125,490 230,200 148,200 210,10"
-              fill="url(#boltGrad)"
-            />
-            <polygon
-              points="175,10 140,140 165,140 155,270 180,175 160,175 190,10"
-              fill="rgba(255,255,255,0.25)"
-            />
-          </svg>
-          <div className="lp-bolt-reflection" />
+          <div className="lp-earnings-card">
+            <div className="lp-ec-header">
+              <div className="lp-ec-avatar">₱</div>
+              <div>
+                <p className="lp-ec-label">Today's Earnings</p>
+                <p className="lp-ec-value">₱84.50</p>
+              </div>
+            </div>
+            <div className="lp-ec-progress">
+              <div className="lp-ec-progress-bar" style={{ width: '84%' }} />
+            </div>
+            <p className="lp-ec-progress-label">84% of daily limit reached</p>
+            <div className="lp-ec-tasks">
+              <div className="lp-ec-task lp-ec-task--done">
+                <CheckCircle2 size={14} />
+                <span>Watch Video</span>
+                <span className="lp-ec-earn">+₱2.50</span>
+              </div>
+              <div className="lp-ec-task lp-ec-task--done">
+                <CheckCircle2 size={14} />
+                <span>Survey Complete</span>
+                <span className="lp-ec-earn">+₱15.00</span>
+              </div>
+              <div className="lp-ec-task lp-ec-task--active">
+                <span className="lp-ec-dot" />
+                <span>Click Ads</span>
+                <span className="lp-ec-earn lp-ec-earn--live">Live</span>
+              </div>
+            </div>
+            <div className="lp-ec-footer">
+              <div className="lp-ec-withdraw">
+                <Wallet size={13} />
+                <span>GCash Ready</span>
+              </div>
+              <span className="lp-ec-streak">🔥 7-day streak</span>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ─── How It Works ───────────────────────────────────────────────── */}
-      <section className="lp-section lp-steps-section" id="how-it-works" ref={stepsRef}>
+      {/* ─── Features ───────────────────────────────────────────────────── */}
+      <section className="lp-section lp-features-section" id="features" ref={featuresRef}>
         <div className="lp-section-inner">
           <div className="lp-section-header reveal">
-            <h2 className="lp-section-title">How To Start Earning</h2>
-            <p className="lp-section-subtitle">Three simple steps to your first payout</p>
+            <h2 className="lp-section-title">Why Filipinos Choose Plivio</h2>
+            <p className="lp-section-subtitle">Everything you need to earn real money online — in one platform</p>
           </div>
 
-          <div className="lp-steps">
-            <div className="lp-step reveal" style={{ transitionDelay: '0ms' }}>
-              <div className="lp-step-num">01</div>
-              <div className="lp-step-icon"><UserPlus size={28} /></div>
-              <h3 className="lp-step-title">Create Free Account</h3>
-              <p className="lp-step-desc">
-                Sign up with your email in under 60 seconds. No fees, no credit card.
-                Verified Filipino platform.
-              </p>
-            </div>
-
-            <div className="lp-step-arrow" aria-hidden="true">→</div>
-
-            <div className="lp-step reveal" style={{ transitionDelay: '120ms' }}>
-              <div className="lp-step-num">02</div>
-              <div className="lp-step-icon"><CheckCircle2 size={28} /></div>
-              <h3 className="lp-step-title">Complete Tasks</h3>
-              <p className="lp-step-desc">
-                Watch videos, solve captchas, answer surveys, and click ads.
-                New tasks available every day.
-              </p>
-            </div>
-
-            <div className="lp-step-arrow" aria-hidden="true">→</div>
-
-            <div className="lp-step reveal" style={{ transitionDelay: '240ms' }}>
-              <div className="lp-step-num">03</div>
-              <div className="lp-step-icon"><Wallet size={28} /></div>
-              <h3 className="lp-step-title">Withdraw Earnings</h3>
-              <p className="lp-step-desc">
-                Cash out to GCash or PayPal once you reach ₱50.
-                Processed within 24 hours.
-              </p>
-            </div>
+          <div className="lp-features-grid">
+            {FEATURES.map(({ icon: Icon, title, desc, delay }) => (
+              <div key={title} className="lp-feature-card reveal" style={{ transitionDelay: `${delay}ms` }}>
+                <div className="lp-feature-icon"><Icon size={22} /></div>
+                <h3 className="lp-feature-title">{title}</h3>
+                <p className="lp-feature-desc">{desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -500,7 +519,6 @@ export default function LandingPage() {
       {/* ─── CTA Banner ─────────────────────────────────────────────────── */}
       <section className="lp-cta-banner">
         <div className="lp-cta-inner">
-          <div className="lp-cta-bolt" aria-hidden="true"><Zap size={32} /></div>
           <h2 className="lp-cta-title">Ready to Start Earning?</h2>
           <p className="lp-cta-sub">
             Join thousands of Filipinos already earning with Plivio.
@@ -524,7 +542,7 @@ export default function LandingPage() {
           <div className="lp-footer-links">
             <div className="lp-footer-col">
               <h5>Platform</h5>
-              <a href="#how-it-works">How It Works</a>
+              <a href="#features">Features</a>
               <a href="#testimonials">Reviews</a>
               <a href="#plans">Plans &amp; Pricing</a>
               <Link to="/register">Sign Up</Link>
