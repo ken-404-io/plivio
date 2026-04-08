@@ -1,18 +1,19 @@
 /**
- * Subscription controller with Xendit payment integration.
+ * Subscription controller with PayMongo payment integration.
  *
  * Flow:
- *  1. POST /subscriptions/checkout  – creates a Xendit invoice,
+ *  1. POST /subscriptions/checkout  – creates a PayMongo payment link,
  *     stores a pending checkout row, returns { checkout_url }.
- *  2. User pays on Xendit's hosted page.
- *  3. Xendit fires a webhook → POST /subscriptions/webhook.
- *  4. Webhook verifies x-callback-token, marks checkout as paid,
- *     activates the subscription and sends a confirmation email.
+ *  2. User pays on PayMongo's hosted page.
+ *  3. PayMongo fires a webhook → POST /subscriptions/webhook.
+ *  4. Webhook verifies HMAC signature, marks checkout as paid, activates
+ *     the subscription and sends a confirmation email.
  *
  * Environment variables needed:
- *   XENDIT_SECRET_KEY      – starts with xnd_production_... or xnd_development_...
- *   XENDIT_WEBHOOK_TOKEN   – callback token set in Xendit dashboard
+ *   PAYMONGO_SECRET_KEY     – sk_test_… or sk_live_…
+ *   PAYMONGO_WEBHOOK_SECRET – whsk_… (from PayMongo dashboard)
  */
+import crypto from 'crypto';
 import https  from 'https';
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
@@ -68,18 +69,18 @@ export async function getCurrentSubscription(
   } catch (err) { next(err); }
 }
 
-// ─── Helper: POST to Xendit API ───────────────────────────────────────────────
+// ─── Helper: make authenticated PayMongo API request ─────────────────────────
 
-async function xenditPost(path: string, body: unknown): Promise<Record<string, unknown>> {
-  const secret = process.env.XENDIT_SECRET_KEY ?? '';
+async function paymongoPost(path: string, body: unknown): Promise<Record<string, unknown>> {
+  const secret = process.env.PAYMONGO_SECRET_KEY ?? '';
   const auth   = Buffer.from(`${secret}:`).toString('base64');
   const json   = JSON.stringify(body);
 
   return new Promise((resolve, reject) => {
     const req = https.request(
       {
-        hostname: 'api.xendit.co',
-        path,
+        hostname: 'api.paymongo.com',
+        path:     `/v1${path}`,
         method:   'POST',
         headers:  {
           'Authorization':  `Basic ${auth}`,
@@ -94,12 +95,12 @@ async function xenditPost(path: string, body: unknown): Promise<Record<string, u
           try {
             const parsed = JSON.parse(data) as Record<string, unknown>;
             if ((res.statusCode ?? 0) >= 400) {
-              reject(new Error(`Xendit error ${res.statusCode}: ${data}`));
+              reject(new Error(`PayMongo error ${res.statusCode}: ${data}`));
             } else {
               resolve(parsed);
             }
           } catch {
-            reject(new Error(`Xendit invalid JSON: ${data}`));
+            reject(new Error(`PayMongo invalid JSON: ${data}`));
           }
         });
       },
@@ -110,7 +111,7 @@ async function xenditPost(path: string, body: unknown): Promise<Record<string, u
   });
 }
 
-// ─── 1. Create checkout (Xendit Invoice) ─────────────────────────────────────
+// ─── 1. Create checkout session ───────────────────────────────────────────────
 
 export async function createCheckout(
   req: Request,
@@ -141,49 +142,70 @@ export async function createCheckout(
     );
     const checkoutId = (checkoutRows[0] as { id: string }).id;
 
-    // If Xendit is not configured, return demo mode
-    if (!process.env.XENDIT_SECRET_KEY) {
+    // If PayMongo is not configured, return demo mode
+    if (!process.env.PAYMONGO_SECRET_KEY) {
       res.json({
         success:      true,
         checkout_url: null,
         demo:         true,
-        message:      'Xendit not configured. Set XENDIT_SECRET_KEY to enable real payments.',
+        message:      'PayMongo not configured. Set PAYMONGO_SECRET_KEY to enable real payments.',
       });
       return;
     }
 
-    // Create a Xendit invoice
-    const invoice = await xenditPost('/v2/invoices', {
-      external_id:          checkoutId,
-      amount:               planInfo.price_php,
-      currency:             'PHP',
-      description:          `Plivio ${planInfo.name} – ${duration_days} days`,
-      invoice_duration:     86400,                         // 24h to pay
-      success_redirect_url: `${appUrl}/plans?payment=success`,
-      failure_redirect_url: `${appUrl}/plans?payment=failed`,
-      items: [{
-        name:     `Plivio ${planInfo.name}`,
-        quantity: 1,
-        price:    planInfo.price_php,
-        category: 'Subscription',
-      }],
-      fees: [],
+    // Create a PayMongo payment link
+    const pmResponse = await paymongoPost('/links', {
+      data: {
+        attributes: {
+          amount:      planInfo.price_php * 100,   // PayMongo uses centavos
+          description: `Plivio ${planInfo.name} – ${duration_days} days`,
+          remarks:     checkoutId,                  // used to look up in webhook
+          redirect: {
+            success: `${appUrl}/plans?payment=success`,
+            failed:  `${appUrl}/plans?payment=failed`,
+          },
+        },
+      },
     });
 
-    const xenditId   = invoice.id   as string;
-    const invoiceUrl = invoice.invoice_url as string;
+    const linkData    = pmResponse.data as Record<string, unknown>;
+    const attributes  = (linkData?.attributes as Record<string, unknown>) ?? {};
+    const pmRef       = (linkData?.id as string) ?? '';
+    const checkoutUrl = (attributes.checkout_url as string) ?? '';
 
-    // Save Xendit invoice ID for webhook lookup
+    // Save PayMongo link ID for webhook lookup
     await pool.query(
       'UPDATE subscription_checkouts SET paymongo_ref = $1 WHERE id = $2',
-      [xenditId, checkoutId],
+      [pmRef, checkoutId],
     );
 
-    res.json({ success: true, checkout_url: invoiceUrl });
+    res.json({ success: true, checkout_url: checkoutUrl });
   } catch (err) { next(err); }
 }
 
-// ─── 2. Xendit webhook ────────────────────────────────────────────────────────
+// ─── 2. PayMongo webhook ──────────────────────────────────────────────────────
+
+/**
+ * Verify PayMongo webhook signature.
+ * Header format: "t=<timestamp>,te=<test_sig>,li=<live_sig>"
+ * Signed payload: "<timestamp>.<rawBody>"
+ */
+function verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean {
+  const secret = process.env.PAYMONGO_WEBHOOK_SECRET;
+  if (!secret) return true; // Skip verification if not configured (dev mode)
+
+  const parts     = Object.fromEntries(signatureHeader.split(',').map((p) => p.split('=')));
+  const timestamp = parts['t'] ?? '';
+  const signature = parts['te'] ?? parts['li'] ?? '';
+
+  if (!timestamp || !signature) return false;
+
+  const payload  = `${timestamp}.${rawBody}`;
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+  if (expected.length !== signature.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
 
 export async function handleWebhook(
   req: Request,
@@ -191,44 +213,50 @@ export async function handleWebhook(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // Verify webhook token
-    const token         = process.env.XENDIT_WEBHOOK_TOKEN;
-    const receivedToken = req.headers['x-callback-token'] as string | undefined;
+    const rawBody   = (req as Request & { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
+    const sigHeader = (req.headers['paymongo-signature'] as string) ?? '';
 
-    if (token && receivedToken !== token) {
-      res.status(401).json({ success: false, error: 'Invalid webhook token' });
+    if (!verifyWebhookSignature(rawBody, sigHeader)) {
+      res.status(400).json({ success: false, error: 'Invalid webhook signature' });
       return;
     }
 
-    const event = req.body as Record<string, unknown>;
+    const event      = req.body as Record<string, unknown>;
+    const eventData  = event.data as Record<string, unknown> | undefined;
+    const attributes = eventData?.attributes as Record<string, unknown> | undefined;
+    const eventType  = attributes?.type as string | undefined;
 
-    // Only handle paid invoices
-    if (event.status !== 'PAID' && event.status !== 'SETTLED') {
+    // Only handle successful payments
+    if (eventType !== 'payment.paid' && eventType !== 'link.payment.paid') {
       res.json({ received: true });
       return;
     }
 
-    const externalId = event.external_id as string | undefined;
-    const xenditId   = event.id          as string | undefined;
+    const paymentData = attributes?.data as Record<string, unknown> | undefined;
+    const payAttribs  = paymentData?.attributes as Record<string, unknown> | undefined;
 
-    if (!externalId && !xenditId) {
+    // PayMongo stores our checkoutId in the remarks field
+    const remarks = (payAttribs?.remarks as string)
+                 ?? (payAttribs?.description as string)
+                 ?? '';
+
+    if (!remarks) {
       res.json({ received: true });
       return;
     }
 
-    // Look up the checkout session by external_id (our checkoutId) or xendit invoice id
+    // Look up the checkout session
     const { rows } = await pool.query(
       `SELECT sc.id, sc.user_id, sc.plan, sc.duration_days, sc.status, sc.amount_php,
               u.email, u.username
        FROM subscription_checkouts sc
        JOIN users u ON u.id = sc.user_id
-       WHERE (sc.id = $1 OR sc.paymongo_ref = $2) AND sc.status = 'pending'
+       WHERE (sc.id = $1 OR sc.paymongo_ref = $1) AND sc.status = 'pending'
        LIMIT 1`,
-      [externalId ?? '', xenditId ?? ''],
+      [remarks],
     );
 
     if (rows.length === 0) {
-      // Already processed or unknown — acknowledge to stop retries
       res.json({ received: true });
       return;
     }
@@ -242,20 +270,17 @@ export async function handleWebhook(
     try {
       await client.query('BEGIN');
 
-      // Mark checkout as paid
       await client.query(
         `UPDATE subscription_checkouts SET status = 'paid' WHERE id = $1`,
         [checkout.id],
       );
 
-      // Deactivate existing active subscription
       await client.query(
         `UPDATE subscriptions SET is_active = FALSE
          WHERE user_id = $1 AND is_active = TRUE`,
         [checkout.user_id],
       );
 
-      // Create new subscription
       const { rows: subRows } = await client.query(
         `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at)
          VALUES ($1, $2, NOW(), NOW() + ($3 || ' days')::INTERVAL)
@@ -263,7 +288,6 @@ export async function handleWebhook(
         [checkout.user_id, checkout.plan, checkout.duration_days],
       );
 
-      // Update user plan
       await client.query(
         `UPDATE users SET plan = $1 WHERE id = $2`,
         [checkout.plan, checkout.user_id],
@@ -271,7 +295,6 @@ export async function handleWebhook(
 
       await client.query('COMMIT');
 
-      // Send confirmation email (non-fatal)
       const expiresAt = new Date((subRows[0] as { expires_at: string }).expires_at);
       await sendSubscriptionConfirmEmail(
         checkout.email,

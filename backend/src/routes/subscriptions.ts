@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { authenticate } from '../middleware/auth.ts';
 import { validateBody }  from '../middleware/validate.ts';
 import {
@@ -13,14 +13,27 @@ const router = Router();
 
 router.get('/plans', getPlans);
 
-// ── Xendit webhook – plain JSON, verified via x-callback-token header ──────
-router.post('/webhook', handleWebhook);
+// ── PayMongo webhook – must receive raw body for HMAC verification ─────────
+router.post(
+  '/webhook',
+  express.raw({ type: 'application/json' }),
+  (req, _res, next) => {
+    (req as express.Request & { rawBody?: string }).rawBody = req.body instanceof Buffer
+      ? req.body.toString('utf8')
+      : JSON.stringify(req.body);
+    try {
+      req.body = JSON.parse((req as express.Request & { rawBody?: string }).rawBody ?? '{}') as unknown;
+    } catch { req.body = {}; }
+    next();
+  },
+  handleWebhook,
+);
 
 router.use(authenticate);
 
 router.get('/current', getCurrentSubscription);
 
-// ── Xendit checkout (creates an invoice) ──────────────────────────────────
+// ── PayMongo checkout (creates a payment link) ─────────────────────────────
 router.post('/checkout',
   validateBody({
     plan:          { required: true, enum: ['premium', 'elite'] },
