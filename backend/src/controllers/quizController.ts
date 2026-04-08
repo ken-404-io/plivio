@@ -42,9 +42,10 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
       [userId],
     );
 
-    // Today's earnings from quiz
+    // Today's earnings and answer count from quiz
     const todayRes = await pool.query(
-      `SELECT COALESCE(SUM(reward_earned), 0) AS today_earned
+      `SELECT COALESCE(SUM(reward_earned), 0) AS today_earned,
+              COUNT(*) AS today_answered
        FROM user_question_answers
        WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW())`,
       [userId],
@@ -65,10 +66,11 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
       [userId],
     );
 
-    const total        = parseInt(totalRes.rows[0]?.total ?? '0');
-    const correct      = parseInt(totalRes.rows[0]?.correct ?? '0');
-    const totalEarned  = parseFloat(totalRes.rows[0]?.total_earned ?? '0');
-    const todayEarned  = parseFloat(todayRes.rows[0]?.today_earned ?? '0');
+    const total         = parseInt(totalRes.rows[0]?.total ?? '0');
+    const correct       = parseInt(totalRes.rows[0]?.correct ?? '0');
+    const totalEarned   = parseFloat(totalRes.rows[0]?.total_earned ?? '0');
+    const todayEarned   = parseFloat(todayRes.rows[0]?.today_earned ?? '0');
+    const todayAnswered = parseInt(todayRes.rows[0]?.today_answered ?? '0');
     const allTodayEarned = parseFloat(allTodayRes.rows[0]?.all_today_earned ?? '0');
 
     const questionsLeft  = Math.max(0, questionLimit - total);
@@ -81,15 +83,16 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
     res.json({
       success: true,
       plan: effectivePlan,
-      question_limit: questionLimit,
-      total_answered: total,
-      total_correct:  correct,
-      questions_left: questionsLeft,
-      total_earned:   totalEarned,
-      today_earned:   todayEarned,
-      daily_limit:    dailyLimit,
+      question_limit:  questionLimit,
+      total_answered:  total,
+      total_correct:   correct,
+      questions_left:  questionsLeft,
+      total_earned:    totalEarned,
+      today_earned:    todayEarned,
+      today_answered:  todayAnswered,
+      daily_limit:     dailyLimit,
       daily_remaining: dailyRemaining,
-      can_earn_more:  canEarnMore,
+      can_earn_more:   canEarnMore,
     });
   } catch (err) {
     next(err);

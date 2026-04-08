@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import api from '../../services/api.ts';
+import { useAuth } from '../../store/authStore.tsx';
+import { useToast } from '../../components/common/Toast.tsx';
 import {
   Bot, Send, X, CheckCircle2, XCircle,
   ChevronRight, Trophy, Zap, BookOpen,
 } from 'lucide-react';
+
+const STREAK_QUIZ_GOAL = 15;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,6 +20,7 @@ interface QuizStatus {
   questions_left: number;
   total_earned: number;
   today_earned: number;
+  today_answered: number;
   daily_limit: number | null;
   daily_remaining: number | null;
   can_earn_more: boolean;
@@ -56,6 +61,9 @@ function categoryColor(cat: string) {
 // ─── ChatTask ─────────────────────────────────────────────────────────────────
 
 export default function ChatTask({ onClose }: Props) {
+  const { fetchMe }  = useAuth();
+  const toast        = useToast();
+
   const [status,    setStatus]    = useState<QuizStatus | null>(null);
   const [question,  setQuestion]  = useState<QuizQuestion | null>(null);
   const [input,     setInput]     = useState('');
@@ -64,6 +72,7 @@ export default function ChatTask({ onClose }: Props) {
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionCount,   setSessionCount]   = useState(0);
   const [limitMsg,  setLimitMsg]  = useState('');
+  const streakTriggeredRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadStatus = useCallback(async () => {
@@ -140,8 +149,34 @@ export default function ChatTask({ onClose }: Props) {
       if (data.is_correct) setSessionCorrect((n) => n + 1);
       setPhase('feedback');
 
-      // Refresh status silently
+      // Real-time balance update in the header
+      if (data.is_correct && data.reward_earned > 0) {
+        void fetchMe();
+      }
+
+      // Refresh quiz status
       const s = await loadStatus();
+
+      // Auto streak check-in when user hits 15 questions today
+      if (s.today_answered >= STREAK_QUIZ_GOAL && !streakTriggeredRef.current) {
+        streakTriggeredRef.current = true;
+        try {
+          const { data: checkin } = await api.post<{
+            already_checked_in?: boolean;
+            streak_count: number;
+            bonus_day: boolean;
+          }>('/coins/checkin');
+          if (!checkin.already_checked_in) {
+            if (checkin.bonus_day) {
+              toast.success(`🔥 Day ${checkin.streak_count} streak! +50 coins bonus!`);
+            } else {
+              toast.success(`🔥 Streak day ${checkin.streak_count} earned!`);
+            }
+            void fetchMe();
+          }
+        } catch { /* silent */ }
+      }
+
       if (!s.can_earn_more || s.questions_left === 0) {
         setTimeout(() => {
           setLimitMsg(
@@ -160,11 +195,14 @@ export default function ChatTask({ onClose }: Props) {
     }
   }
 
-  const todayEarned  = status?.today_earned ?? 0;
+  const todayEarned   = status?.today_earned ?? 0;
   const totalAnswered = status?.total_answered ?? 0;
+  const todayAnswered = status?.today_answered ?? 0;
   const qLimit        = status?.question_limit ?? 0;
   const qLeft         = status?.questions_left ?? 0;
   const pct           = qLimit > 0 ? Math.min(100, (totalAnswered / qLimit) * 100) : 0;
+  const streakPct     = Math.min(100, (todayAnswered / STREAK_QUIZ_GOAL) * 100);
+  const streakDone    = todayAnswered >= STREAK_QUIZ_GOAL;
 
   return (
     <div className="cq-overlay">
@@ -202,18 +240,23 @@ export default function ChatTask({ onClose }: Props) {
           <span className="cq-progress-label">{totalAnswered}/{qLimit}</span>
         </div>
 
-        {/* ── Session score ── */}
-        {sessionCount > 0 && (
-          <div className="cq-session-score">
+        {/* ── Streak + session bar ── */}
+        <div className="cq-streak-bar">
+          <div className="cq-streak-bar-left">
             <Zap size={13} />
-            Session: {sessionCorrect}/{sessionCount} correct
-            {sessionCorrect > 0 && (
-              <span className="cq-session-earned">
-                +₱{(sessionCorrect * 0.50).toFixed(2)}
-              </span>
-            )}
+            <span>
+              {streakDone
+                ? 'Streak earned today!'
+                : `${todayAnswered}/${STREAK_QUIZ_GOAL} for streak`}
+            </span>
           </div>
-        )}
+          <div className="cq-streak-bar-track">
+            <div className="cq-streak-bar-fill" style={{ width: `${streakPct}%` }} />
+          </div>
+          {sessionCorrect > 0 && (
+            <span className="cq-session-earned">+₱{(sessionCorrect * 0.50).toFixed(2)}</span>
+          )}
+        </div>
 
         {/* ── Main area ── */}
         <div className="cq-body">

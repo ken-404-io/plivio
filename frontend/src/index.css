@@ -4563,6 +4563,40 @@ a, button, [role="button"], [tabindex] {
   font-weight: 700; color: var(--success);
 }
 
+/* Streak bar */
+.cq-streak-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.cq-streak-bar svg { color: var(--warning); flex-shrink: 0; }
+.cq-streak-bar-left { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.cq-streak-bar-track {
+  flex: 1;
+  height: 5px;
+  background: var(--bg-surface);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.cq-streak-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f97316, #fbbf24);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.cq-session-earned {
+  font-weight: 700;
+  color: var(--success);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Body */
 .cq-body {
   flex: 1;

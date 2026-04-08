@@ -185,7 +185,7 @@ export default function Coins() {
   const today = new Date().toISOString().slice(0, 10);
   const checkedInToday = info?.last_streak_date === today;
   const todayCompletions = info?.today_completions ?? 0;
-  const STREAK_TASK_GOAL = 5;
+  const STREAK_TASK_GOAL = 15;
 
   return (
     <>
@@ -265,7 +265,7 @@ export default function Coins() {
               <div className="streak-task-progress-row">
                 <span className="streak-task-progress-label">
                   <Flame size={14} />
-                  Complete {STREAK_TASK_GOAL} tasks to earn today's streak
+                  Answer {STREAK_TASK_GOAL} questions to earn today's streak
                 </span>
                 <span className="streak-task-progress-count">
                   {todayCompletions}/{STREAK_TASK_GOAL}
