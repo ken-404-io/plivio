@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import { Router } from 'express';
 import { authenticate } from '../middleware/auth.ts';
 import { validateBody }  from '../middleware/validate.ts';
 import { requireAdmin } from '../middleware/auth.ts';
@@ -16,24 +16,10 @@ const router = Router();
 
 router.get('/plans', getPlans);
 
-// ── PayMongo webhook – must receive raw body for HMAC verification ─────────
-// Mount BEFORE express.json() is applied to this route
-router.post(
-  '/webhook',
-  express.raw({ type: 'application/json' }),
-  (req, _res, next) => {
-    // Attach rawBody string for signature verification
-    (req as express.Request & { rawBody?: string }).rawBody = req.body instanceof Buffer
-      ? req.body.toString('utf8')
-      : JSON.stringify(req.body);
-    // Re-parse so controller can access req.body as plain object
-    try {
-      req.body = JSON.parse((req as express.Request & { rawBody?: string }).rawBody ?? '{}') as unknown;
-    } catch { req.body = {}; }
-    next();
-  },
-  handleWebhook,
-);
+// ── PayMongo webhook ───────────────────────────────────────────────────────
+// rawBody is captured by the global express.json() verify callback in index.ts
+// (raw bytes must be captured before parsing — express.raw() here is too late)
+router.post('/webhook', handleWebhook);
 
 router.use(authenticate);
 
