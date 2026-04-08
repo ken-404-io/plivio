@@ -18,6 +18,7 @@ import https  from 'https';
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { ValidationError, NotFoundError } from '../utils/errors.ts';
+import { logger } from '../utils/logger.ts';
 import {
   sendSubscriptionConfirmEmail,
 } from '../services/email.ts';
@@ -232,10 +233,12 @@ async function activateSubscription(checkout: {
   try {
     await client.query('BEGIN');
 
-    await client.query(
-      `UPDATE subscription_checkouts SET status = 'paid' WHERE id = $1`,
-      [checkout.id],
-    );
+    if (checkout.id !== 'admin-override') {
+      await client.query(
+        `UPDATE subscription_checkouts SET status = 'paid' WHERE id = $1`,
+        [checkout.id],
+      );
+    }
 
     await client.query(
       `UPDATE subscriptions SET is_active = FALSE WHERE user_id = $1 AND is_active = TRUE`,
@@ -275,6 +278,8 @@ async function activateSubscription(checkout: {
 
 // ─── 3. Verify payment after redirect (fallback when webhook is delayed) ──────
 
+
+
 export async function verifyPayment(
   req: Request,
   res: Response,
@@ -282,14 +287,6 @@ export async function verifyPayment(
 ): Promise<void> {
   try {
     const userId = req.user!.id;
-
-    // Already on a paid plan? Return current subscription immediately
-    const { rows: activeSub } = await pool.query(
-      `SELECT id, plan, expires_at FROM subscriptions
-       WHERE user_id = $1 AND is_active = TRUE AND expires_at > NOW()
-       ORDER BY expires_at DESC LIMIT 1`,
-      [userId],
-    );
 
     // Find the most recent pending checkout for this user
     const { rows } = await pool.query(
@@ -303,7 +300,14 @@ export async function verifyPayment(
     );
 
     if (rows.length === 0) {
-      // No pending checkout — check if already active (webhook already processed)
+      // No pending checkout — check if webhook already processed it
+      const { rows: activeSub } = await pool.query(
+        `SELECT plan FROM subscriptions
+         WHERE user_id = $1 AND is_active = TRUE AND expires_at > NOW()
+         ORDER BY expires_at DESC LIMIT 1`,
+        [userId],
+      );
+      logger.info({ userId }, '🔍 verifyPayment: no pending checkout found');
       res.json({
         success:   true,
         activated: activeSub.length > 0,
@@ -318,17 +322,35 @@ export async function verifyPayment(
       amount_php: string; email: string; username: string;
     };
 
+    logger.info({
+      userId,
+      checkoutId:   checkout.id,
+      plan:         checkout.plan,
+      paymongo_ref: checkout.paymongo_ref,
+      hasKey:       !!process.env.PAYMONGO_SECRET_KEY,
+    }, '🔍 verifyPayment: checking checkout');
+
     // Can't verify without PayMongo configured
     if (!checkout.paymongo_ref || !process.env.PAYMONGO_SECRET_KEY) {
+      logger.warn({ userId, paymongo_ref: checkout.paymongo_ref }, '⚠️ verifyPayment: PayMongo not configured or missing ref');
       res.json({ success: true, activated: false, message: 'PayMongo not configured' });
       return;
     }
 
     // Query PayMongo for the link payment status
-    const linkRes  = await paymongoGet(`/links/${checkout.paymongo_ref}`);
-    const linkData = (linkRes.data as Record<string, unknown>);
-    const attrs    = (linkData?.attributes as Record<string, unknown>) ?? {};
-    const status   = attrs.status as string;
+    let status = '';
+    try {
+      const linkRes  = await paymongoGet(`/links/${checkout.paymongo_ref}`);
+      const linkData = (linkRes.data as Record<string, unknown>);
+      const attrs    = (linkData?.attributes as Record<string, unknown>) ?? {};
+      status = attrs.status as string;
+
+      logger.info({ userId, paymongo_ref: checkout.paymongo_ref, status, attrs }, '🔍 verifyPayment: PayMongo link status');
+    } catch (pmErr) {
+      logger.error({ userId, err: (pmErr as Error).message }, '❌ verifyPayment: PayMongo API error');
+      res.json({ success: true, activated: false, message: 'Could not reach PayMongo API' });
+      return;
+    }
 
     if (status !== 'paid') {
       res.json({ success: true, activated: false, paymongo_status: status });
@@ -337,6 +359,7 @@ export async function verifyPayment(
 
     // Payment confirmed by PayMongo — activate now
     const expiresAt = await activateSubscription(checkout);
+    logger.info({ userId, plan: checkout.plan }, '✅ verifyPayment: subscription activated');
 
     res.json({
       success:    true,
@@ -344,6 +367,45 @@ export async function verifyPayment(
       plan:       checkout.plan,
       expires_at: expiresAt,
     });
+  } catch (err) {
+    logger.error({ err: (err as Error).message, userId: req.user?.id }, '❌ verifyPayment error');
+    next(err);
+  }
+}
+
+// ─── 4. Admin: manually activate subscription ─────────────────────────────────
+
+export async function adminActivateSubscription(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { user_id, plan, duration_days = 30 } = req.body as {
+      user_id: string; plan: string; duration_days?: number;
+    };
+
+    if (!PLANS[plan] || plan === 'free') throw new ValidationError('Invalid plan');
+
+    const { rows: userRows } = await pool.query(
+      'SELECT id, email, username FROM users WHERE id = $1',
+      [user_id],
+    );
+    if (!userRows.length) throw new NotFoundError('User not found');
+
+    const user = userRows[0] as { id: string; email: string; username: string };
+
+    await activateSubscription({
+      id:           'admin-override',   // no checkout row to update
+      user_id:      user.id,
+      plan,
+      duration_days: Number(duration_days),
+      email:        user.email,
+      username:     user.username,
+    });
+
+    logger.info({ user_id, plan, by: req.user?.id }, '✅ Admin manually activated subscription');
+    res.json({ success: true, message: `${plan} activated for user ${user_id}` });
   } catch (err) { next(err); }
 }
 
