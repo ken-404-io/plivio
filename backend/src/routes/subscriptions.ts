@@ -7,6 +7,7 @@ import {
   subscribe,
   createCheckout,
   handleWebhook,
+  verifyPayment,
 } from '../controllers/subscriptionController.ts';
 
 const router = Router();
@@ -35,6 +36,8 @@ router.post(
 router.use(authenticate);
 
 router.get('/current', getCurrentSubscription);
+// Verify payment after PayMongo redirect (fallback when webhook is delayed/missing)
+router.post('/verify-payment', verifyPayment);
 
 // ── PayMongo checkout (creates a payment link) ─────────────────────────────
 router.post('/checkout',

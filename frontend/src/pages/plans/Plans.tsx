@@ -83,17 +83,49 @@ export default function Plans() {
     }
   }
 
+  // After PayMongo redirect, poll verify-payment until the plan activates
   useEffect(() => {
     const params  = new URLSearchParams(window.location.search);
     const payment = params.get('payment');
-    if (payment === 'success') {
-      toast.success('Payment received! Your plan will activate shortly.');
-      window.history.replaceState({}, '', '/plans');
-      void fetchMe();
-    } else if (payment === 'failed') {
+    window.history.replaceState({}, '', '/plans');
+
+    if (payment === 'failed') {
       toast.error('Payment was not completed. You have not been charged.');
-      window.history.replaceState({}, '', '/plans');
+      return;
     }
+    if (payment !== 'success') return;
+
+    toast.success('Payment received! Verifying your plan…');
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 10; // ~20 seconds total
+
+    const poll = async () => {
+      try {
+        const { data } = await api.post<{ activated: boolean; plan?: string }>('/subscriptions/verify-payment');
+        if (data.activated) {
+          toast.success(`Plan activated! Welcome to ${data.plan ?? 'your new plan'}.`);
+          await fetchMe();
+          // Reload plans list
+          const [planRes, subRes] = await Promise.all([
+            api.get<PlansResponse>('/subscriptions/plans'),
+            api.get<{ subscription: Subscription | null }>('/subscriptions/current'),
+          ]);
+          setPlans(planRes.data.plans);
+          setSub(subRes.data.subscription);
+          return;
+        }
+      } catch { /* ignore — keep polling */ }
+
+      attempts++;
+      if (attempts < MAX_ATTEMPTS) {
+        setTimeout(() => { void poll(); }, 2000);
+      } else {
+        toast.error('Plan activation is taking longer than expected. Please refresh in a minute.');
+      }
+    };
+
+    void poll();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
