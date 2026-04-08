@@ -109,6 +109,8 @@ export interface TaskListResponse {
   today_earnings: number;
   daily_limit: number | null;
   plan: PlanType;
+  referral_count: number;
+  referral_earned: number;
 }
 
 export interface StartTaskResponse {
