@@ -46,6 +46,8 @@ router.post('/checkout',
   validateBody({
     plan:          { required: true, enum: ['premium', 'elite'] },
     duration_days: { type: 'int', min: 1, max: 365 },
+    success_url:   {},
+    failed_url:    {},
   }),
   createCheckout,
 );

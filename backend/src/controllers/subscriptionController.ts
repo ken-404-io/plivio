@@ -122,8 +122,8 @@ export async function createCheckout(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { plan, duration_days = 30 } = req.body as {
-      plan: string; duration_days?: number;
+    const { plan, duration_days = 30, success_url, failed_url } = req.body as {
+      plan: string; duration_days?: number; success_url?: string; failed_url?: string;
     };
     const userId = req.user!.id;
 
@@ -135,6 +135,8 @@ export async function createCheckout(
     const planInfo   = PLANS[plan];
     const amountPhp  = planInfo.price_php;
     const appUrl     = process.env.APP_URL ?? 'http://localhost:5173';
+    const successUrl = success_url ?? `${appUrl}/plans?payment=success`;
+    const failedUrl  = failed_url  ?? `${appUrl}/plans?payment=failed`;
 
     // Insert a pending checkout row to track this payment attempt
     const { rows: checkoutRows } = await pool.query(
@@ -165,8 +167,8 @@ export async function createCheckout(
           description: `Plivio ${planInfo.name} – ${duration_days} days`,
           remarks:     checkoutId,                // used to look up in webhook
           redirect:    {
-            success: `${appUrl}/plans?payment=success`,
-            failed:  `${appUrl}/plans?payment=failed`,
+            success: successUrl,
+            failed:  failedUrl,
           },
         },
       },
