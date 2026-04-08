@@ -23,6 +23,9 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction):
 
   if (SAFE_METHODS.has(req.method)) { next(); return; }
 
+  // Exempt PayMongo webhook — server-to-server call, no CSRF token
+  if (req.path === '/api/subscriptions/webhook') { next(); return; }
+
   const headerToken = req.headers[CSRF_HEADER] as string | undefined;
   if (!headerToken || headerToken !== req.csrfToken) {
     res.status(403).json({ success: false, error: 'Invalid CSRF token.' });
