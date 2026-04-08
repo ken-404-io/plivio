@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Loader, X } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
@@ -41,10 +41,12 @@ export default function Plans() {
   const { user, fetchMe } = useAuth();
   const toast             = useToast();
 
-  const [plans,       setPlans]       = useState<Record<string, PlanInfo>>({});
-  const [sub,         setSub]         = useState<Subscription | null>(null);
-  const [loading,     setLoading]     = useState(true);
-  const [subscribing, setSubscribing] = useState('');
+  const [plans,          setPlans]          = useState<Record<string, PlanInfo>>({});
+  const [sub,            setSub]            = useState<Subscription | null>(null);
+  const [loading,        setLoading]        = useState(true);
+  const [subscribing,    setSubscribing]    = useState('');
+  const [awaitingPayment, setAwaitingPayment] = useState(false);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Default to 'premium' for free users so the upgrade CTA is immediately visible
   const [activeTab,   setActiveTab]   = useState<string>(
     user?.plan && user.plan !== 'free' ? user.plan : 'premium',
@@ -63,6 +65,44 @@ export default function Plans() {
       .finally(() => setLoading(false));
   }, []);
 
+  function startPolling() {
+    if (pollTimer.current) clearTimeout(pollTimer.current);
+    let attempts = 0;
+    const MAX = 60; // 3 minutes (60 × 3s)
+
+    const refreshPlans = async () => {
+      const [planRes, subRes] = await Promise.all([
+        api.get<PlansResponse>('/subscriptions/plans'),
+        api.get<{ subscription: Subscription | null }>('/subscriptions/current'),
+      ]);
+      setPlans(planRes.data.plans);
+      setSub(subRes.data.subscription);
+    };
+
+    const poll = async () => {
+      try {
+        const { data } = await api.post<{ activated: boolean; plan?: string }>('/subscriptions/verify-payment');
+        if (data.activated) {
+          setAwaitingPayment(false);
+          toast.success(`Plan activated! Welcome to ${data.plan ?? 'your new plan'}.`);
+          await fetchMe();
+          await refreshPlans();
+          return;
+        }
+      } catch { /* keep polling */ }
+
+      attempts++;
+      if (attempts < MAX) {
+        pollTimer.current = setTimeout(() => { void poll(); }, 3000);
+      } else {
+        setAwaitingPayment(false);
+        toast.error('Verification timed out. Refresh the page if you already paid.');
+      }
+    };
+
+    void poll();
+  }
+
   async function handleSubscribe(planKey: string) {
     setSubscribing(planKey);
     try {
@@ -80,7 +120,10 @@ export default function Plans() {
         toast.error('Payment gateway not configured yet. Please contact admin.');
         return;
       }
-      window.location.href = data.checkout_url;
+      // Open PayMongo in a new tab — user stays on this page
+      window.open(data.checkout_url, '_blank');
+      setAwaitingPayment(true);
+      startPolling();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       toast.error(msg ?? 'Failed to create checkout. Please try again.');
@@ -89,7 +132,7 @@ export default function Plans() {
     }
   }
 
-  // After PayMongo redirect, poll verify-payment until the plan activates
+  // If PayMongo redirected back (fallback), trigger the same polling
   useEffect(() => {
     const params  = new URLSearchParams(window.location.search);
     const payment = params.get('payment');
@@ -102,36 +145,8 @@ export default function Plans() {
     if (payment !== 'success') return;
 
     toast.success('Payment received! Verifying your plan…');
-
-    let attempts = 0;
-    const MAX_ATTEMPTS = 10; // ~20 seconds total
-
-    const poll = async () => {
-      try {
-        const { data } = await api.post<{ activated: boolean; plan?: string }>('/subscriptions/verify-payment');
-        if (data.activated) {
-          toast.success(`Plan activated! Welcome to ${data.plan ?? 'your new plan'}.`);
-          await fetchMe();
-          // Reload plans list
-          const [planRes, subRes] = await Promise.all([
-            api.get<PlansResponse>('/subscriptions/plans'),
-            api.get<{ subscription: Subscription | null }>('/subscriptions/current'),
-          ]);
-          setPlans(planRes.data.plans);
-          setSub(subRes.data.subscription);
-          return;
-        }
-      } catch { /* ignore — keep polling */ }
-
-      attempts++;
-      if (attempts < MAX_ATTEMPTS) {
-        setTimeout(() => { void poll(); }, 2000);
-      } else {
-        toast.error('Plan activation is taking longer than expected. Please refresh in a minute.');
-      }
-    };
-
-    void poll();
+    setAwaitingPayment(true);
+    startPolling();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -153,6 +168,17 @@ export default function Plans() {
           </p>
         </div>
       </header>
+
+      {/* ── Awaiting payment banner ── */}
+      {awaitingPayment && (
+        <div className="payment-awaiting-banner">
+          <Loader size={18} className="spin" />
+          <span>Waiting for payment confirmation… Complete payment in the PayMongo tab.</span>
+          <button className="payment-awaiting-dismiss" onClick={() => { setAwaitingPayment(false); if (pollTimer.current) clearTimeout(pollTimer.current); }}>
+            <X size={15} />
+          </button>
+        </div>
+      )}
 
       {/* ── Mobile plan tab switcher ── */}
       <div className="plans-tab-row">

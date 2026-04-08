@@ -4173,6 +4173,35 @@ a, button, [role="button"], [tabindex] {
 /* ─── Plans scroll wrapper (enables swipe on mobile) ─────────────────────────── */
 .plans-scroll-wrap { width: 100%; }
 
+/* ─── Awaiting payment banner ────────────────────────────────────────────────── */
+.payment-awaiting-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  color: var(--text);
+  font-size: 14px;
+}
+.payment-awaiting-banner .spin {
+  animation: spin 1.2s linear infinite;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.payment-awaiting-banner span { flex: 1; }
+.payment-awaiting-dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px;
+  flex-shrink: 0;
+}
+
 /* ─── Plans tab switcher (mobile only) ───────────────────────────────────────── */
 .plans-tab-row {
   display: none; /* hidden on desktop */
