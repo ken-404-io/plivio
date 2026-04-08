@@ -66,9 +66,15 @@ export default function Plans() {
   async function handleSubscribe(planKey: string) {
     setSubscribing(planKey);
     try {
+      const returnBase = `${window.location.origin}/plans`;
       const { data } = await api.post<{ checkout_url: string | null; demo?: boolean }>(
         '/subscriptions/checkout',
-        { plan: planKey, duration_days: 30 },
+        {
+          plan:          planKey,
+          duration_days: 30,
+          success_url:   `${returnBase}?payment=success`,
+          failed_url:    `${returnBase}?payment=failed`,
+        },
       );
       if (data.demo || !data.checkout_url) {
         toast.error('Payment gateway not configured yet. Please contact admin.');
