@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import TaskModal from './TaskModal.tsx';
+import ChatTask from './ChatTask.tsx';
 import type { Task, TaskListResponse } from '../../types/index.ts';
 import {
   ShieldCheck,
@@ -15,6 +16,7 @@ import {
   CheckCircle2,
   PartyPopper,
   MailX,
+  MessageCircle,
 } from 'lucide-react';
 
 // ─── Task type meta ───────────────────────────────────────────────────────────
@@ -109,9 +111,10 @@ function TaskCard({ task, variant, onStart, atLimit }: TaskCardProps) {
 export default function Tasks() {
   const toast = useToast();
 
-  const [taskData,   setTaskData]   = useState<TaskListResponse | null>(null);
-  const [loading,    setLoading]    = useState(true);
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [taskData,      setTaskData]      = useState<TaskListResponse | null>(null);
+  const [loading,       setLoading]       = useState(true);
+  const [activeTask,    setActiveTask]    = useState<Task | null>(null);
+  const [showChatQuiz,  setShowChatQuiz]  = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -227,6 +230,24 @@ export default function Tasks() {
           </div>
         </div>
 
+        {/* ── Quiz Bot card ── */}
+        <section className="tasks-section">
+          <h2 className="tasks-section-title">Featured Task</h2>
+          <button className="quiz-task-card" onClick={() => setShowChatQuiz(true)}>
+            <div className="quiz-task-card-icon">
+              <MessageCircle size={22} />
+            </div>
+            <div className="quiz-task-card-body">
+              <div className="quiz-task-card-title">Quiz Bot — Answer &amp; Earn</div>
+              <div className="quiz-task-card-sub">Bot asks you 1 question at a time — answer correctly to earn real money</div>
+            </div>
+            <div className="quiz-task-card-right">
+              <span className="quiz-task-card-reward">₱0.50</span>
+              <span className="quiz-task-card-tag">per question</span>
+            </div>
+          </button>
+        </section>
+
         {/* ── In-progress ── */}
         {inProgress.length > 0 && (
           <section className="tasks-section">
@@ -311,6 +332,10 @@ export default function Tasks() {
           onClose={() => setActiveTask(null)}
           onComplete={handleModalComplete}
         />
+      )}
+
+      {showChatQuiz && (
+        <ChatTask onClose={() => setShowChatQuiz(false)} />
       )}
     </>
   );
