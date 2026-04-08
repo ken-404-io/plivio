@@ -10,17 +10,15 @@
  *     the subscription and sends a confirmation email.
  *
  * Environment variables needed:
- *   PAYMONGO_SECRET_KEY    – sk_test_… or sk_live_…
+ *   PAYMONGO_SECRET_KEY     – sk_test_… or sk_live_…
  *   PAYMONGO_WEBHOOK_SECRET – whsk_… (from PayMongo dashboard)
  */
 import crypto from 'crypto';
 import https  from 'https';
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
-import { ValidationError, NotFoundError } from '../utils/errors.ts';
-import {
-  sendSubscriptionConfirmEmail,
-} from '../services/email.ts';
+import { ValidationError } from '../utils/errors.ts';
+import { sendSubscriptionConfirmEmail } from '../services/email.ts';
 
 interface PlanInfo {
   name:        string;
@@ -85,8 +83,8 @@ async function paymongoPost(path: string, body: unknown): Promise<Record<string,
         path:     `/v1${path}`,
         method:   'POST',
         headers:  {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type':  'application/json',
+          'Authorization':  `Basic ${auth}`,
+          'Content-Type':   'application/json',
           'Content-Length': Buffer.byteLength(json),
         },
       },
@@ -131,21 +129,20 @@ export async function createCheckout(
       throw new ValidationError('Duration must be 1–365 days');
     }
 
-    const planInfo   = PLANS[plan];
-    const amountPhp  = planInfo.price_php;
-    const appUrl     = process.env.APP_URL ?? 'http://localhost:5173';
+    const planInfo  = PLANS[plan];
+    const appUrl    = process.env.APP_URL ?? 'http://localhost:5173';
 
-    // Insert a pending checkout row to track this payment attempt
+    // Insert a pending checkout row
     const { rows: checkoutRows } = await pool.query(
       `INSERT INTO subscription_checkouts
          (user_id, plan, duration_days, amount_php)
        VALUES ($1, $2, $3, $4)
        RETURNING id`,
-      [userId, plan, duration_days, amountPhp],
+      [userId, plan, duration_days, planInfo.price_php],
     );
     const checkoutId = (checkoutRows[0] as { id: string }).id;
 
-    // If PayMongo is not configured fall back to demo mode
+    // If PayMongo is not configured, return demo mode
     if (!process.env.PAYMONGO_SECRET_KEY) {
       res.json({
         success:      true,
@@ -160,10 +157,10 @@ export async function createCheckout(
     const pmResponse = await paymongoPost('/links', {
       data: {
         attributes: {
-          amount:      amountPhp * 100,           // PayMongo uses centavos
+          amount:      planInfo.price_php * 100,   // PayMongo uses centavos
           description: `Plivio ${planInfo.name} – ${duration_days} days`,
-          remarks:     checkoutId,                // used to look up in webhook
-          redirect:    {
+          remarks:     checkoutId,                  // used to look up in webhook
+          redirect: {
             success: `${appUrl}/plans?payment=success`,
             failed:  `${appUrl}/plans?payment=failed`,
           },
@@ -171,9 +168,9 @@ export async function createCheckout(
       },
     });
 
-    const linkData   = (pmResponse.data as Record<string, unknown>);
-    const attributes = (linkData?.attributes as Record<string, unknown>) ?? {};
-    const pmRef      = (linkData?.id as string) ?? '';
+    const linkData    = pmResponse.data as Record<string, unknown>;
+    const attributes  = (linkData?.attributes as Record<string, unknown>) ?? {};
+    const pmRef       = (linkData?.id as string) ?? '';
     const checkoutUrl = (attributes.checkout_url as string) ?? '';
 
     // Save PayMongo link ID for webhook lookup
@@ -206,7 +203,6 @@ function verifyWebhookSignature(rawBody: string, signatureHeader: string): boole
   const payload  = `${timestamp}.${rawBody}`;
   const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
 
-  // Constant-time comparison to prevent timing attacks
   if (expected.length !== signature.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }
@@ -217,9 +213,8 @@ export async function handleWebhook(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // Express must NOT parse this route as JSON — raw body needed for HMAC
-    const rawBody        = (req as Request & { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
-    const sigHeader      = (req.headers['paymongo-signature'] as string) ?? '';
+    const rawBody   = (req as Request & { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
+    const sigHeader = (req.headers['paymongo-signature'] as string) ?? '';
 
     if (!verifyWebhookSignature(rawBody, sigHeader)) {
       res.status(400).json({ success: false, error: 'Invalid webhook signature' });
@@ -237,13 +232,13 @@ export async function handleWebhook(
       return;
     }
 
-    const paymentData  = attributes?.data as Record<string, unknown> | undefined;
-    const payAttribs   = paymentData?.attributes as Record<string, unknown> | undefined;
+    const paymentData = attributes?.data as Record<string, unknown> | undefined;
+    const payAttribs  = paymentData?.attributes as Record<string, unknown> | undefined;
 
-    // PayMongo stores our checkoutId in the payment's description or remarks field
-    const remarks      = (payAttribs?.remarks as string)
-                      ?? (payAttribs?.description as string)
-                      ?? '';
+    // PayMongo stores our checkoutId in the remarks field
+    const remarks = (payAttribs?.remarks as string)
+                 ?? (payAttribs?.description as string)
+                 ?? '';
 
     if (!remarks) {
       res.json({ received: true });
@@ -262,7 +257,6 @@ export async function handleWebhook(
     );
 
     if (rows.length === 0) {
-      // Already processed or unknown — acknowledge to stop retries
       res.json({ received: true });
       return;
     }
@@ -276,20 +270,17 @@ export async function handleWebhook(
     try {
       await client.query('BEGIN');
 
-      // Mark checkout as paid
       await client.query(
         `UPDATE subscription_checkouts SET status = 'paid' WHERE id = $1`,
         [checkout.id],
       );
 
-      // Deactivate existing active subscription
       await client.query(
         `UPDATE subscriptions SET is_active = FALSE
          WHERE user_id = $1 AND is_active = TRUE`,
         [checkout.user_id],
       );
 
-      // Create new subscription
       const { rows: subRows } = await client.query(
         `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at)
          VALUES ($1, $2, NOW(), NOW() + ($3 || ' days')::INTERVAL)
@@ -297,7 +288,6 @@ export async function handleWebhook(
         [checkout.user_id, checkout.plan, checkout.duration_days],
       );
 
-      // Update user plan
       await client.query(
         `UPDATE users SET plan = $1 WHERE id = $2`,
         [checkout.plan, checkout.user_id],
@@ -305,7 +295,6 @@ export async function handleWebhook(
 
       await client.query('COMMIT');
 
-      // Send confirmation email (outside transaction — non-fatal)
       const expiresAt = new Date((subRows[0] as { expires_at: string }).expires_at);
       await sendSubscriptionConfirmEmail(
         checkout.email,
@@ -324,7 +313,7 @@ export async function handleWebhook(
   } catch (err) { next(err); }
 }
 
-// ─── Legacy subscribe (kept for admin manual override) ───────────────────────
+// ─── Legacy subscribe (admin manual override) ─────────────────────────────────
 
 export async function subscribe(
   req: Request,
