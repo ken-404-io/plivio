@@ -182,8 +182,7 @@ export default function Coins() {
   const feeAmt    = Math.round(coinsNum * 0.07 * 100) / 100;
   const netPayout = Math.max(0, Math.floor(coinsNum * 0.93 * 100) / 100);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const checkedInToday = info?.last_streak_date === today;
+  const checkedInToday   = info?.checked_in_today ?? false;
   const todayCompletions = info?.today_completions ?? 0;
   const STREAK_TASK_GOAL = 15;
 

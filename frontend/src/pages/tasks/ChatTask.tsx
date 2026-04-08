@@ -113,6 +113,13 @@ export default function ChatTask({ onClose }: Props) {
     void (async () => {
       try {
         const s = await loadStatus();
+
+        // If user already hit the streak goal today (from a previous session),
+        // mark as triggered so we don't fire checkin again on re-open.
+        if (s.today_answered >= STREAK_QUIZ_GOAL) {
+          streakTriggeredRef.current = true;
+        }
+
         if (!s.can_earn_more) {
           setLimitMsg(
             s.questions_left === 0
