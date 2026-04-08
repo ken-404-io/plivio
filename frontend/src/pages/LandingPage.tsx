@@ -5,12 +5,68 @@ import { useScrollReveal } from '../hooks/useScrollReveal';
 import {
   Zap, Sun, Moon, Menu, X,
   UserPlus, CheckCircle2, Wallet,
-  Building2, Building, Lock, FileText, CreditCard, ShieldCheck,
   Check, Star,
 } from 'lucide-react';
 import './LandingPage.css';
 
 // ─── Static data ───────────────────────────────────────────────────────────────
+
+const CERTS = [
+  {
+    logo:  'https://upload.wikimedia.org/wikipedia/commons/4/4e/Securities_and_Exchange_Commission_of_the_Philippines_(SEC).svg',
+    title: 'SEC Registered',
+    sub:   'Securities and Exchange Commission',
+    desc:  'Halvex Digital Inc. is duly registered under the Securities and Exchange Commission of the Philippines as a domestic corporation.',
+    badge: 'Verified',
+    color: 'green',
+    delay: 0,
+  },
+  {
+    logo:  'https://upload.wikimedia.org/wikipedia/commons/f/f2/DTI_PH_new_logo.svg',
+    title: 'DTI Registered',
+    sub:   'Department of Trade and Industry',
+    desc:  "Registered business name under the DTI's business name registration system as a legitimate e-commerce platform.",
+    badge: 'Verified',
+    color: 'green',
+    delay: 60,
+  },
+  {
+    logo:  'https://upload.wikimedia.org/wikipedia/commons/f/f5/National_Privacy_Commission_Philippines.svg',
+    title: 'NPC Compliant',
+    sub:   'National Privacy Commission',
+    desc:  'Fully compliant with Republic Act No. 10173 (Data Privacy Act of 2012). Your personal data is protected and secure.',
+    badge: 'Compliant',
+    color: 'blue',
+    delay: 120,
+  },
+  {
+    logo:  'https://upload.wikimedia.org/wikipedia/commons/5/54/Bureau_of_Internal_Revenue_(BIR).svg',
+    title: 'BIR Registered',
+    sub:   'Bureau of Internal Revenue',
+    desc:  'Registered taxpaying entity compliant with BIR regulations. All user earnings are subject to applicable Philippine tax laws.',
+    badge: 'Verified',
+    color: 'green',
+    delay: 0,
+  },
+  {
+    logo:  'https://upload.wikimedia.org/wikipedia/commons/2/2c/Bangko_Sentral_ng_Pilipinas_2020_logo.svg',
+    title: 'BSP Guidelines',
+    sub:   'Bangko Sentral ng Pilipinas',
+    desc:  'Payout operations follow BSP e-money and digital payment guidelines. GCash and PayPal payouts processed under regulated channels.',
+    badge: 'Compliant',
+    color: 'blue',
+    delay: 60,
+  },
+  {
+    logo:  'https://upload.wikimedia.org/wikipedia/commons/7/7e/Department_of_Information_and_Communications_Technology_(DICT).svg',
+    title: 'DICT Aligned',
+    sub:   'Dept. of Information & Communications Technology',
+    desc:  "Platform developed in alignment with DICT's cybersecurity and digital economy frameworks under the e-Commerce Act (RA 8792).",
+    badge: 'Aligned',
+    color: 'purple',
+    delay: 120,
+  },
+] as const;
 
 const TESTIMONIALS = [
   {
@@ -416,16 +472,11 @@ export default function LandingPage() {
           </div>
 
           <div className="lp-certs-grid">
-            {[
-              { Icon: Building2, title: 'SEC Registered', sub: 'Securities and Exchange Commission', desc: 'Halvex Digital Inc. is duly registered under the Securities and Exchange Commission of the Philippines as a domestic corporation.', badge: 'Verified', color: 'green', delay: 0 },
-              { Icon: Building,  title: 'DTI Registered', sub: 'Department of Trade and Industry', desc: 'Registered business name under the DTI\'s business name registration system as a legitimate e-commerce platform.', badge: 'Verified', color: 'green', delay: 60 },
-              { Icon: Lock,      title: 'NPC Compliant',  sub: 'National Privacy Commission', desc: 'Fully compliant with Republic Act No. 10173 (Data Privacy Act of 2012). Your personal data is protected and secure.', badge: 'Compliant', color: 'blue', delay: 120 },
-              { Icon: FileText,  title: 'BIR Registered', sub: 'Bureau of Internal Revenue', desc: 'Registered taxpaying entity compliant with BIR regulations. All user earnings are subject to applicable Philippine tax laws.', badge: 'Verified', color: 'green', delay: 0 },
-              { Icon: CreditCard, title: 'BSP Guidelines', sub: 'Bangko Sentral ng Pilipinas', desc: 'Payout operations follow BSP e-money and digital payment guidelines. GCash and PayPal payouts processed under regulated channels.', badge: 'Compliant', color: 'blue', delay: 60 },
-              { Icon: ShieldCheck, title: 'DICT Aligned',  sub: 'Dept. of Information & Communications Technology', desc: 'Platform developed in alignment with DICT\'s cybersecurity and digital economy frameworks under the e-Commerce Act (RA 8792).', badge: 'Aligned', color: 'purple', delay: 120 },
-            ].map(({ Icon, title, sub, desc, badge, color, delay }) => (
+            {CERTS.map(({ logo, title, sub, desc, badge, color, delay }) => (
               <div key={title} className="lp-cert-card reveal" style={{ transitionDelay: `${delay}ms` }}>
-                <div className="lp-cert-icon"><Icon size={26} /></div>
+                <div className="lp-cert-icon">
+                  <img src={logo} alt={title} className="lp-cert-logo" />
+                </div>
                 <div className="lp-cert-body">
                   <h4 className="lp-cert-title">{title}</h4>
                   <p className="lp-cert-sub">{sub}</p>
