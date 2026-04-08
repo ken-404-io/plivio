@@ -1,6 +1,7 @@
 import express, { Router } from 'express';
 import { authenticate } from '../middleware/auth.ts';
 import { validateBody }  from '../middleware/validate.ts';
+import { requireAdmin } from '../middleware/auth.ts';
 import {
   getPlans,
   getCurrentSubscription,
@@ -8,6 +9,7 @@ import {
   createCheckout,
   handleWebhook,
   verifyPayment,
+  adminActivateSubscription,
 } from '../controllers/subscriptionController.ts';
 
 const router = Router();
@@ -46,6 +48,17 @@ router.post('/checkout',
     duration_days: { type: 'int', min: 1, max: 365 },
   }),
   createCheckout,
+);
+
+// ── Admin: manually activate subscription for any user ────────────────────
+router.post('/admin/activate',
+  requireAdmin,
+  validateBody({
+    user_id:       { required: true },
+    plan:          { required: true, enum: ['premium', 'elite'] },
+    duration_days: { type: 'int', min: 1, max: 365 },
+  }),
+  adminActivateSubscription,
 );
 
 // ── Legacy direct subscribe (admin / manual) ──────────────────────────────
