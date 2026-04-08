@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { pool } from '../config/db.ts';
+import pool from '../config/db.ts';
 
 const REWARD_PER_CORRECT = 0.50;
 
