@@ -186,7 +186,166 @@ export async function createCheckout(
   } catch (err) { next(err); }
 }
 
-// ─── 2. PayMongo webhook ──────────────────────────────────────────────────────
+// ─── Helper: make authenticated PayMongo GET request ─────────────────────────
+
+async function paymongoGet(path: string): Promise<Record<string, unknown>> {
+  const secret = process.env.PAYMONGO_SECRET_KEY ?? '';
+  const auth   = Buffer.from(`${secret}:`).toString('base64');
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: 'api.paymongo.com',
+        path:     `/v1${path}`,
+        method:   'GET',
+        headers:  { 'Authorization': `Basic ${auth}` },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk: Buffer) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data) as Record<string, unknown>;
+            if ((res.statusCode ?? 0) >= 400) {
+              reject(new Error(`PayMongo error ${res.statusCode}: ${data}`));
+            } else {
+              resolve(parsed);
+            }
+          } catch {
+            reject(new Error(`PayMongo invalid JSON: ${data}`));
+          }
+        });
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+// ─── Helper: activate subscription (shared by webhook + verify) ───────────────
+
+async function activateSubscription(checkout: {
+  id: string; user_id: string; plan: string;
+  duration_days: number; email: string; username: string;
+}): Promise<Date> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    await client.query(
+      `UPDATE subscription_checkouts SET status = 'paid' WHERE id = $1`,
+      [checkout.id],
+    );
+
+    await client.query(
+      `UPDATE subscriptions SET is_active = FALSE WHERE user_id = $1 AND is_active = TRUE`,
+      [checkout.user_id],
+    );
+
+    const { rows: subRows } = await client.query(
+      `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at)
+       VALUES ($1, $2::plan_type, NOW(), NOW() + ($3 || ' days')::INTERVAL)
+       RETURNING expires_at`,
+      [checkout.user_id, checkout.plan, checkout.duration_days],
+    );
+
+    await client.query(
+      `UPDATE users SET plan = $1::plan_type WHERE id = $2`,
+      [checkout.plan, checkout.user_id],
+    );
+
+    await client.query('COMMIT');
+
+    const expiresAt = new Date((subRows[0] as { expires_at: string }).expires_at);
+
+    // Send confirmation email (non-fatal)
+    sendSubscriptionConfirmEmail(
+      checkout.email, checkout.username,
+      PLANS[checkout.plan]?.name ?? checkout.plan, expiresAt,
+    ).catch(() => {});
+
+    return expiresAt;
+  } catch (inner) {
+    await client.query('ROLLBACK');
+    throw inner;
+  } finally {
+    client.release();
+  }
+}
+
+// ─── 3. Verify payment after redirect (fallback when webhook is delayed) ──────
+
+export async function verifyPayment(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user!.id;
+
+    // Already on a paid plan? Return current subscription immediately
+    const { rows: activeSub } = await pool.query(
+      `SELECT id, plan, expires_at FROM subscriptions
+       WHERE user_id = $1 AND is_active = TRUE AND expires_at > NOW()
+       ORDER BY expires_at DESC LIMIT 1`,
+      [userId],
+    );
+
+    // Find the most recent pending checkout for this user
+    const { rows } = await pool.query(
+      `SELECT sc.id, sc.user_id, sc.plan, sc.duration_days, sc.paymongo_ref,
+              sc.status, sc.amount_php, u.email, u.username
+       FROM subscription_checkouts sc
+       JOIN users u ON u.id = sc.user_id
+       WHERE sc.user_id = $1 AND sc.status = 'pending'
+       ORDER BY sc.created_at DESC LIMIT 1`,
+      [userId],
+    );
+
+    if (rows.length === 0) {
+      // No pending checkout — check if already active (webhook already processed)
+      res.json({
+        success:   true,
+        activated: activeSub.length > 0,
+        plan:      (activeSub[0] as { plan: string } | undefined)?.plan ?? null,
+      });
+      return;
+    }
+
+    const checkout = rows[0] as {
+      id: string; user_id: string; plan: string; duration_days: number;
+      paymongo_ref: string | null; status: string;
+      amount_php: string; email: string; username: string;
+    };
+
+    // Can't verify without PayMongo configured
+    if (!checkout.paymongo_ref || !process.env.PAYMONGO_SECRET_KEY) {
+      res.json({ success: true, activated: false, message: 'PayMongo not configured' });
+      return;
+    }
+
+    // Query PayMongo for the link payment status
+    const linkRes  = await paymongoGet(`/links/${checkout.paymongo_ref}`);
+    const linkData = (linkRes.data as Record<string, unknown>);
+    const attrs    = (linkData?.attributes as Record<string, unknown>) ?? {};
+    const status   = attrs.status as string;
+
+    if (status !== 'paid') {
+      res.json({ success: true, activated: false, paymongo_status: status });
+      return;
+    }
+
+    // Payment confirmed by PayMongo — activate now
+    const expiresAt = await activateSubscription(checkout);
+
+    res.json({
+      success:    true,
+      activated:  true,
+      plan:       checkout.plan,
+      expires_at: expiresAt,
+    });
+  } catch (err) { next(err); }
+}
 
 /**
  * Verify PayMongo webhook signature.
@@ -272,54 +431,7 @@ export async function handleWebhook(
       status: string; amount_php: string; email: string; username: string;
     };
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      // Mark checkout as paid
-      await client.query(
-        `UPDATE subscription_checkouts SET status = 'paid' WHERE id = $1`,
-        [checkout.id],
-      );
-
-      // Deactivate existing active subscription
-      await client.query(
-        `UPDATE subscriptions SET is_active = FALSE
-         WHERE user_id = $1 AND is_active = TRUE`,
-        [checkout.user_id],
-      );
-
-      // Create new subscription
-      const { rows: subRows } = await client.query(
-        `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at)
-         VALUES ($1, $2, NOW(), NOW() + ($3 || ' days')::INTERVAL)
-         RETURNING expires_at`,
-        [checkout.user_id, checkout.plan, checkout.duration_days],
-      );
-
-      // Update user plan
-      await client.query(
-        `UPDATE users SET plan = $1 WHERE id = $2`,
-        [checkout.plan, checkout.user_id],
-      );
-
-      await client.query('COMMIT');
-
-      // Send confirmation email (outside transaction — non-fatal)
-      const expiresAt = new Date((subRows[0] as { expires_at: string }).expires_at);
-      await sendSubscriptionConfirmEmail(
-        checkout.email,
-        checkout.username,
-        PLANS[checkout.plan]?.name ?? checkout.plan,
-        expiresAt,
-      );
-    } catch (inner) {
-      await client.query('ROLLBACK');
-      throw inner;
-    } finally {
-      client.release();
-    }
-
+    await activateSubscription(checkout);
     res.json({ received: true });
   } catch (err) { next(err); }
 }
