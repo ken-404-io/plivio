@@ -454,8 +454,11 @@ export async function handleWebhook(
     const attributes = eventData?.attributes as Record<string, unknown> | undefined;
     const eventType  = attributes?.type as string | undefined;
 
+    logger.info({ eventType, eventId: eventData?.id, payload: JSON.stringify(event).slice(0, 1000) }, '📨 Webhook received');
+
     // Only handle successful payments
     if (eventType !== 'payment.paid' && eventType !== 'link.payment.paid') {
+      logger.info({ eventType }, '⏭ Webhook: ignored event type');
       res.json({ received: true });
       return;
     }
@@ -463,29 +466,45 @@ export async function handleWebhook(
     const paymentData  = attributes?.data as Record<string, unknown> | undefined;
     const payAttribs   = paymentData?.attributes as Record<string, unknown> | undefined;
 
-    // PayMongo stores our checkoutId in the payment's description or remarks field
-    const remarks      = (payAttribs?.remarks as string)
-                      ?? (payAttribs?.description as string)
-                      ?? '';
+    logger.info({
+      paymentDataId:   paymentData?.id,
+      paymentDataType: paymentData?.type,
+      remarks:         payAttribs?.remarks,
+      description:     payAttribs?.description,
+      reference:       payAttribs?.reference_number,
+      status:          payAttribs?.status,
+    }, '🔍 Webhook: payment data extracted');
 
-    if (!remarks) {
+    // Try remarks first (our checkoutId), then link ID, then paymongo_ref lookup
+    const remarks = (payAttribs?.remarks as string)
+                 ?? (payAttribs?.reference_number as string)
+                 ?? '';
+
+    // Also capture the link/payment ID for paymongo_ref lookup
+    const pmId = (paymentData?.id as string) ?? '';
+
+    if (!remarks && !pmId) {
+      logger.warn({ payAttribs }, '⚠️ Webhook: no remarks or ID to look up checkout');
       res.json({ received: true });
       return;
     }
 
-    // Look up the checkout session
+    // Look up the checkout session by remarks (checkoutId), paymongo_ref (link ID), or payment ID
     const { rows } = await pool.query(
       `SELECT sc.id, sc.user_id, sc.plan, sc.duration_days, sc.status, sc.amount_php,
               u.email, u.username
        FROM subscription_checkouts sc
        JOIN users u ON u.id = sc.user_id
-       WHERE (sc.id = $1 OR sc.paymongo_ref = $1) AND sc.status = 'pending'
+       WHERE (sc.id = $1 OR sc.paymongo_ref = $1 OR sc.paymongo_ref = $2) AND sc.status = 'pending'
        LIMIT 1`,
-      [remarks],
+      [remarks || pmId, pmId],
     );
+
+    logger.info({ remarks, pmId, found: rows.length }, '🔍 Webhook: checkout lookup result');
 
     if (rows.length === 0) {
       // Already processed or unknown — acknowledge to stop retries
+      logger.warn({ remarks, pmId }, '⚠️ Webhook: no pending checkout found');
       res.json({ received: true });
       return;
     }
