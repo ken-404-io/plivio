@@ -67,7 +67,15 @@ app.use(cors({
   exposedHeaders: ['X-CSRF-Token'],
 }));
 
-app.use(express.json({ limit: '16kb' }));
+app.use(express.json({
+  limit: '16kb',
+  // Capture raw bytes BEFORE parsing — needed for PayMongo webhook HMAC verification.
+  // express.raw() on the route level is too late: the global json() parser
+  // consumes the stream first, making the raw body unavailable for signing.
+  verify: (req: Request, _res: Response, buf: Buffer) => {
+    (req as Request & { rawBody?: string }).rawBody = buf.toString('utf-8');
+  },
+}));
 app.use(express.urlencoded({ extended: false, limit: '16kb' }));
 app.use(cookieParser());
 app.use(rateLimiter());
