@@ -47,7 +47,7 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
       `SELECT COALESCE(SUM(reward_earned), 0) AS today_earned,
               COUNT(*) AS today_answered
        FROM user_question_answers
-       WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW())`,
+       WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
       [userId],
     );
 
@@ -57,11 +57,11 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
         COALESCE((
           SELECT SUM(reward_earned) FROM task_completions
           WHERE user_id = $1 AND status = 'approved'
-            AND completed_at >= date_trunc('day', NOW())
+            AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
         ), 0) +
         COALESCE((
           SELECT SUM(reward_earned) FROM user_question_answers
-          WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW())
+          WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
         ), 0) AS all_today_earned`,
       [userId],
     );
@@ -139,11 +139,11 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
           COALESCE((
             SELECT SUM(reward_earned) FROM task_completions
             WHERE user_id = $1 AND status = 'approved'
-              AND completed_at >= date_trunc('day', NOW())
+              AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
           ), 0) +
           COALESCE((
             SELECT SUM(reward_earned) FROM user_question_answers
-            WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW())
+            WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
           ), 0) AS all_today_earned`,
         [userId],
       );
@@ -284,11 +284,11 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
             COALESCE((
               SELECT SUM(reward_earned) FROM task_completions
               WHERE user_id = $1 AND status = 'approved'
-                AND completed_at >= date_trunc('day', NOW())
+                AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
             ), 0) +
             COALESCE((
               SELECT SUM(reward_earned) FROM user_question_answers
-              WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW())
+              WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
             ), 0) AS all_today_earned`,
           [userId],
         );
