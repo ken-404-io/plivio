@@ -199,13 +199,13 @@ export default function LandingPage() {
           <svg className="lp-bolt-svg" viewBox="0 0 300 500" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="boltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%"   stopColor="#7fff00" />
-                <stop offset="50%"  stopColor="#39d353" />
-                <stop offset="100%" stopColor="#1a7a2a" />
+                <stop offset="0%"   stopColor="#60a5fa" />
+                <stop offset="50%"  stopColor="#1877f2" />
+                <stop offset="100%" stopColor="#0d5abf" />
               </linearGradient>
               <linearGradient id="boltGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%"   stopColor="#a8ff3e" stopOpacity="0.6" />
-                <stop offset="100%" stopColor="#2d9e44" stopOpacity="0.3" />
+                <stop offset="0%"   stopColor="#93c5fd" stopOpacity="0.6" />
+                <stop offset="100%" stopColor="#1877f2" stopOpacity="0.3" />
               </linearGradient>
               <filter id="boltBlur">
                 <feGaussianBlur stdDeviation="8" />
