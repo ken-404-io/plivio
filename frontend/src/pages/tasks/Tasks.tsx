@@ -2,77 +2,26 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
-import TaskModal from './TaskModal.tsx';
 import ChatTask from './ChatTask.tsx';
 import type { Task, TaskListResponse } from '../../types/index.ts';
 import {
-  ShieldCheck,
-  Play,
-  MousePointerClick,
-  ClipboardList,
   Users,
-  Zap,
-  Clock,
   CheckCircle2,
-  PartyPopper,
-  MailX,
   MessageCircle,
 } from 'lucide-react';
 
-// ─── Task type meta ───────────────────────────────────────────────────────────
+// ─── Referral task card ───────────────────────────────────────────────────────
 
-type TaskIcon = React.ReactElement;
-
-const TYPE_META: Record<string, { label: string; Icon: () => TaskIcon; cls: string }> = {
-  captcha:  { label: 'Captcha',     Icon: () => <ShieldCheck size={18} />,        cls: 'type--captcha'  },
-  video:    { label: 'Watch Video', Icon: () => <Play size={18} />,               cls: 'type--video'    },
-  ad_click: { label: 'Ad Click',    Icon: () => <MousePointerClick size={18} />,  cls: 'type--adclick'  },
-  survey:   { label: 'Survey',      Icon: () => <ClipboardList size={18} />,      cls: 'type--survey'   },
-  referral: { label: 'Referral',    Icon: () => <Users size={18} />,              cls: 'type--referral' },
-};
-
-function typeMeta(type: string) {
-  return TYPE_META[type] ?? { label: type, Icon: () => <Zap size={18} />, cls: '' };
-}
-
-// ─── Duration / hint helper ───────────────────────────────────────────────────
-
-function taskHint(task: Task): string {
-  const cfg = task.verification_config;
-  if (!cfg) return '';
-  if ((task.type === 'video' || task.type === 'ad_click') && cfg.duration_seconds) {
-    return `${cfg.duration_seconds}s`;
-  }
-  if (task.type === 'survey' && cfg.questions) {
-    return `${cfg.questions.length} question${cfg.questions.length !== 1 ? 's' : ''}`;
-  }
-  if (task.type === 'referral') return 'Auto';
-  return '';
-}
-
-// ─── Single task card ─────────────────────────────────────────────────────────
-
-interface TaskCardProps {
-  task:    Task;
-  variant: 'available' | 'progress' | 'done';
-  onStart: (task: Task) => void;
-  atLimit: boolean;
-}
-
-function TaskCard({ task, variant, onStart, atLimit }: TaskCardProps) {
-  const meta = typeMeta(task.type);
-  const hint = taskHint(task);
-
+function ReferralCard({ task }: { task: Task }) {
   return (
-    <div className={`task-card2 task-card2--${variant}`}>
-      <div className={`task-card2-icon ${meta.cls}`} aria-hidden="true">
-        <meta.Icon />
+    <div className="task-card2 task-card2--available">
+      <div className="task-card2-icon type--referral" aria-hidden="true">
+        <Users size={18} />
       </div>
-
       <div className="task-card2-body">
         <div className="task-card2-meta">
-          <span className={`task-type-badge ${meta.cls}`}>{meta.label}</span>
-          {hint && <span className="task-hint2">{hint}</span>}
+          <span className="task-type-badge type--referral">Referral</span>
+          <span className="task-hint2">Auto</span>
           {task.min_plan !== 'free' && (
             <span className={`plan-badge plan-badge--${task.min_plan}`}>
               {task.min_plan.toUpperCase()}
@@ -81,26 +30,11 @@ function TaskCard({ task, variant, onStart, atLimit }: TaskCardProps) {
         </div>
         <p className="task-card2-title">{task.title}</p>
       </div>
-
       <div className="task-card2-right">
-        <span className="task-card2-reward">
-          +₱{Number(task.reward_amount).toFixed(2)}
+        <span className="task-card2-reward">+₱{Number(task.reward_amount).toFixed(2)}</span>
+        <span className="task-card2-done-badge" style={{ opacity: 0.6, fontSize: 11 }}>
+          Auto-credited
         </span>
-
-        {variant === 'done' ? (
-          <span className="task-card2-done-badge">
-            <CheckCircle2 size={14} />
-            Done
-          </span>
-        ) : (
-          <button
-            className={`btn btn-sm ${variant === 'progress' ? 'btn-warning' : 'btn-primary'}`}
-            onClick={() => onStart(task)}
-            disabled={variant === 'available' && atLimit}
-          >
-            {variant === 'progress' ? 'Resume' : 'Start'}
-          </button>
-        )}
       </div>
     </div>
   );
@@ -111,10 +45,9 @@ function TaskCard({ task, variant, onStart, atLimit }: TaskCardProps) {
 export default function Tasks() {
   const toast = useToast();
 
-  const [taskData,      setTaskData]      = useState<TaskListResponse | null>(null);
-  const [loading,       setLoading]       = useState(true);
-  const [activeTask,    setActiveTask]    = useState<Task | null>(null);
-  const [showChatQuiz,  setShowChatQuiz]  = useState(false);
+  const [taskData,     setTaskData]     = useState<TaskListResponse | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [showChatQuiz, setShowChatQuiz] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -130,56 +63,16 @@ export default function Tasks() {
 
   useEffect(() => { void load(); }, [load]);
 
-  function handleStart(task: Task) {
-    if (task.type === 'referral') {
-      toast.info('Referral rewards are credited automatically when a friend registers with your code.');
-      return;
-    }
-    setActiveTask(task);
-  }
-
-  async function handleModalComplete(message: string) {
-    setActiveTask(null);
-    toast.success(message);
-
-    // Fetch updated task list to get the new completed count
-    try {
-      const { data } = await api.get<TaskListResponse>('/tasks');
-      setTaskData(data);
-
-      // Auto check-in when 5 or more tasks completed today
-      const completedCount = data.tasks?.filter((t) => t.completed_today).length ?? 0;
-      if (completedCount >= 5) {
-        try {
-          const { data: checkin } = await api.post<{
-            already_checked_in?: boolean;
-            streak_count: number;
-            bonus_day: boolean;
-          }>('/coins/checkin');
-          if (!checkin.already_checked_in) {
-            if (checkin.bonus_day) {
-              toast.success(`Streak day ${checkin.streak_count}! +50 coins bonus!`);
-            } else {
-              toast.success(`Day ${checkin.streak_count} streak earned! Keep it up.`);
-            }
-          }
-        } catch { /* silent — streak already claimed */ }
-      }
-    } catch {
-      toast.error('Failed to load tasks.');
-    }
-  }
-
   if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
 
-  const available  = taskData?.tasks?.filter((t) => !t.completed_today && !t.in_progress_today) ?? [];
-  const inProgress = taskData?.tasks?.filter((t) => t.in_progress_today)                        ?? [];
-  const completed  = taskData?.tasks?.filter((t) => t.completed_today)                           ?? [];
-  const atLimit    = taskData?.daily_limit != null && taskData.today_earnings >= taskData.daily_limit;
+  const referralTasks = taskData?.tasks?.filter((t) => t.type === 'referral') ?? [];
+  const completedReferrals = referralTasks.filter((t) => t.completed_today);
+  const pendingReferrals   = referralTasks.filter((t) => !t.completed_today);
 
   const todayEarned = Number(taskData?.today_earnings ?? 0);
   const dailyLimit  = taskData?.daily_limit ?? null;
   const pct         = dailyLimit ? Math.min(100, (todayEarned / dailyLimit) * 100) : 100;
+  const atLimit     = dailyLimit != null && todayEarned >= dailyLimit;
 
   return (
     <>
@@ -212,25 +105,7 @@ export default function Tasks() {
           )}
         </div>
 
-        {/* ── Quick stats ── */}
-        <div className="tasks-stats-row">
-          <div className="tasks-stat">
-            <span className="tasks-stat-num">{available.length}</span>
-            <span className="tasks-stat-lbl">Available</span>
-          </div>
-          <div className="tasks-stat-divider" />
-          <div className="tasks-stat">
-            <span className="tasks-stat-num">{inProgress.length}</span>
-            <span className="tasks-stat-lbl">In Progress</span>
-          </div>
-          <div className="tasks-stat-divider" />
-          <div className="tasks-stat">
-            <span className="tasks-stat-num">{completed.length}</span>
-            <span className="tasks-stat-lbl">Completed</span>
-          </div>
-        </div>
-
-        {/* ── Quiz Bot card ── */}
+        {/* ── Quiz Bot ── */}
         <section className="tasks-section">
           <h2 className="tasks-section-title">Featured Task</h2>
           <button className="quiz-task-card" onClick={() => setShowChatQuiz(true)}>
@@ -239,100 +114,51 @@ export default function Tasks() {
             </div>
             <div className="quiz-task-card-body">
               <div className="quiz-task-card-title">Quiz Bot — Answer &amp; Earn</div>
-              <div className="quiz-task-card-sub">Bot asks you 1 question at a time — answer correctly to earn real money</div>
+              <div className="quiz-task-card-sub">Bot asks questions one at a time — answer correctly to earn real money</div>
             </div>
             <div className="quiz-task-card-right">
               <span className="quiz-task-card-reward">₱0.50</span>
-              <span className="quiz-task-card-tag">per question</span>
+              <span className="quiz-task-card-tag">per correct</span>
             </div>
           </button>
         </section>
 
-        {/* ── In-progress ── */}
-        {inProgress.length > 0 && (
-          <section className="tasks-section">
-            <h2 className="tasks-section-title tasks-section-title--warning">
-              <Clock size={16} />
-              In Progress
-            </h2>
-            <div className="task-list">
-              {inProgress.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  variant="progress"
-                  onStart={handleStart}
-                  atLimit={false}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ── Available ── */}
+        {/* ── Referral tasks ── */}
         <section className="tasks-section">
-          <h2 className="tasks-section-title">Available Tasks</h2>
-
-          {available.length === 0 ? (
+          <h2 className="tasks-section-title">Referrals</h2>
+          {referralTasks.length === 0 ? (
             <div className="tasks-empty">
-              {(taskData?.tasks?.length ?? 0) === 0 ? (
-                <>
-                  <MailX size={36} className="tasks-empty-icon" />
-                  <p>No tasks available right now. Check back soon.</p>
-                </>
-              ) : (
-                <>
-                  <PartyPopper size={36} className="tasks-empty-icon" />
-                  <p>All tasks completed for today. Great work!</p>
-                  <p className="text-muted">Come back tomorrow for more tasks.</p>
-                </>
-              )}
+              <Users size={32} className="tasks-empty-icon" />
+              <p>No referral tasks available right now.</p>
             </div>
           ) : (
             <div className="task-list">
-              {available.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  variant="available"
-                  onStart={handleStart}
-                  atLimit={atLimit}
-                />
+              {pendingReferrals.map((task) => (
+                <ReferralCard key={task.id} task={task} />
               ))}
+              {completedReferrals.length > 0 && (
+                <div className="task-list task-list--dim" style={{ marginTop: 8 }}>
+                  {completedReferrals.map((task) => (
+                    <div key={task.id} className="task-card2 task-card2--done">
+                      <div className="task-card2-icon type--referral"><Users size={18} /></div>
+                      <div className="task-card2-body">
+                        <p className="task-card2-title">{task.title}</p>
+                      </div>
+                      <div className="task-card2-right">
+                        <span className="task-card2-reward">+₱{Number(task.reward_amount).toFixed(2)}</span>
+                        <span className="task-card2-done-badge">
+                          <CheckCircle2 size={14} /> Done
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>
 
-        {/* ── Completed ── */}
-        {completed.length > 0 && (
-          <section className="tasks-section">
-            <h2 className="tasks-section-title tasks-section-title--muted">
-              <CheckCircle2 size={16} />
-              Completed Today
-            </h2>
-            <div className="task-list task-list--dim">
-              {completed.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  variant="done"
-                  onStart={handleStart}
-                  atLimit={false}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
       </div>
-
-      {activeTask && (
-        <TaskModal
-          task={activeTask}
-          onClose={() => setActiveTask(null)}
-          onComplete={handleModalComplete}
-        />
-      )}
 
       {showChatQuiz && (
         <ChatTask onClose={() => setShowChatQuiz(false)} />
