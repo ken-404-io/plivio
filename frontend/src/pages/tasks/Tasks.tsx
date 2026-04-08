@@ -6,8 +6,8 @@ import { useToast } from '../../components/common/Toast.tsx';
 import ChatTask from './ChatTask.tsx';
 import type { Task, TaskListResponse } from '../../types/index.ts';
 import {
-  Users, CheckCircle2, MessageCircle, Copy, Check,
-  TrendingUp, ChevronRight,
+  Users, CheckCircle2, MessageCircle,
+  Copy, Check, ChevronRight, TrendingUp, Flame,
 } from 'lucide-react';
 
 // ─── Referral task card ───────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ function ReferralTaskCard({ task }: { task: Task }) {
           <div className="ref-task-title">{task.title}</div>
           <div className="ref-task-sub">
             {task.min_plan !== 'free' && (
-              <span className={`plan-badge plan-badge--${task.min_plan}`} style={{ marginRight: 6 }}>
+              <span className={`plan-badge plan-badge--${task.min_plan}`}>
                 {task.min_plan.toUpperCase()}
               </span>
             )}
@@ -91,7 +91,7 @@ export default function Tasks() {
   const referralCount  = taskData?.referral_count ?? 0;
   const referralEarned = taskData?.referral_earned ?? 0;
   const referralCode   = user?.referral_code ?? '';
-  const plan           = taskData?.plan ?? user?.active_sub_plan ?? user?.plan ?? 'free';
+  const plan           = taskData?.plan ?? 'free';
 
   return (
     <>
@@ -101,105 +101,135 @@ export default function Tasks() {
         <header className="page-header">
           <div>
             <h1 className="page-title">Tasks</h1>
-            <p className="page-subtitle">Earn real money — quiz bot &amp; referrals</p>
+            <p className="page-subtitle">Earn real money — quiz &amp; referrals</p>
           </div>
         </header>
 
-        {/* ── Today's earnings bar ── */}
-        <div className="tasks-progress-card">
-          <div className="tasks-progress-row">
-            <span className="tasks-progress-label">Today's earnings</span>
-            <span className="tasks-progress-value">
-              ₱{todayEarned.toFixed(2)}
-              {dailyLimit != null && <span className="tasks-progress-limit"> / ₱{dailyLimit}</span>}
-            </span>
+        {/* ── Earnings card ── */}
+        <div className="tasks-earn-card">
+          <div className="tasks-earn-top">
+            <div>
+              <div className="tasks-earn-label">Today's earnings</div>
+              <div className="tasks-earn-amount">
+                ₱{todayEarned.toFixed(2)}
+                {dailyLimit != null && (
+                  <span className="tasks-earn-limit"> / ₱{dailyLimit}</span>
+                )}
+              </div>
+            </div>
+            <div className="tasks-earn-plan-badge">
+              <Flame size={12} />
+              {plan.toUpperCase()}
+            </div>
           </div>
-          <div className="tasks-progress-bar">
+          <div className="tasks-progress-bar" style={{ marginTop: 10 }}>
             <div className="tasks-progress-fill" style={{ width: `${pct}%` }} />
           </div>
           {atLimit ? (
             <p className="tasks-progress-limit-msg">
               Daily limit reached.{' '}
-              <Link to="/plans" className="link">Upgrade</Link> to earn more.
+              <Link to="/plans" className="link">Upgrade your plan</Link>
             </p>
           ) : (
             <p className="tasks-progress-plan-note">
-              {plan.toUpperCase()} plan
-              {dailyLimit != null ? ` · ₱${(dailyLimit - todayEarned).toFixed(2)} remaining today` : ' · No daily limit'}
+              {dailyLimit != null
+                ? `₱${(dailyLimit - todayEarned).toFixed(2)} remaining today`
+                : 'No daily earning limit'}
             </p>
           )}
         </div>
 
-        {/* ── Quiz Bot ── */}
+        {/* ── Quiz Bot card ── */}
         <section className="tasks-section">
-          <h2 className="tasks-section-title">Featured</h2>
+          <div className="tasks-section-header">
+            <h2 className="tasks-section-title">Featured</h2>
+          </div>
           <button className="quiz-task-card" onClick={() => setShowChatQuiz(true)}>
             <div className="quiz-task-card-icon">
-              <MessageCircle size={22} />
+              <MessageCircle size={24} />
             </div>
             <div className="quiz-task-card-body">
               <div className="quiz-task-card-title">Quiz Bot</div>
-              <div className="quiz-task-card-sub">Answer questions one at a time and earn ₱0.50 each</div>
+              <div className="quiz-task-card-sub">
+                Pick A or B — answer correctly to earn ₱0.50 each
+              </div>
+              <div className="quiz-task-card-limits">
+                Free: 50q · Premium: 150q · Elite: 500q
+              </div>
             </div>
             <div className="quiz-task-card-right">
               <span className="quiz-task-card-reward">₱0.50</span>
               <span className="quiz-task-card-tag">per answer</span>
+              <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 4 }} />
             </div>
           </button>
         </section>
 
         {/* ── Referrals ── */}
         <section className="tasks-section">
-          <h2 className="tasks-section-title">
-            Referrals
+          <div className="tasks-section-header">
+            <h2 className="tasks-section-title">Referrals</h2>
             <Link to="/referrals" className="tasks-section-link">
-              View all <ChevronRight size={13} />
+              History <ChevronRight size={13} />
             </Link>
-          </h2>
-
-          {/* Referral code card */}
-          <div className="ref-code-card">
-            <div className="ref-code-label">Your referral code</div>
-            <div className="ref-code-row">
-              <span className="ref-code-value">{referralCode || '—'}</span>
-              <button className="ref-code-copy" onClick={copyCode} disabled={!referralCode}>
-                {copied ? <Check size={15} /> : <Copy size={15} />}
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-            <button className="ref-link-btn" onClick={copyLink} disabled={!referralCode}>
-              Copy referral link
-            </button>
           </div>
 
-          {/* Referral stats */}
+          {/* How it works */}
+          <div className="ref-how-it-works">
+            <div className="ref-how-step">
+              <span className="ref-how-num">1</span>
+              <span>Share your code or link</span>
+            </div>
+            <ChevronRight size={14} className="ref-how-arrow" />
+            <div className="ref-how-step">
+              <span className="ref-how-num">2</span>
+              <span>Friend registers</span>
+            </div>
+            <ChevronRight size={14} className="ref-how-arrow" />
+            <div className="ref-how-step">
+              <span className="ref-how-num">3</span>
+              <span>You earn automatically</span>
+            </div>
+          </div>
+
+          {/* Code + share row */}
+          <div className="ref-code-card">
+            <div className="ref-code-inner">
+              <div className="ref-code-label">Your code</div>
+              <div className="ref-code-value">{referralCode || '—'}</div>
+            </div>
+            <button className="ref-code-copy" onClick={copyCode} disabled={!referralCode}>
+              {copied ? <Check size={15} /> : <Copy size={15} />}
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <button className="ref-link-btn" onClick={copyLink} disabled={!referralCode}>
+            Copy full referral link
+          </button>
+
+          {/* Stats */}
           {(referralCount > 0 || referralEarned > 0) && (
             <div className="ref-stats-row">
               <div className="ref-stat">
                 <span className="ref-stat-val">{referralCount}</span>
-                <span className="ref-stat-lbl">People Referred</span>
+                <span className="ref-stat-lbl">Referred</span>
               </div>
               <div className="ref-stat-divider" />
               <div className="ref-stat">
                 <span className="ref-stat-val">₱{referralEarned.toFixed(2)}</span>
-                <span className="ref-stat-lbl">Total Earned</span>
+                <span className="ref-stat-lbl">Earned</span>
               </div>
               <div className="ref-stat-divider" />
               <div className="ref-stat">
-                <TrendingUp size={14} style={{ color: 'var(--success)' }} />
+                <TrendingUp size={16} style={{ color: 'var(--success)' }} />
                 <span className="ref-stat-lbl">All time</span>
               </div>
             </div>
           )}
 
-          {/* Referral task list */}
-          {tasks.length === 0 ? (
-            <div className="tasks-empty" style={{ paddingTop: 20, paddingBottom: 20 }}>
-              <Users size={28} className="tasks-empty-icon" />
-              <p style={{ fontSize: 14 }}>No referral tasks configured yet.</p>
-            </div>
-          ) : (
-            <div className="task-list" style={{ marginTop: 12 }}>
+          {/* Task list */}
+          {tasks.length > 0 && (
+            <div className="task-list" style={{ marginTop: 14 }}>
               {tasks.map((task) => (
                 <ReferralTaskCard key={task.id} task={task} />
               ))}

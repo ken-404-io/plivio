@@ -3,8 +3,8 @@ import api from '../../services/api.ts';
 import { useAuth } from '../../store/authStore.tsx';
 import { useToast } from '../../components/common/Toast.tsx';
 import {
-  Bot, Send, X, CheckCircle2, XCircle,
-  ChevronRight, Trophy, Zap, BookOpen,
+  Bot, X, CheckCircle2, XCircle,
+  ChevronRight, Trophy, Zap, BookOpen, Flame,
 } from 'lucide-react';
 
 const STREAK_QUIZ_GOAL = 15;
@@ -30,10 +30,17 @@ interface QuizQuestion {
   id: number;
   question: string;
   category: string;
+  choices: [string, string];
 }
 
 type Phase = 'loading' | 'question' | 'feedback' | 'done';
-type FeedbackState = { correct: boolean; reward: number; correct_answer: string } | null;
+
+interface FeedbackState {
+  correct: boolean;
+  reward: number;
+  correct_answer: string;
+  selected: string;
+}
 
 interface Props {
   onClose: () => void;
@@ -42,16 +49,16 @@ interface Props {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const CATEGORY_COLORS: Record<string, string> = {
-  math:          '#6366f1',
-  science:       '#06b6d4',
-  geography:     '#10b981',
-  history:       '#f59e0b',
-  philippines:   '#f43f5e',
-  technology:    '#8b5cf6',
-  english:       '#3b82f6',
-  sports:        '#f97316',
-  food:          '#ec4899',
-  general:       '#64748b',
+  math:        '#6366f1',
+  science:     '#06b6d4',
+  geography:   '#10b981',
+  history:     '#f59e0b',
+  philippines: '#f43f5e',
+  technology:  '#8b5cf6',
+  english:     '#3b82f6',
+  sports:      '#f97316',
+  food:        '#ec4899',
+  general:     '#64748b',
 };
 
 function categoryColor(cat: string) {
@@ -61,19 +68,19 @@ function categoryColor(cat: string) {
 // ─── ChatTask ─────────────────────────────────────────────────────────────────
 
 export default function ChatTask({ onClose }: Props) {
-  const { fetchMe }  = useAuth();
-  const toast        = useToast();
+  const { fetchMe } = useAuth();
+  const toast       = useToast();
 
-  const [status,    setStatus]    = useState<QuizStatus | null>(null);
-  const [question,  setQuestion]  = useState<QuizQuestion | null>(null);
-  const [input,     setInput]     = useState('');
-  const [phase,     setPhase]     = useState<Phase>('loading');
-  const [feedback,  setFeedback]  = useState<FeedbackState>(null);
+  const [status,         setStatus]         = useState<QuizStatus | null>(null);
+  const [question,       setQuestion]       = useState<QuizQuestion | null>(null);
+  const [phase,          setPhase]          = useState<Phase>('loading');
+  const [feedback,       setFeedback]       = useState<FeedbackState | null>(null);
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionCount,   setSessionCount]   = useState(0);
-  const [limitMsg,  setLimitMsg]  = useState('');
+  const [limitMsg,       setLimitMsg]       = useState('');
+  const [submitting,     setSubmitting]     = useState(false);
+
   const streakTriggeredRef = useRef(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const loadStatus = useCallback(async () => {
     const { data } = await api.get<QuizStatus>('/quiz/status');
@@ -84,21 +91,19 @@ export default function ChatTask({ onClose }: Props) {
   const loadNextQuestion = useCallback(async () => {
     setPhase('loading');
     setFeedback(null);
-    setInput('');
     try {
       const { data } = await api.get<{
         success: boolean; question?: QuizQuestion; message?: string;
       }>('/quiz/next');
       if (!data.success || !data.question) {
-        setLimitMsg(data.message ?? 'No more questions.');
+        setLimitMsg(data.message ?? 'No more questions available.');
         setPhase('done');
         return;
       }
       setQuestion(data.question);
       setPhase('question');
-      setTimeout(() => inputRef.current?.focus(), 100);
     } catch {
-      setLimitMsg('Failed to load question.');
+      setLimitMsg('Failed to load question. Please try again.');
       setPhase('done');
     }
   }, []);
@@ -112,7 +117,7 @@ export default function ChatTask({ onClose }: Props) {
           setLimitMsg(
             s.questions_left === 0
               ? `You've used all ${s.question_limit} questions on the ${s.plan} plan. Upgrade to answer more!`
-              : `Daily earning limit of ₱${s.daily_limit} reached. Come back tomorrow!`
+              : `Daily earning limit of ₱${s.daily_limit} reached. Come back tomorrow!`,
           );
           setPhase('done');
           return;
@@ -126,10 +131,9 @@ export default function ChatTask({ onClose }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleSubmit(e?: React.FormEvent) {
-    e?.preventDefault();
-    const answer = input.trim();
-    if (!answer || !question || phase !== 'question') return;
+  async function handleChoice(choice: string) {
+    if (!question || submitting || phase !== 'question') return;
+    setSubmitting(true);
     setPhase('loading');
 
     try {
@@ -138,71 +142,81 @@ export default function ChatTask({ onClose }: Props) {
         is_correct: boolean;
         correct_answer: string;
         reward_earned: number;
-      }>('/quiz/answer', { question_id: question.id, answer });
+      }>('/quiz/answer', { question_id: question.id, answer: choice });
 
       setFeedback({
         correct:        data.is_correct,
         reward:         data.reward_earned,
         correct_answer: data.correct_answer,
+        selected:       choice,
       });
       setSessionCount((n) => n + 1);
       if (data.is_correct) setSessionCorrect((n) => n + 1);
       setPhase('feedback');
 
-      // Real-time balance update in the header
-      if (data.is_correct && data.reward_earned > 0) {
-        void fetchMe();
-      }
+      // Real-time balance update
+      if (data.is_correct && data.reward_earned > 0) void fetchMe();
 
       // Refresh quiz status
       const s = await loadStatus();
 
-      // Auto streak check-in when user hits 15 questions today
+      // Auto streak check-in at 15 questions today
       if (s.today_answered >= STREAK_QUIZ_GOAL && !streakTriggeredRef.current) {
         streakTriggeredRef.current = true;
         try {
-          const { data: checkin } = await api.post<{
+          const { data: ci } = await api.post<{
             already_checked_in?: boolean;
             streak_count: number;
             bonus_day: boolean;
           }>('/coins/checkin');
-          if (!checkin.already_checked_in) {
-            if (checkin.bonus_day) {
-              toast.success(`🔥 Day ${checkin.streak_count} streak! +50 coins bonus!`);
-            } else {
-              toast.success(`🔥 Streak day ${checkin.streak_count} earned!`);
-            }
+          if (!ci.already_checked_in) {
+            toast.success(
+              ci.bonus_day
+                ? `🔥 Day ${ci.streak_count} streak! +50 coins bonus!`
+                : `🔥 Streak day ${ci.streak_count} earned!`,
+            );
             void fetchMe();
           }
         } catch { /* silent */ }
       }
 
       if (!s.can_earn_more || s.questions_left === 0) {
-        setTimeout(() => {
-          setLimitMsg(
-            s.questions_left === 0
-              ? `You've used all ${s.question_limit} questions on the ${s.plan} plan. Upgrade to earn more!`
-              : `Daily earning limit of ₱${s.daily_limit} reached. Come back tomorrow!`
-          );
-          setPhase('done');
-        }, 2200);
-        return;
+        setLimitMsg(
+          s.questions_left === 0
+            ? `You've used all ${s.question_limit} questions on the ${s.plan} plan. Upgrade to earn more!`
+            : `Daily earning limit of ₱${s.daily_limit} reached. Come back tomorrow!`,
+        );
+        // Stay on feedback for a moment then show done
+        setTimeout(() => setPhase('done'), 2500);
       }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
       setLimitMsg(msg ?? 'Failed to submit answer.');
       setPhase('done');
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  const todayEarned   = status?.today_earned ?? 0;
-  const totalAnswered = status?.total_answered ?? 0;
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const todayEarned   = status?.today_earned  ?? 0;
   const todayAnswered = status?.today_answered ?? 0;
+  const totalAnswered = status?.total_answered ?? 0;
   const qLimit        = status?.question_limit ?? 0;
   const qLeft         = status?.questions_left ?? 0;
-  const pct           = qLimit > 0 ? Math.min(100, (totalAnswered / qLimit) * 100) : 0;
+  const planPct       = qLimit > 0 ? Math.min(100, (totalAnswered / qLimit) * 100) : 0;
   const streakPct     = Math.min(100, (todayAnswered / STREAK_QUIZ_GOAL) * 100);
   const streakDone    = todayAnswered >= STREAK_QUIZ_GOAL;
+
+  // Choice button state helper
+  function choiceState(choice: string): 'default' | 'correct' | 'wrong' | 'dim' {
+    if (phase !== 'feedback' || !feedback) return 'default';
+    const isCorrect = choice.toLowerCase() === feedback.correct_answer.toLowerCase();
+    const isSelected = choice === feedback.selected;
+    if (isCorrect) return 'correct';
+    if (isSelected && !isCorrect) return 'wrong';
+    return 'dim';
+  }
 
   return (
     <div className="cq-overlay">
@@ -211,13 +225,11 @@ export default function ChatTask({ onClose }: Props) {
         {/* ── Header ── */}
         <div className="cq-header">
           <div className="cq-header-left">
-            <div className="cq-bot-avatar">
-              <Bot size={22} />
-            </div>
+            <div className="cq-bot-avatar"><Bot size={20} /></div>
             <div>
               <div className="cq-title">Quiz Bot</div>
               <div className="cq-subtitle">
-                {status ? `${status.plan.toUpperCase()} · ${qLeft} left` : 'Loading…'}
+                {status ? `${status.plan.toUpperCase()} · ${qLeft} questions left` : 'Loading…'}
               </div>
             </div>
           </div>
@@ -226,29 +238,24 @@ export default function ChatTask({ onClose }: Props) {
               <Trophy size={13} />
               ₱{todayEarned.toFixed(2)}{status?.daily_limit ? ` / ₱${status.daily_limit}` : ''}
             </div>
-            <button className="cq-close" onClick={onClose} aria-label="Close">
-              <X size={18} />
-            </button>
+            <button className="cq-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
           </div>
         </div>
 
-        {/* ── Progress bar ── */}
+        {/* ── Plan progress bar ── */}
         <div className="cq-progress-wrap">
+          <span className="cq-progress-label">Progress</span>
           <div className="cq-progress-bar">
-            <div className="cq-progress-fill" style={{ width: `${pct}%` }} />
+            <div className="cq-progress-fill" style={{ width: `${planPct}%` }} />
           </div>
           <span className="cq-progress-label">{totalAnswered}/{qLimit}</span>
         </div>
 
-        {/* ── Streak + session bar ── */}
+        {/* ── Streak bar ── */}
         <div className="cq-streak-bar">
           <div className="cq-streak-bar-left">
-            <Zap size={13} />
-            <span>
-              {streakDone
-                ? 'Streak earned today!'
-                : `${todayAnswered}/${STREAK_QUIZ_GOAL} for streak`}
-            </span>
+            <Flame size={13} />
+            <span>{streakDone ? 'Streak earned today! 🔥' : `${todayAnswered}/${STREAK_QUIZ_GOAL} for streak`}</span>
           </div>
           <div className="cq-streak-bar-track">
             <div className="cq-streak-bar-fill" style={{ width: `${streakPct}%` }} />
@@ -258,56 +265,82 @@ export default function ChatTask({ onClose }: Props) {
           )}
         </div>
 
-        {/* ── Main area ── */}
+        {/* ── Body ── */}
         <div className="cq-body">
 
           {/* Loading */}
           {phase === 'loading' && (
             <div className="cq-loader">
               <div className="cq-dots"><span /><span /><span /></div>
-              <p>Loading question…</p>
+              <p>Loading…</p>
             </div>
           )}
 
-          {/* Question */}
+          {/* Question + choices */}
           {(phase === 'question' || phase === 'feedback') && question && (
-            <div className="cq-question-card">
-              <div
-                className="cq-category-tag"
-                style={{ background: categoryColor(question.category) + '22', color: categoryColor(question.category) }}
-              >
-                <BookOpen size={12} />
-                {question.category}
+            <div className="cq-question-wrap">
+              {/* Question card */}
+              <div className="cq-question-card">
+                <div
+                  className="cq-category-tag"
+                  style={{
+                    background: categoryColor(question.category) + '22',
+                    color:      categoryColor(question.category),
+                  }}
+                >
+                  <BookOpen size={12} />
+                  {question.category}
+                </div>
+                <p className="cq-question-text">{question.question}</p>
               </div>
-              <p className="cq-question-text">{question.question}</p>
-            </div>
-          )}
 
-          {/* Feedback */}
-          {phase === 'feedback' && feedback && (
-            <div className={`cq-feedback ${feedback.correct ? 'cq-feedback--correct' : 'cq-feedback--wrong'}`}>
-              {feedback.correct ? (
-                <>
-                  <CheckCircle2 size={28} className="cq-feedback-icon" />
-                  <div className="cq-feedback-title">Correct!</div>
-                  <div className="cq-feedback-sub">+₱{feedback.reward.toFixed(2)} added to your balance</div>
-                </>
-              ) : (
-                <>
-                  <XCircle size={28} className="cq-feedback-icon" />
-                  <div className="cq-feedback-title">Wrong answer</div>
-                  <div className="cq-feedback-sub">
-                    Correct answer: <strong>{feedback.correct_answer}</strong>
-                  </div>
-                </>
+              {/* Feedback banner */}
+              {phase === 'feedback' && feedback && (
+                <div className={`cq-feedback-banner ${feedback.correct ? 'cq-feedback-banner--correct' : 'cq-feedback-banner--wrong'}`}>
+                  {feedback.correct ? (
+                    <>
+                      <CheckCircle2 size={18} />
+                      <span>Correct! +₱{feedback.reward.toFixed(2)} earned</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle size={18} />
+                      <span>Wrong! Correct: <strong>{feedback.correct_answer}</strong></span>
+                    </>
+                  )}
+                </div>
               )}
-              <button className="cq-next-btn" onClick={() => { void loadNextQuestion(); }}>
-                Next question <ChevronRight size={16} />
-              </button>
+
+              {/* 2 Choice buttons */}
+              <div className="cq-choices">
+                {question.choices.map((choice, i) => {
+                  const state = choiceState(choice);
+                  return (
+                    <button
+                      key={i}
+                      className={`cq-choice cq-choice--${state}`}
+                      onClick={() => { void handleChoice(choice); }}
+                      disabled={phase === 'feedback' || submitting}
+                    >
+                      <span className="cq-choice-label">{i === 0 ? 'A' : 'B'}</span>
+                      <span className="cq-choice-text">{choice}</span>
+                      {state === 'correct' && <CheckCircle2 size={18} className="cq-choice-icon" />}
+                      {state === 'wrong'   && <XCircle      size={18} className="cq-choice-icon" />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Next button (only after feedback) */}
+              {phase === 'feedback' && (
+                <button className="cq-next-btn" onClick={() => { void loadNextQuestion(); }}>
+                  Next question <ChevronRight size={16} />
+                </button>
+              )}
             </div>
           )}
 
-          {/* Done */}
+          {/* Done screen */}
           {phase === 'done' && (
             <div className="cq-done">
               <div className="cq-done-icon">🎉</div>
@@ -335,27 +368,12 @@ export default function ChatTask({ onClose }: Props) {
 
         </div>
 
-        {/* ── Input ── */}
-        {phase === 'question' && (
-          <form className="cq-input-row" onSubmit={handleSubmit}>
-            <input
-              ref={inputRef}
-              className="cq-input"
-              type="text"
-              placeholder="Type your answer and press Enter…"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              autoComplete="off"
-            />
-            <button
-              className="cq-send"
-              type="submit"
-              disabled={!input.trim()}
-              aria-label="Submit"
-            >
-              <Send size={18} />
-            </button>
-          </form>
+        {/* Session score footer */}
+        {(phase === 'question' || phase === 'feedback') && sessionCount > 0 && (
+          <div className="cq-footer">
+            <Zap size={13} />
+            Session: {sessionCorrect}/{sessionCount} correct
+          </div>
         )}
 
       </div>
