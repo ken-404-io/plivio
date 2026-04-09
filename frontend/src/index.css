@@ -1217,12 +1217,39 @@ a, button, [role="button"], [tabindex] {
   font-weight: 500;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
 }
 .tab-btn:hover { color: var(--text-heading); }
 .tab-btn--active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Mobile: pill / segment-control style tabs */
+@media (max-width: 768px) {
+  .tabs {
+    background: var(--bg-elevated);
+    border-radius: 10px;
+    border-bottom: none;
+    padding: 3px;
+    gap: 2px;
+  }
+  .tab-btn {
+    flex: 1;
+    text-align: center;
+    border-bottom: none;
+    margin-bottom: 0;
+    border-radius: 8px;
+    padding: 9px 4px;
+    font-size: 13px;
+  }
+  .tab-btn--active {
+    background: var(--bg-surface);
+    color: var(--accent);
+    border-bottom: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  }
+  .tab-btn:hover { background: transparent; }
+}
 .tab-badge {
   display: inline-flex;
   align-items: center;
@@ -1393,65 +1420,85 @@ a, button, [role="button"], [tabindex] {
 .badge--success { background: rgba(34,197,94,0.15); color: var(--success); border-color: rgba(34,197,94,0.3); }
 
 /* ─── Profile hero ────────────────────────────────────────────────────────────── */
+/* ─── Profile hero — mobile-first centered card ───────────────────────────── */
 .profile-hero {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  text-align: center;
+  gap: 0;
+  padding: 24px 20px 0;
+  overflow: hidden;
 }
 
-.profile-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: var(--accent-light);
-  border: 2px solid var(--accent-border);
-  color: var(--accent);
-  font-size: 26px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  user-select: none;
+/* Desktop: horizontal layout */
+@media (min-width: 769px) {
+  .profile-hero {
+    flex-direction: row;
+    align-items: flex-start;
+    text-align: left;
+    gap: 20px;
+    padding: 20px;
+  }
 }
 
 .profile-hero-info {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
+  width: 100%;
+  margin-bottom: 4px;
 }
 
-.profile-username  { font-size: 20px; font-weight: 700; color: var(--text-heading); }
-.profile-email     { font-size: 14px; }
-.profile-join-date { font-size: 13px; }
+@media (min-width: 769px) {
+  .profile-hero-info {
+    align-items: flex-start;
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.profile-username  { font-size: 22px; font-weight: 700; color: var(--text-heading); line-height: 1.2; }
+.profile-email     { font-size: 13px; color: var(--text-muted); word-break: break-all; }
+.profile-join-date { font-size: 12px; color: var(--text-muted); }
 
 .profile-hero-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
   flex-wrap: wrap;
-  margin-top: 4px;
+  margin-top: 6px;
+  margin-bottom: 2px;
 }
 
-.profile-balance-pill {
+@media (min-width: 769px) {
+  .profile-hero-meta { justify-content: flex-start; }
+}
+
+/* Balance row — pinned at bottom of hero card with a divider */
+.profile-balance-row {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  margin-left: auto;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px 0 18px;
+  border-top: 1px solid var(--border-light);
 }
 
-.profile-balance-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
-.profile-balance-value { font-size: 24px; font-weight: 700; color: var(--accent); }
+.profile-balance-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-muted); font-weight: 600; }
+.profile-balance-value { font-size: 26px; font-weight: 800; color: var(--accent); letter-spacing: -0.5px; }
+
+/* Legacy alias kept for backward compat */
+.profile-balance-pill { display: none; }
 
 /* ─── Profile sections ────────────────────────────────────────────────────────── */
 .profile-sections {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 /* ─── Detail list (account tab) ──────────────────────────────────────────────── */
@@ -1463,19 +1510,39 @@ a, button, [role="button"], [tabindex] {
 
 .detail-row {
   display: flex;
-  align-items: baseline;
-  gap: 16px;
-  padding: 12px 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 0;
   border-bottom: 1px solid var(--border-light);
 }
 .detail-row:last-child { border-bottom: none; }
 
+/* Desktop: side-by-side label + value */
+@media (min-width: 769px) {
+  .detail-row {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 16px;
+  }
+}
+
 .detail-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
-  font-weight: 500;
-  min-width: 120px;
-  flex-shrink: 0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+@media (min-width: 769px) {
+  .detail-label {
+    font-size: 13px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    min-width: 120px;
+    flex-shrink: 0;
+  }
 }
 
 .detail-value {
@@ -1485,6 +1552,7 @@ a, button, [role="button"], [tabindex] {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+  word-break: break-word;
 }
 
 /* ─── Referral field ──────────────────────────────────────────────────────────── */
@@ -3738,18 +3806,42 @@ a, button, [role="button"], [tabindex] {
 /* ─── Profile: avatar upload ──────────────────────────────────────────────────── */
 .avatar-upload-section {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
   flex-shrink: 0;
+  margin-bottom: 14px;
 }
+
+@media (min-width: 769px) {
+  .avatar-upload-section {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 0;
+  }
+}
+
+.avatar-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (min-width: 769px) {
+  .avatar-hint { text-align: left; font-size: 13px; }
+}
+
 .avatar-upload-btn {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: 84px;
+  height: 84px;
   border-radius: 50%;
   cursor: pointer;
   flex-shrink: 0;
   overflow: hidden;
+  /* always show the upload overlay icon faintly on mobile */
+  box-shadow: 0 0 0 3px var(--bg-surface), 0 0 0 5px var(--accent-border);
 }
 .avatar-img {
   width: 100%;
@@ -3762,11 +3854,10 @@ a, button, [role="button"], [tabindex] {
   height: 100%;
   border-radius: 50%;
   background: var(--accent-light);
-  border: 2px solid var(--accent-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--accent);
 }
@@ -3774,14 +3865,18 @@ a, button, [role="button"], [tabindex] {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.45);
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
+  /* Show subtly by default on mobile (no hover); hidden on desktop until hover */
+  opacity: 0.35;
   transition: opacity 0.15s;
 }
-.avatar-upload-btn:hover .avatar-overlay { opacity: 1; }
+@media (min-width: 769px) {
+  .avatar-overlay { opacity: 0; }
+  .avatar-upload-btn:hover .avatar-overlay { opacity: 1; }
+}
 .avatar-upload-btn:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* ─── Auth terms ──────────────────────────────────────────────────────────────── */
@@ -3860,17 +3955,9 @@ a, button, [role="button"], [tabindex] {
   .auth-card { padding: 24px 20px; gap: 16px; }
   .auth-screen { padding: 16px; align-items: flex-start; padding-top: 40px; }
 
-  /* Profile */
-  .profile-hero { gap: 14px; }
-  .profile-avatar { width: 52px; height: 52px; font-size: 20px; }
-  .profile-username { font-size: 17px; }
+  /* Profile — old overrides removed; layout is now mobile-first in component styles */
   .toast-stack { top: 12px; right: 12px; width: calc(100% - 24px); max-width: 100%; }
   .referral-share-grid { grid-template-columns: 1fr; }
-  .profile-balance-pill { margin-left: 0; flex-direction: row; align-items: center; gap: 8px; width: 100%; }
-  .profile-balance-value { font-size: 20px; }
-
-  .detail-row { flex-direction: column; gap: 4px; }
-  .detail-label { min-width: unset; }
 
   .password-form { max-width: 100%; }
   .twofa-confirm-form { max-width: 100%; }

@@ -441,12 +441,7 @@ function AvatarUpload({ avatarUrl, username, onUploaded }: {
           )}
         </div>
       </div>
-      <div>
-        <p className="text-muted" style={{ fontSize: 13 }}>
-          Click the photo to change your avatar.<br />
-          JPEG, PNG or WEBP · max 2 MB
-        </p>
-      </div>
+      <p className="avatar-hint">Tap to change photo · JPEG, PNG, WEBP · 2 MB max</p>
       <input
         ref={inputRef}
         type="file"
@@ -574,7 +569,7 @@ export default function Profile() {
         />
         <div className="profile-hero-info">
           <p className="profile-username">{user?.username}</p>
-          <p className="profile-email text-muted">{user?.email}</p>
+          <p className="profile-email">{user?.email}</p>
           <div className="profile-hero-meta">
             <span className={`plan-badge plan-badge--${user?.plan ?? 'free'}`}>
               {user?.plan?.toUpperCase() ?? 'FREE'}
@@ -583,12 +578,12 @@ export default function Profile() {
               <span className="badge badge--success">Verified</span>
             )}
             {user?.kyc_status === 'approved' && (
-              <span className="badge badge--success">KYC Approved</span>
+              <span className="badge badge--success">KYC</span>
             )}
-            <span className="text-muted profile-join-date">Joined {joinDate}</span>
           </div>
+          <span className="profile-join-date">Joined {joinDate}</span>
         </div>
-        <div className="profile-balance-pill">
+        <div className="profile-balance-row">
           <span className="profile-balance-label">Balance</span>
           <span className="profile-balance-value">₱{Number(user?.balance ?? 0).toFixed(2)}</span>
         </div>
