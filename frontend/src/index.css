@@ -4085,6 +4085,17 @@ a, button, [role="button"], [tabindex] {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .payment-awaiting-banner span { flex: 1; }
+.payment-awaiting-check {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
 .payment-awaiting-dismiss {
   background: none;
   border: none;
