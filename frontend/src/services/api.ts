@@ -8,7 +8,13 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// In-memory CSRF token — populated from response headers
+let csrfToken: string | null = null;
+
 function readCsrfToken(): string | null {
+  // Prefer in-memory token (set from response header)
+  if (csrfToken) return csrfToken;
+  // Fallback: try cookie (works when frontend and API share the same domain)
   const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
 }
@@ -31,8 +37,17 @@ function flushQueue(error: unknown) {
 }
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    // Capture CSRF token from any response header
+    const token = res.headers['x-csrf-token'];
+    if (token) csrfToken = token;
+    return res;
+  },
   async (error) => {
+    // Capture CSRF token even from error responses
+    const token = error.response?.headers?.['x-csrf-token'];
+    if (token) csrfToken = token;
+
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (error.response?.status === 401 && !original._retry) {

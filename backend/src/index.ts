@@ -24,6 +24,7 @@ import kycRoutes          from './routes/kyc.ts';
 import contactRoutes      from './routes/contact.ts';
 import coinsRoutes        from './routes/coins.ts';
 import pushRoutes         from './routes/push.ts';
+import quizRoutes         from './routes/quiz.ts';
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -63,6 +64,7 @@ app.use(cors({
   credentials:    true,
   methods:        ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+  exposedHeaders: ['X-CSRF-Token'],
 }));
 
 // Skip JSON body parsing for the PayMongo webhook — it needs the raw Buffer
@@ -101,6 +103,7 @@ app.use('/api/kyc',           kycRoutes);
 app.use('/api/contact',       contactRoutes);
 app.use('/api/coins',         coinsRoutes);
 app.use('/api/push',          pushRoutes);
+app.use('/api/quiz',          quizRoutes);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ success: false, error: 'Endpoint not found' });

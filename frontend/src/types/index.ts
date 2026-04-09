@@ -45,6 +45,7 @@ export interface CoinsResponse {
   streak_before_break: number;
   can_recover: boolean;
   today_completions: number;
+  checked_in_today: boolean;
 }
 
 export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected';
@@ -109,6 +110,8 @@ export interface TaskListResponse {
   today_earnings: number;
   daily_limit: number | null;
   plan: PlanType;
+  referral_count: number;
+  referral_earned: number;
 }
 
 export interface StartTaskResponse {

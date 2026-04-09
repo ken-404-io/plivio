@@ -73,15 +73,34 @@ async function getEffectivePlan(userId: string): Promise<PlanKey> {
 }
 
 async function todayEarnings(userId: string): Promise<number> {
-  const { rows } = await pool.query(
-    `SELECT COALESCE(SUM(reward_earned), 0) AS total
-     FROM task_completions
-     WHERE user_id = $1
-       AND status = 'approved'
-       AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
-    [userId]
-  );
-  return Number((rows[0] as { total: string }).total);
+  try {
+    // Include both task completions and quiz answer rewards
+    const { rows } = await pool.query(
+      `SELECT
+         COALESCE((
+           SELECT SUM(reward_earned) FROM task_completions
+           WHERE user_id = $1 AND status = 'approved'
+             AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
+         ), 0) +
+         COALESCE((
+           SELECT SUM(reward_earned) FROM user_question_answers
+           WHERE user_id = $1
+             AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
+         ), 0) AS total`,
+      [userId],
+    );
+    return Number((rows[0] as { total: string }).total);
+  } catch {
+    // Fallback if quiz tables haven't been migrated yet
+    const { rows } = await pool.query(
+      `SELECT COALESCE(SUM(reward_earned), 0) AS total
+       FROM task_completions
+       WHERE user_id = $1 AND status = 'approved'
+         AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
+      [userId],
+    );
+    return Number((rows[0] as { total: string }).total);
+  }
 }
 
 /** Generate a simple math captcha challenge. Returns the question and a bcrypt hash of the answer. */
@@ -117,27 +136,29 @@ export async function listTasks(req: Request, res: Response, next: NextFunction)
     const effectivePlan = await getEffectivePlan(userId);
     const planRank      = PLAN_ORDER[effectivePlan] ?? 0;
 
+    // Only return referral tasks — other task types are no longer shown in the UI
     const { rows } = await pool.query(
       `SELECT id, title, type, reward_amount, min_plan, verification_config
        FROM tasks
        WHERE is_active = TRUE
+         AND type = 'referral'
          AND CASE min_plan
                WHEN 'free'    THEN 0
                WHEN 'premium' THEN 1
                WHEN 'elite'   THEN 2
              END <= $1
        ORDER BY reward_amount DESC`,
-      [planRank]
+      [planRank],
     );
 
-    // Fetch today's completions (pending + approved) to mark task states
+    // Mark which referral tasks have been completed (approved) today
     const completions = await pool.query(
       `SELECT task_id, status
        FROM task_completions
        WHERE user_id = $1
          AND started_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
          AND status IN ('pending', 'approved')`,
-      [userId]
+      [userId],
     );
 
     const pendingToday  = new Set<string>();
@@ -153,10 +174,31 @@ export async function listTasks(req: Request, res: Response, next: NextFunction)
       in_progress_today: pendingToday.has(t.id),
     }));
 
+    // Referral stats: total referrals made + all-time referral earnings
+    const refStats = await pool.query(
+      `SELECT
+         COUNT(DISTINCT tc.id)            AS referral_count,
+         COALESCE(SUM(tc.reward_earned), 0) AS referral_earned
+       FROM task_completions tc
+       JOIN tasks t ON t.id = tc.task_id
+       WHERE tc.user_id = $1 AND t.type = 'referral' AND tc.status = 'approved'`,
+      [userId],
+    );
+    const referralCount  = Number((refStats.rows[0] as { referral_count: string }).referral_count);
+    const referralEarned = Number((refStats.rows[0] as { referral_earned: string }).referral_earned);
+
     const earned = await todayEarnings(userId);
     const limit  = DAILY_LIMIT[effectivePlan];
 
-    res.json({ success: true, tasks, today_earnings: earned, daily_limit: limit, plan: effectivePlan });
+    res.json({
+      success:         true,
+      tasks,
+      today_earnings:  earned,
+      daily_limit:     limit,
+      plan:            effectivePlan,
+      referral_count:  referralCount,
+      referral_earned: referralEarned,
+    });
   } catch (err) { next(err); }
 }
 

@@ -23,30 +23,45 @@ export async function getCoins(req: Request, res: Response, next: NextFunction):
     if (!rows[0]) { res.status(404).json({ success: false, error: 'User not found' }); return; }
 
     const u = rows[0];
-    const today = new Date().toISOString().slice(0, 10);
-    const canRecover = u.streak_broken_at != null &&
-      (u.streak_broken_at === today ||
-        new Date(today).getTime() - new Date(u.streak_broken_at).getTime() <= 86_400_000);
 
-    // Count tasks completed today for streak progress
-    const { rows: taskRows } = await pool.query<{ count: string }>(
-      `SELECT COUNT(*) FROM task_completions
-       WHERE user_id = $1
-         AND status = 'approved'
-         AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
-      [userId],
+    // Use server-side UTC date so all timezone comparisons are consistent
+    const { rows: dateRows } = await pool.query<{ today: string; yesterday: string }>(
+      `SELECT
+         (NOW() AT TIME ZONE 'UTC')::date::text          AS today,
+         ((NOW() AT TIME ZONE 'UTC')::date - 1)::text    AS yesterday`,
     );
-    const todayCompletions = Number(taskRows[0]?.count ?? 0);
+    const today     = dateRows[0].today;
+    const yesterday = dateRows[0].yesterday;
+
+    const checkedInToday = u.last_streak_date === today;
+
+    const canRecover = u.streak_broken_at != null &&
+      (u.streak_broken_at === today || u.streak_broken_at === yesterday);
+
+    // Count quiz questions answered today for streak progress (goal: 15)
+    let todayCompletions = 0;
+    try {
+      const { rows: qRows } = await pool.query<{ count: string }>(
+        `SELECT COUNT(*) FROM user_question_answers
+         WHERE user_id = $1
+           AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
+        [userId],
+      );
+      todayCompletions = Number(qRows[0]?.count ?? 0);
+    } catch {
+      // quiz tables not migrated yet — leave at 0
+    }
 
     res.json({
       success: true,
-      coins: Number(u.coins),
-      streak_count: u.streak_count,
-      last_streak_date: u.last_streak_date,
-      streak_broken_at: u.streak_broken_at,
+      coins:               Number(u.coins),
+      streak_count:        u.streak_count,
+      last_streak_date:    u.last_streak_date,
+      streak_broken_at:    u.streak_broken_at,
       streak_before_break: u.streak_before_break,
-      can_recover: canRecover,
-      today_completions: todayCompletions,
+      can_recover:         canRecover,
+      today_completions:   todayCompletions,
+      checked_in_today:    checkedInToday,
     });
   } catch (err) {
     next(err);
@@ -71,9 +86,16 @@ export async function checkIn(req: Request, res: Response, next: NextFunction): 
 
     if (!rows[0]) { await client.query('ROLLBACK'); res.status(404).json({ success: false, error: 'User not found' }); return; }
 
-    const u    = rows[0];
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const u = rows[0];
+
+    // Compute today/yesterday in UTC on the DB server — avoids JS timezone drift
+    const { rows: dateRows } = await client.query<{ today: string; yesterday: string }>(
+      `SELECT
+         (NOW() AT TIME ZONE 'UTC')::date::text       AS today,
+         ((NOW() AT TIME ZONE 'UTC')::date - 1)::text AS yesterday`,
+    );
+    const today     = dateRows[0].today;
+    const yesterday = dateRows[0].yesterday;
 
     // Already checked in today
     if (u.last_streak_date === today) {
@@ -192,17 +214,24 @@ export async function recoverStreak(req: Request, res: Response, next: NextFunct
 
     if (!rows[0]) { await client.query('ROLLBACK'); res.status(404).json({ success: false, error: 'User not found' }); return; }
 
-    const u     = rows[0];
-    const today = new Date().toISOString().slice(0, 10);
+    const u = rows[0];
+
+    const { rows: dateRows } = await client.query<{ today: string }>(
+      `SELECT (NOW() AT TIME ZONE 'UTC')::date::text AS today`,
+    );
+    const today = dateRows[0].today;
 
     if (!u.streak_broken_at) {
       await client.query('ROLLBACK');
       throw new ValidationError('No broken streak to recover.');
     }
 
-    const daysSinceBroken = Math.floor(
-      (new Date(today).getTime() - new Date(u.streak_broken_at).getTime()) / 86_400_000,
+    // Use SQL date arithmetic for reliable day difference
+    const { rows: diffRows } = await client.query<{ days: string }>(
+      `SELECT ($1::date - $2::date) AS days`,
+      [today, u.streak_broken_at],
     );
+    const daysSinceBroken = Number(diffRows[0].days);
     if (daysSinceBroken > 1) {
       await client.query('ROLLBACK');
       throw new ValidationError('Recovery window has passed. You can only recover within 1 day.');
