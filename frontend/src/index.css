@@ -95,6 +95,13 @@ button { cursor: pointer; font-family: inherit; font-size: inherit; }
 input, select, textarea { font-family: inherit; font-size: inherit; }
 img { display: block; max-width: 100%; }
 
+/* Hide scrollbars on all elements while keeping scroll behaviour */
+* {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE / Edge legacy */
+}
+*::-webkit-scrollbar { display: none; } /* Chrome / Safari / WebView */
+
 /* Remove iOS tap flash on interactive elements */
 a, button, [role="button"], [tabindex] {
   -webkit-tap-highlight-color: transparent;
