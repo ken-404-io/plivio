@@ -1,27 +1,71 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api.ts';
+import { useAchievement } from './Achievement.tsx';
 import type { Notification } from '../../types/index.ts';
 
 const POLL_INTERVAL_MS = 30_000;
 
+// Map notification type → achievement emoji
+function notifEmoji(type: string): string {
+  switch (type) {
+    case 'task_approved':      return '✅';
+    case 'withdrawal_paid':    return '💸';
+    case 'withdrawal_rejected':return '❌';
+    case 'referral_bonus':     return '👥';
+    case 'kyc_approved':       return '🪪';
+    case 'kyc_rejected':       return '⚠️';
+    case 'email_verified':     return '📧';
+    case 'admin_message':      return '📣';
+    default:                   return '🔔';
+  }
+}
+
 export default function NotificationBell() {
-  const navigate = useNavigate();
+  const navigate    = useNavigate();
+  const achievement = useAchievement();
 
   const [open,        setOpen]        = useState(false);
   const [unread,      setUnread]      = useState(0);
   const [items,       setItems]       = useState<Notification[]>([]);
   const [loadingList, setLoadingList] = useState(false);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRef  = useRef<HTMLDivElement>(null);
+  const prevUnread   = useRef(0);
+  const initialized  = useRef(false);
 
-  // Poll unread count every 30s
+  // Poll unread count every 30s; show achievement popup when count goes up
   const pollUnread = useCallback(async () => {
     try {
-      const { data } = await api.get<{ count: number }>('/notifications/unread-count');
-      setUnread(data.count);
+      const { data } = await api.get<{ count: number; latest?: { type: string; title: string; message: string } }>(
+        '/notifications/unread-count',
+      );
+      const newCount = data.count;
+      setUnread(newCount);
+
+      // On first load just record baseline, don't pop up
+      if (!initialized.current) {
+        initialized.current = true;
+        prevUnread.current  = newCount;
+        return;
+      }
+
+      // New notification arrived while the user is on the page
+      if (newCount > prevUnread.current && data.latest) {
+        const n = data.latest;
+        achievement.showAchievement({
+          emoji:    notifEmoji(n.type),
+          title:    n.title,
+          subtitle: n.message,
+          type:     n.type === 'referral_bonus'     ? 'referral'
+                  : n.type === 'task_approved'       ? 'task'
+                  : n.type === 'withdrawal_paid'     ? 'coins'
+                  : 'info',
+        });
+      }
+      prevUnread.current = newCount;
     } catch { /* silent — user might not be logged in */ }
-  }, []);
+  }, [achievement]);
 
   useEffect(() => {
     void pollUnread();

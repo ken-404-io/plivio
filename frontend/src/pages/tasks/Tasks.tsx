@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
+import { useAchievement } from '../../components/common/Achievement.tsx';
 import TaskModal from './TaskModal.tsx';
 import type { Task, TaskListResponse } from '../../types/index.ts';
 import {
@@ -107,7 +108,8 @@ function TaskCard({ task, variant, onStart, atLimit }: TaskCardProps) {
 // ─── Tasks page ───────────────────────────────────────────────────────────────
 
 export default function Tasks() {
-  const toast = useToast();
+  const toast       = useToast();
+  const achievement = useAchievement();
 
   const [taskData,   setTaskData]   = useState<TaskListResponse | null>(null);
   const [loading,    setLoading]    = useState(true);
@@ -137,7 +139,16 @@ export default function Tasks() {
 
   async function handleModalComplete(message: string) {
     setActiveTask(null);
-    toast.success(message);
+
+    // Parse the reward from the message (e.g. "₱1.50 added to your balance!")
+    const rewardMatch = message.match(/₱([\d,.]+)/);
+    const rewardStr   = rewardMatch ? `+₱${rewardMatch[1]}` : '';
+    achievement.showAchievement({
+      emoji:    '✅',
+      title:    rewardStr ? `${rewardStr} earned!` : 'Task completed!',
+      subtitle: rewardStr ? 'Added to your balance' : message,
+      type:     'task',
+    });
 
     // Fetch updated task list to get the new completed count
     try {
@@ -155,9 +166,19 @@ export default function Tasks() {
           }>('/coins/checkin');
           if (!checkin.already_checked_in) {
             if (checkin.bonus_day) {
-              toast.success(`Streak day ${checkin.streak_count}! +50 coins bonus!`);
+              achievement.showAchievement({
+                emoji:    '🏆',
+                title:    '+50 Coins Bonus!',
+                subtitle: `Day ${checkin.streak_count} streak — weekly bonus earned!`,
+                type:     'coins',
+              });
             } else {
-              toast.success(`Day ${checkin.streak_count} streak earned! Keep it up.`);
+              achievement.showAchievement({
+                emoji:    '🔥',
+                title:    `Day ${checkin.streak_count} Streak!`,
+                subtitle: 'Keep completing tasks daily to earn coins',
+                type:     'streak',
+              });
             }
           }
         } catch { /* silent — streak already claimed */ }

@@ -4,6 +4,7 @@ import { useAuth } from '../../store/authStore.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
+import { useAchievement } from '../../components/common/Achievement.tsx';
 import type { Subscription, PlansResponse, PlanInfo } from '../../types/index.ts';
 
 const PLAN_ORDER = ['free', 'premium', 'elite'];
@@ -40,6 +41,7 @@ function Cell({ value }: { value: CellVal }) {
 export default function Plans() {
   const { user, fetchMe } = useAuth();
   const toast             = useToast();
+  const achievement       = useAchievement();
 
   const [plans,          setPlans]          = useState<Record<string, PlanInfo>>({});
   const [sub,            setSub]            = useState<Subscription | null>(null);
@@ -80,7 +82,13 @@ export default function Plans() {
       if (data.activated) {
         setAwaitingPayment(false);
         if (pollTimer.current) { clearTimeout(pollTimer.current); pollTimer.current = null; }
-        toast.success(`Plan activated! Welcome to ${data.plan ?? 'your new plan'}.`);
+        const planName = (data.plan ?? 'your new plan');
+        achievement.showAchievement({
+          emoji:    '🎉',
+          title:    `${planName.charAt(0).toUpperCase() + planName.slice(1)} Plan Activated!`,
+          subtitle: 'Your new benefits are now live. Enjoy!',
+          type:     'upgrade',
+        });
         await fetchMe();
         await refreshPlans();
         return true;
