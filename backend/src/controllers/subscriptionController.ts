@@ -437,15 +437,19 @@ function verifyWebhookSignature(rawBody: string, signatureHeader: string): boole
 export async function handleWebhook(
   req: Request,
   res: Response,
-  next: NextFunction,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _next: NextFunction,
 ): Promise<void> {
+  // IMPORTANT: always respond 200 — PayMongo disables the webhook on any 4xx/5xx response.
+  // Errors are logged but never surfaced as non-2xx to PayMongo.
   try {
     // Express must NOT parse this route as JSON — raw body needed for HMAC
     const rawBody        = (req as Request & { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
     const sigHeader      = (req.headers['paymongo-signature'] as string) ?? '';
 
     if (!verifyWebhookSignature(rawBody, sigHeader)) {
-      res.status(400).json({ success: false, error: 'Invalid webhook signature' });
+      logger.warn({ sigHeader: sigHeader.slice(0, 80) }, '⚠️ Webhook: invalid signature — ignoring (acknowledged 200)');
+      res.json({ received: true });
       return;
     }
 
@@ -516,7 +520,11 @@ export async function handleWebhook(
 
     await activateSubscription(checkout);
     res.json({ received: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    // Log but still acknowledge — prevents PayMongo from disabling the webhook
+    logger.error({ err: (err as Error).message }, '❌ Webhook: processing error (still acknowledged 200)');
+    res.json({ received: true });
+  }
 }
 
 // ─── Legacy subscribe (kept for admin manual override) ───────────────────────
