@@ -75,15 +75,18 @@ export async function register(req: Request, res: Response, next: NextFunction):
     // ── Referral bonus: credit referrer for each new sign-up ──────────────
     if (referredById) {
       try {
-        // Find the first active referral task to get the reward amount
+        // Pick the referral task for a free-plan signup (lowest reward tier).
+        // New users always start on free, so use min_plan = 'free' or unset.
+        // ORDER BY reward_amount ASC ensures we don't accidentally pick the
+        // premium upgrade bonus (₱25) when the new user is still on free (₱10).
         const refTaskRes = await pool.query(
           `SELECT id, reward_amount FROM tasks
            WHERE type = 'referral' AND is_active = TRUE
-           ORDER BY reward_amount DESC LIMIT 1`,
+             AND (min_plan IS NULL OR min_plan = 'free')
+           ORDER BY reward_amount ASC LIMIT 1`,
         );
         if (refTaskRes.rowCount && refTaskRes.rowCount > 0) {
           const refTask = refTaskRes.rows[0] as { id: string; reward_amount: string };
-          // Credit referrer balance + record a task completion for them
           await pool.query('BEGIN');
           try {
             await pool.query(
@@ -92,9 +95,9 @@ export async function register(req: Request, res: Response, next: NextFunction):
             );
             await pool.query(
               `INSERT INTO task_completions
-                 (user_id, task_id, status, reward_earned, completed_at,
+                 (user_id, task_id, type, status, reward_earned, completed_at,
                   proof, server_data)
-               VALUES ($1, $2, 'approved', $3, NOW(), '{}', '{}')`,
+               VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
               [referredById, refTask.id, refTask.reward_amount],
             );
             await pool.query('COMMIT');
