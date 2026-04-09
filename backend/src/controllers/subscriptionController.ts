@@ -19,6 +19,7 @@ import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { ValidationError, NotFoundError } from '../utils/errors.ts';
 import { logger } from '../utils/logger.ts';
+import { createNotification } from '../utils/notify.ts';
 import {
   sendSubscriptionConfirmEmail,
 } from '../services/email.ts';
@@ -263,11 +264,19 @@ async function activateSubscription(checkout: {
 
     const expiresAt = new Date((subRows[0] as { expires_at: string }).expires_at);
 
-    // Send confirmation email (non-fatal)
+    // Send confirmation email + in-app notification (non-fatal)
+    const planName = PLANS[checkout.plan]?.name ?? checkout.plan;
     sendSubscriptionConfirmEmail(
-      checkout.email, checkout.username,
-      PLANS[checkout.plan]?.name ?? checkout.plan, expiresAt,
+      checkout.email, checkout.username, planName, expiresAt,
     ).catch(() => {});
+
+    void createNotification(
+      checkout.user_id,
+      'admin_message',
+      `${planName} Plan Activated!`,
+      `Your ${planName} subscription is now active until ${expiresAt.toLocaleDateString('en-PH')}.`,
+      '/plans',
+    );
 
     return expiresAt;
   } catch (inner) {

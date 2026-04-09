@@ -32,10 +32,28 @@ export async function unreadCount(
 ): Promise<void> {
   try {
     const { rows } = await pool.query(
+      `SELECT id, type, title, message, is_read
+       FROM notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [req.user!.id],
+    );
+
+    const countRes = await pool.query(
       `SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE`,
       [req.user!.id],
     );
-    res.json({ success: true, count: Number((rows[0] as { count: string }).count) });
+
+    const count  = Number((countRes.rows[0] as { count: string }).count);
+    const latest = rows[0] as { id: string; type: string; title: string; message: string; is_read: boolean } | undefined;
+
+    res.json({
+      success: true,
+      count,
+      // Only surface the latest if it's unread (used by the frontend popup)
+      latest: (latest && !latest.is_read) ? { type: latest.type, title: latest.title, message: latest.message } : null,
+    });
   } catch (err) { next(err); }
 }
 

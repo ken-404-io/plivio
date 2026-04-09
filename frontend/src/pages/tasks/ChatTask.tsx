@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import api from '../../services/api.ts';
 import { useAuth } from '../../store/authStore.tsx';
 import { useToast } from '../../components/common/Toast.tsx';
+import { useAchievement } from '../../components/common/Achievement.tsx';
 import {
   Bot, X, CheckCircle2, XCircle,
   ChevronRight, Trophy, Zap, BookOpen, Flame,
@@ -70,6 +71,7 @@ function categoryColor(cat: string) {
 export default function ChatTask({ onClose }: Props) {
   const { fetchMe } = useAuth();
   const toast       = useToast();
+  const achievement = useAchievement();
 
   const [status,         setStatus]         = useState<QuizStatus | null>(null);
   const [question,       setQuestion]       = useState<QuizQuestion | null>(null);
@@ -161,8 +163,16 @@ export default function ChatTask({ onClose }: Props) {
       if (data.is_correct) setSessionCorrect((n) => n + 1);
       setPhase('feedback');
 
-      // Real-time balance update
-      if (data.is_correct && data.reward_earned > 0) void fetchMe();
+      // Real-time balance update + achievement popup for correct answers
+      if (data.is_correct && data.reward_earned > 0) {
+        void fetchMe();
+        achievement.showAchievement({
+          emoji:    '✅',
+          title:    `+₱${data.reward_earned.toFixed(2)} earned!`,
+          subtitle: 'Correct answer — keep it up!',
+          type:     'task',
+        });
+      }
 
       // Refresh quiz status
       const s = await loadStatus();
@@ -177,11 +187,21 @@ export default function ChatTask({ onClose }: Props) {
             bonus_day: boolean;
           }>('/coins/checkin');
           if (!ci.already_checked_in) {
-            toast.success(
-              ci.bonus_day
-                ? `🔥 Day ${ci.streak_count} streak! +50 coins bonus!`
-                : `🔥 Streak day ${ci.streak_count} earned!`,
-            );
+            if (ci.bonus_day) {
+              achievement.showAchievement({
+                emoji:    '🏆',
+                title:    '+50 Coins Bonus!',
+                subtitle: `Day ${ci.streak_count} streak — weekly bonus earned!`,
+                type:     'coins',
+              });
+            } else {
+              achievement.showAchievement({
+                emoji:    '🔥',
+                title:    `Day ${ci.streak_count} Streak!`,
+                subtitle: 'Answered 15 questions today — come back tomorrow!',
+                type:     'streak',
+              });
+            }
             void fetchMe();
           }
         } catch { /* silent */ }

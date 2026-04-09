@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { ValidationError, ForbiddenError } from '../utils/errors.ts';
+import { createNotification } from '../utils/notify.ts';
 
 // ─── GET /api/coins ───────────────────────────────────────────────────────────
 export async function getCoins(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -160,6 +161,17 @@ export async function checkIn(req: Request, res: Response, next: NextFunction): 
     }
 
     await client.query('COMMIT');
+
+    // In-app notification for streak bonus (non-fatal, after commit)
+    if (coinsAwarded > 0) {
+      void createNotification(
+        userId,
+        'task_approved',
+        `${coinsAwarded} Coins Bonus!`,
+        `You hit a ${newStreak}-day streak — ${coinsAwarded} coins added to your wallet!`,
+        '/coins',
+      );
+    }
 
     res.json({
       success: true,

@@ -5,6 +5,7 @@ import Sidebar           from './Sidebar.tsx';
 import BottomNav         from './BottomNav.tsx';
 import NotificationBell  from '../common/NotificationBell.tsx';
 import OnboardingModal, { hasCompletedOnboarding } from '../common/OnboardingModal.tsx';
+import { AchievementProvider } from '../common/Achievement.tsx';
 import { useAuth }       from '../../store/authStore.tsx';
 import { usePushNotifications } from '../../hooks/usePushNotifications.ts';
 
@@ -30,6 +31,7 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
   });
 
   return (
+    <AchievementProvider>
     <div className="app-shell">
       {/* Desktop: left sidebar */}
       <Sidebar isAdmin={isAdmin} />
@@ -93,5 +95,6 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
         />
       )}
     </div>
+    </AchievementProvider>
   );
 }

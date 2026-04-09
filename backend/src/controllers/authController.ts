@@ -34,6 +34,42 @@ function deviceFingerprint(req: Request): string {
   return Buffer.from(`${req.ip}|${ua}|${lang}|${enc}`).toString('base64').slice(0, 64);
 }
 
+// ─── Disposable / throwaway email domains ─────────────────────────────────
+const DISPOSABLE_DOMAINS = new Set([
+  'mailinator.com', 'guerrillamail.com', 'guerrillamail.net', 'guerrillamail.org',
+  'guerrillamail.biz', 'guerrillamail.de', 'guerrillamailblock.com', 'grr.la',
+  'sharklasers.com', 'guerrillamailblock.com', 'spam4.me', 'trashmail.com',
+  'trashmail.me', 'trashmail.at', 'trashmail.io', 'trashmail.net', 'trashmail.org',
+  'yopmail.com', 'yopmail.fr', 'cool.fr.nf', 'jetable.fr.nf', 'nospam.ze.tc',
+  'nomail.xl.cx', 'mega.zik.dj', 'speed.1s.fr', 'courriel.fr.nf', 'moncourrier.fr.nf',
+  'monemail.fr.nf', 'monmail.fr.nf', 'tempmail.com', 'temp-mail.org', 'temp-mail.io',
+  'fakeinbox.com', 'mailnull.com', 'spamgourmet.com', 'spamgourmet.net',
+  'dispostable.com', 'maildrop.cc', 'throwam.com', 'throwaway.email',
+  'emailondeck.com', 'mohmal.com', 'getairmail.com', 'filzmail.com',
+  'getnada.com', 'nada.email', 'nada.ltd', 'mytemp.email', 'tempinbox.com',
+  'tempail.com', 'inboxbear.com', 'discard.email', 'spamhereplease.com',
+  'tempinbox.co.uk', 'mailnesia.com', 'throwam.com', 'binkmail.com',
+  'spamavert.com', 'bspamfree.org', 'mailseal.de', 'oneoffmail.com',
+  'tempr.email', 'trbvm.com', 'spamfree24.org', 'spamfree.eu',
+]);
+
+/**
+ * Normalise a Gmail address to its canonical form so that
+ * dots-in-username variants and +alias tricks all map to the same identity.
+ * e.g. j.o.h.n+spam@gmail.com → john@gmail.com
+ */
+function normaliseEmail(raw: string): string {
+  const lower = raw.toLowerCase().trim();
+  const [localRaw, domain] = lower.split('@');
+  if (!domain) return lower;
+
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    const local = (localRaw.split('+')[0] ?? localRaw).replace(/\./g, '');
+    return `${local}@gmail.com`;
+  }
+  return lower;
+}
+
 export function issueTokenCookies(res: Response, payload: Partial<JwtPayload>): void {
   const accessToken  = generateAccessToken(payload);
   const refreshToken = generateRefreshToken({ id: payload.id! });
@@ -45,13 +81,34 @@ export function issueTokenCookies(res: Response, payload: Partial<JwtPayload>): 
 
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { username, email, password, referral_code: refCode } = req.body as Record<string, string>;
+    const { username, email, password, referral_code: refCode, device_id: deviceId } = req.body as Record<string, string>;
+
+    // ── Block disposable email domains ────────────────────────────────────
+    const emailDomain = email.toLowerCase().trim().split('@')[1] ?? '';
+    if (DISPOSABLE_DOMAINS.has(emailDomain)) {
+      throw new ValidationError('Disposable email addresses are not allowed. Please use a real email.');
+    }
+
+    // ── Normalise email (collapse Gmail dots/plus tricks) ─────────────────
+    const normalisedEmail = normaliseEmail(email);
 
     const exists = await pool.query(
-      'SELECT id FROM users WHERE email = $1 OR username = $2 LIMIT 1',
-      [email.toLowerCase(), username.toLowerCase()]
+      'SELECT id FROM users WHERE email = $1 OR email = $2 OR username = $3 LIMIT 1',
+      [email.toLowerCase(), normalisedEmail, username.toLowerCase()]
     );
     if (exists.rowCount && exists.rowCount > 0) throw new ConflictError('Email or username is already taken');
+
+    // ── Device-ID uniqueness (1 registration per device) ─────────────────
+    const deviceKey = deviceId?.trim().slice(0, 128) || null;
+    if (deviceKey) {
+      const devRes = await pool.query(
+        'SELECT id FROM users WHERE device_fingerprint = $1 LIMIT 1',
+        [deviceKey],
+      );
+      if (devRes.rowCount && devRes.rowCount > 0) {
+        throw new ConflictError('An account has already been registered from this device.');
+      }
+    }
 
     let referredById: string | null = null;
     if (refCode) {
@@ -61,13 +118,14 @@ export async function register(req: Request, res: Response, next: NextFunction):
 
     const passwordHash    = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const newReferralCode = makeReferralCode();
-    const fingerprint     = deviceFingerprint(req);
+    // Prefer the client-supplied device UUID; fall back to server-side headers fingerprint
+    const fingerprint     = deviceKey ?? deviceFingerprint(req);
 
     const { rows } = await pool.query(
       `INSERT INTO users (username, email, password_hash, referral_code, referred_by, device_fingerprint)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, username, email, plan, balance, referral_code, is_admin`,
-      [username.toLowerCase(), email.toLowerCase(), passwordHash, newReferralCode, referredById, fingerprint]
+      [username.toLowerCase(), normalisedEmail, passwordHash, newReferralCode, referredById, fingerprint]
     );
 
     const user = rows[0] as Record<string, unknown>;
