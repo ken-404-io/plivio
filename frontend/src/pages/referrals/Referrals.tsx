@@ -205,7 +205,18 @@ export default function Referrals() {
         </div>
 
         {loading ? (
-          <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>
+          <div className="sk-section">
+            {[0,1,2,3].map(i => (
+              <div key={i} className="sk-card sk-row">
+                <span className="sk skeleton sk-circle" style={{ width: 36, height: 36, flexShrink: 0 }} />
+                <div className="sk-col">
+                  <span className="sk sk-line skeleton" style={{ width: '50%' }} />
+                  <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
+                </div>
+                <span className="sk skeleton" style={{ width: 50, height: 22, borderRadius: 12, flexShrink: 0 }} />
+              </div>
+            ))}
+          </div>
         ) : sortedReferrals.length === 0 ? (
           <div className="empty-state">
             <p>No referrals yet.</p>

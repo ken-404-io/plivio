@@ -171,7 +171,57 @@ export default function Coins() {
     }
   }
 
-  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
+  if (loading) return (
+    <div className="page">
+      <div className="sk-section">
+        <span className="sk sk-line sk-line--xl skeleton" style={{ width: '35%' }} />
+      </div>
+      {/* hero card */}
+      <div className="sk-card sk-section" style={{ padding: 24, gap: 14 }}>
+        <div className="sk-row">
+          <span className="sk skeleton sk-circle" style={{ width: 48, height: 48 }} />
+          <div className="sk-col">
+            <span className="sk sk-line--lg skeleton" style={{ width: 100 }} />
+            <span className="sk sk-line--sm skeleton" style={{ width: 60 }} />
+          </div>
+        </div>
+        <span className="sk skeleton" style={{ height: 8, borderRadius: 4, width: '100%' }} />
+        <div className="sk-row" style={{ gap: 8 }}>
+          <span className="sk skeleton" style={{ flex: 1, height: 44, borderRadius: 8 }} />
+          <span className="sk skeleton" style={{ flex: 1, height: 44, borderRadius: 8 }} />
+        </div>
+      </div>
+      {/* streak card */}
+      <div className="sk-card sk-section">
+        <div className="sk-row" style={{ justifyContent: 'space-between' }}>
+          <span className="sk sk-line skeleton" style={{ width: '40%' }} />
+          <span className="sk sk-line--sm skeleton" style={{ width: 60 }} />
+        </div>
+        <div className="sk-row" style={{ justifyContent: 'space-around' }}>
+          {[0,1,2].map(i => (
+            <div key={i} className="sk-col" style={{ alignItems: 'center', gap: 6 }}>
+              <span className="sk sk-line--xl skeleton" style={{ width: 40 }} />
+              <span className="sk sk-line--sm skeleton" style={{ width: 60 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* transaction list */}
+      <div className="sk-section">
+        <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
+        {[0,1,2,3,4].map(i => (
+          <div key={i} className="sk-card sk-row">
+            <span className="sk skeleton sk-circle" style={{ width: 34, height: 34, flexShrink: 0 }} />
+            <div className="sk-col">
+              <span className="sk sk-line skeleton" style={{ width: '70%' }} />
+              <span className="sk sk-line--sm skeleton" style={{ width: '40%' }} />
+            </div>
+            <span className="sk sk-line skeleton" style={{ width: 44, flexShrink: 0 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const coins       = Number(info?.coins ?? user?.coins ?? 0);
   const streak      = info?.streak_count ?? 0;

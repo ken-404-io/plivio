@@ -81,7 +81,57 @@ export default function Tasks() {
     });
   }
 
-  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
+  if (loading) return (
+    <div className="page">
+      {/* header */}
+      <div className="sk-section">
+        <span className="sk sk-line sk-line--xl skeleton" style={{ width: '40%' }} />
+        <span className="sk sk-line--sm skeleton" style={{ width: '60%' }} />
+      </div>
+      {/* earnings card */}
+      <div className="sk-card sk-section">
+        <div className="sk-row" style={{ justifyContent: 'space-between' }}>
+          <div className="sk-col">
+            <span className="sk sk-line--sm skeleton" style={{ width: 90 }} />
+            <span className="sk sk-line--xl skeleton" style={{ width: 120 }} />
+          </div>
+          <span className="sk skeleton" style={{ width: 70, height: 28, borderRadius: 20 }} />
+        </div>
+        <span className="sk skeleton" style={{ height: 8, borderRadius: 4, width: '100%' }} />
+        <span className="sk sk-line--sm skeleton" style={{ width: '50%' }} />
+      </div>
+      {/* quiz bot card */}
+      <div className="sk-section">
+        <span className="sk sk-line--sm skeleton" style={{ width: '25%' }} />
+        <div className="sk-card sk-row" style={{ padding: 20 }}>
+          <span className="sk skeleton sk-circle" style={{ width: 48, height: 48, flexShrink: 0 }} />
+          <div className="sk-col">
+            <span className="sk sk-line skeleton" style={{ width: '55%' }} />
+            <span className="sk sk-line--sm skeleton" style={{ width: '85%' }} />
+            <span className="sk sk-line--sm skeleton" style={{ width: '70%' }} />
+          </div>
+          <div className="sk-col" style={{ alignItems: 'flex-end', flexShrink: 0, gap: 4 }}>
+            <span className="sk sk-line--lg skeleton" style={{ width: 48 }} />
+            <span className="sk sk-line--sm skeleton" style={{ width: 60 }} />
+          </div>
+        </div>
+      </div>
+      {/* referrals */}
+      <div className="sk-section">
+        <span className="sk sk-line--sm skeleton" style={{ width: '30%' }} />
+        {[0,1,2].map(i => (
+          <div key={i} className="sk-card sk-row">
+            <span className="sk skeleton sk-circle" style={{ width: 36, height: 36, flexShrink: 0 }} />
+            <div className="sk-col">
+              <span className="sk sk-line skeleton" style={{ width: '60%' }} />
+              <span className="sk sk-line--sm skeleton" style={{ width: '40%' }} />
+            </div>
+            <span className="sk sk-line skeleton" style={{ width: 48, flexShrink: 0 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const tasks          = taskData?.tasks ?? [];
   const todayEarned    = Number(taskData?.today_earnings ?? 0);

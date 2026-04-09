@@ -111,7 +111,69 @@ export default function Dashboard() {
   }, [load, fetchMe]);
 
   if (loading) {
-    return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
+    return (
+      <div className="page">
+        {/* header */}
+        <div className="sk-section">
+          <span className="sk sk-line sk-line--xl skeleton" style={{ width: '55%' }} />
+          <span className="sk sk-line sk-line--sm skeleton" style={{ width: '35%' }} />
+        </div>
+        {/* stat cards */}
+        <div className="dash-stats-row">
+          {[0,1].map(i => (
+            <div key={i} className="sk-card sk-section">
+              <span className="sk sk-line sk-line--sm skeleton" style={{ width: '50%' }} />
+              <span className="sk sk-line sk-line--xl skeleton" style={{ width: '70%' }} />
+              <span className="sk sk-line sk-line--sm skeleton" style={{ width: '40%' }} />
+            </div>
+          ))}
+        </div>
+        {/* goal card */}
+        <div className="sk-card sk-section">
+          <div className="sk-row">
+            <span className="sk sk-line skeleton" style={{ width: 18, height: 18, borderRadius: 4 }} />
+            <span className="sk sk-line skeleton" style={{ width: '40%' }} />
+          </div>
+          <span className="sk skeleton" style={{ height: 8, borderRadius: 4, width: '100%' }} />
+          <div className="sk-row" style={{ justifyContent: 'space-between' }}>
+            {[0,1,2].map(i => (
+              <div key={i} className="sk-col" style={{ alignItems: 'center', gap: 6 }}>
+                <span className="sk sk-line--lg skeleton" style={{ width: 32 }} />
+                <span className="sk sk-line--sm skeleton" style={{ width: 56 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* quick actions */}
+        <div className="sk-section">
+          <span className="sk sk-line--sm skeleton" style={{ width: '30%' }} />
+          {[0,1,2].map(i => (
+            <div key={i} className="sk-card sk-row">
+              <span className="sk skeleton sk-circle" style={{ width: 40, height: 40, flexShrink: 0 }} />
+              <div className="sk-col">
+                <span className="sk sk-line skeleton" style={{ width: '60%' }} />
+                <span className="sk sk-line--sm skeleton" style={{ width: '80%' }} />
+              </div>
+              <span className="sk skeleton" style={{ width: 16, height: 16, borderRadius: 3, flexShrink: 0 }} />
+            </div>
+          ))}
+        </div>
+        {/* recent earnings */}
+        <div className="sk-section">
+          <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
+          {[0,1,2].map(i => (
+            <div key={i} className="sk-card sk-row">
+              <span className="sk skeleton sk-circle" style={{ width: 36, height: 36, flexShrink: 0 }} />
+              <div className="sk-col">
+                <span className="sk sk-line skeleton" style={{ width: '65%' }} />
+                <span className="sk sk-line--sm skeleton" style={{ width: '45%' }} />
+              </div>
+              <span className="sk sk-line skeleton" style={{ width: 48, flexShrink: 0 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   // Derived values
