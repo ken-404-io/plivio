@@ -13,7 +13,6 @@ import {
   Zap,
   BadgeCheck,
   Flame,
-  Coins,
   CheckSquare,
   ArrowUpCircle,
   UserPlus,
@@ -21,6 +20,7 @@ import {
   TrendingUp,
   ChevronRight,
   Trophy,
+  Coins,
 } from 'lucide-react';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -37,48 +37,6 @@ function EarningTypeIcon({ type }: { type: string }) {
   }
 }
 
-interface StatCardProps {
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: boolean;
-  to?: string;
-  ctaLabel?: string;
-}
-
-function StatCard({ label, value, sub, accent, to, ctaLabel }: StatCardProps) {
-  return (
-    <div className={`dash-stat-card${accent ? ' dash-stat-card--accent' : ''}`}>
-      <span className="dash-stat-label">{label}</span>
-      <span className="dash-stat-value">{value}</span>
-      {sub && <span className="dash-stat-sub">{sub}</span>}
-      {to && ctaLabel && (
-        <Link to={to} className="dash-stat-cta">{ctaLabel} →</Link>
-      )}
-    </div>
-  );
-}
-
-interface QuickActionProps {
-  to: string;
-  Icon: React.ElementType;
-  label: string;
-  desc: string;
-}
-
-function QuickAction({ to, Icon, label, desc }: QuickActionProps) {
-  return (
-    <Link to={to} className="dash-quick-action">
-      <span className="dash-quick-action-icon"><Icon size={20} /></span>
-      <div className="dash-quick-action-body">
-        <span className="dash-quick-action-label">{label}</span>
-        <span className="dash-quick-action-desc">{desc}</span>
-      </div>
-      <ChevronRight size={16} className="dash-quick-action-chevron" />
-    </Link>
-  );
-}
-
 // ─── Dashboard page ───────────────────────────────────────────────────────────
 
 const STREAK_TASK_GOAL = 5;
@@ -86,9 +44,9 @@ const STREAK_TASK_GOAL = 5;
 export default function Dashboard() {
   const { user, fetchMe } = useAuth();
 
-  const [taskData,  setTaskData]  = useState<TaskListResponse | null>(null);
-  const [earnings,  setEarnings]  = useState<Earning[]>([]);
-  const [loading,   setLoading]   = useState(true);
+  const [taskData, setTaskData] = useState<TaskListResponse | null>(null);
+  const [earnings, setEarnings] = useState<Earning[]>([]);
+  const [loading,  setLoading]  = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -110,33 +68,31 @@ export default function Dashboard() {
     fetchMe();
   }, [load, fetchMe]);
 
+  // ── Skeleton ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="page">
-        {/* header */}
         <div className="sk-section">
           <span className="sk sk-line sk-line--xl skeleton" style={{ width: '55%' }} />
-          <span className="sk sk-line sk-line--sm skeleton" style={{ width: '35%' }} />
+          <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
         </div>
-        {/* stat cards */}
-        <div className="dash-stats-row">
-          {[0,1].map(i => (
-            <div key={i} className="sk-card sk-section">
-              <span className="sk sk-line sk-line--sm skeleton" style={{ width: '50%' }} />
-              <span className="sk sk-line sk-line--xl skeleton" style={{ width: '70%' }} />
-              <span className="sk sk-line sk-line--sm skeleton" style={{ width: '40%' }} />
-            </div>
-          ))}
+        <div className="sk-card sk-section" style={{ padding: 20, gap: 16, borderRadius: 16 }}>
+          <span className="sk sk-line--sm skeleton" style={{ width: '40%' }} />
+          <span className="sk skeleton" style={{ height: 40, width: '65%', borderRadius: 8 }} />
+          <span className="sk skeleton" style={{ height: 6, width: '100%', borderRadius: 99 }} />
+          <div className="sk-row" style={{ justifyContent: 'space-between' }}>
+            <span className="sk sk-line--sm skeleton" style={{ width: '45%' }} />
+            <span className="sk sk-line--sm skeleton" style={{ width: '20%' }} />
+          </div>
         </div>
-        {/* goal card */}
         <div className="sk-card sk-section">
           <div className="sk-row">
-            <span className="sk sk-line skeleton" style={{ width: 18, height: 18, borderRadius: 4 }} />
+            <span className="sk skeleton" style={{ width: 18, height: 18, borderRadius: 4 }} />
             <span className="sk sk-line skeleton" style={{ width: '40%' }} />
           </div>
           <span className="sk skeleton" style={{ height: 8, borderRadius: 4, width: '100%' }} />
           <div className="sk-row" style={{ justifyContent: 'space-between' }}>
-            {[0,1,2].map(i => (
+            {[0, 1, 2].map(i => (
               <div key={i} className="sk-col" style={{ alignItems: 'center', gap: 6 }}>
                 <span className="sk sk-line--lg skeleton" style={{ width: 32 }} />
                 <span className="sk sk-line--sm skeleton" style={{ width: 56 }} />
@@ -144,24 +100,17 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-        {/* quick actions */}
-        <div className="sk-section">
-          <span className="sk sk-line--sm skeleton" style={{ width: '30%' }} />
-          {[0,1,2].map(i => (
-            <div key={i} className="sk-card sk-row">
-              <span className="sk skeleton sk-circle" style={{ width: 40, height: 40, flexShrink: 0 }} />
-              <div className="sk-col">
-                <span className="sk sk-line skeleton" style={{ width: '60%' }} />
-                <span className="sk sk-line--sm skeleton" style={{ width: '80%' }} />
-              </div>
-              <span className="sk skeleton" style={{ width: 16, height: 16, borderRadius: 3, flexShrink: 0 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="sk-card sk-section" style={{ minHeight: 90 }}>
+              <span className="sk skeleton sk-circle" style={{ width: 36, height: 36 }} />
+              <span className="sk sk-line skeleton" style={{ width: '60%' }} />
             </div>
           ))}
         </div>
-        {/* recent earnings */}
         <div className="sk-section">
           <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
-          {[0,1,2].map(i => (
+          {[0, 1, 2].map(i => (
             <div key={i} className="sk-card sk-row">
               <span className="sk skeleton sk-circle" style={{ width: 36, height: 36, flexShrink: 0 }} />
               <div className="sk-col">
@@ -176,44 +125,39 @@ export default function Dashboard() {
     );
   }
 
-  // Derived values
+  // ── Derived values ─────────────────────────────────────────────────────────
   const todayEarned    = Number(taskData?.today_earnings ?? 0);
   const dailyLimit     = taskData?.daily_limit ?? null;
-  const earningsPct    = dailyLimit
-    ? Math.min(100, Math.round((todayEarned / dailyLimit) * 100))
-    : 100;
-
-  const availableCount = taskData?.tasks?.filter(
-    (t) => !t.completed_today && !t.in_progress_today,
-  ).length ?? 0;
-
-  const completedCount = taskData?.tasks?.filter((t) => t.completed_today).length ?? 0;
+  const earningsPct    = dailyLimit ? Math.min(100, Math.round((todayEarned / dailyLimit) * 100)) : 100;
+  const availableCount = taskData?.tasks?.filter(t => !t.completed_today && !t.in_progress_today).length ?? 0;
+  const completedCount = taskData?.tasks?.filter(t => t.completed_today).length ?? 0;
   const streakPct      = Math.min(100, Math.round((completedCount / STREAK_TASK_GOAL) * 100));
   const streakDone     = completedCount >= STREAK_TASK_GOAL;
-
   const streak         = user?.streak_count ?? 0;
   const coins          = Number(user?.coins ?? 0);
   const balance        = Number(user?.balance ?? 0);
-
   const isFreePlan     = !user?.plan || user.plan === 'free';
   const nextBonusIn    = streak > 0 ? 7 - (streak % 7) : 7;
 
   return (
     <div className="page">
+
       {/* Email verification banner */}
       {user && !user.is_email_verified && (
         <EmailVerificationBanner email={user.email} />
       )}
 
       {/* ── Greeting ── */}
-      <header className="page-header">
+      <header className="dash-greeting">
         <div>
-          <h1 className="page-title">Hi, {user?.username}</h1>
-          <p className="page-subtitle">
-            {(user?.plan ?? 'free').charAt(0).toUpperCase() + (user?.plan ?? 'free').slice(1)} plan
+          <h1 className="dash-greeting-title">Hi, {user?.username} 👋</h1>
+          <p className="dash-greeting-sub">
+            <span className={`plan-badge plan-badge--${user?.plan ?? 'free'}`} style={{ fontSize: 11 }}>
+              {(user?.plan ?? 'free').toUpperCase()}
+            </span>
             {user?.active_sub_plan && user.sub_expires_at && (
-              <span className="badge badge--accent">
-                &nbsp;· Active until {new Date(user.sub_expires_at).toLocaleDateString('en-PH')}
+              <span className="dash-greeting-exp">
+                &nbsp;· until {new Date(user.sub_expires_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
               </span>
             )}
           </p>
@@ -223,60 +167,59 @@ export default function Dashboard() {
         )}
       </header>
 
-      {/* ── Balance + today's earnings ── */}
-      <div className="dash-stats-row">
-        <StatCard
-          label="Total Balance"
-          value={`₱${balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          accent
-          to="/withdraw"
-          ctaLabel="Withdraw"
-        />
-        <StatCard
-          label="Today's Earnings"
-          value={`₱${todayEarned.toFixed(2)}`}
-          sub={dailyLimit ? `of ₱${dailyLimit} daily limit (${earningsPct}%)` : 'No limit set'}
-        />
-      </div>
+      {/* ── Hero balance card ── */}
+      <div className="dash-hero-card">
+        {/* decorative circle */}
+        <div className="dash-hero-circle" aria-hidden="true" />
 
-      {/* Daily earnings progress bar */}
-      {dailyLimit && (
-        <div className="dash-progress-wrap">
-          <div className="dash-progress-bar">
-            <div className="dash-progress-fill" style={{ width: `${earningsPct}%` }} />
-          </div>
-        </div>
-      )}
-
-      {/* ── Today's Goal card (streak + task progress) ── */}
-      <div className="dash-goal-card">
-        <div className="dash-goal-header">
-          <div className="dash-goal-title-row">
-            <Flame size={18} className={streak > 0 ? 'dash-goal-flame--active' : 'dash-goal-flame'} />
-            <span className="dash-goal-title">Today's Goal</span>
-            {streakDone && (
-              <span className="dash-goal-done-badge">
-                <Trophy size={12} /> Streak earned!
-              </span>
-            )}
-          </div>
-          <Link to="/coins" className="dash-goal-coins">
-            <Coins size={14} />
-            <span>{coins.toLocaleString()}</span>
+        <div className="dash-hero-top">
+          <span className="dash-hero-label">Total Balance</span>
+          <Link to="/coins" className="dash-hero-coins">
+            <Coins size={13} />
+            {coins.toLocaleString()}
           </Link>
         </div>
 
-        {/* Task progress toward streak */}
-        <div className="dash-goal-progress-row">
-          <span className="dash-goal-progress-label">
-            {streakDone
-              ? 'Come back tomorrow to continue your streak'
-              : `Complete ${STREAK_TASK_GOAL - completedCount} more task${STREAK_TASK_GOAL - completedCount !== 1 ? 's' : ''} to earn your streak`}
-          </span>
-          <span className="dash-goal-progress-count">
-            {completedCount}/{STREAK_TASK_GOAL}
-          </span>
+        <div className="dash-hero-balance">
+          ₱{balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
+
+        <div className="dash-hero-divider" />
+
+        <div className="dash-hero-today-row">
+          <span className="dash-hero-today-label">
+            Today&nbsp;
+            <strong className="dash-hero-today-amount">₱{todayEarned.toFixed(2)}</strong>
+            {dailyLimit && (
+              <span className="dash-hero-today-of"> / ₱{dailyLimit}</span>
+            )}
+          </span>
+          <Link to="/withdraw" className="dash-hero-withdraw-btn">
+            <ArrowUpCircle size={14} />
+            Withdraw
+          </Link>
+        </div>
+
+        {dailyLimit && (
+          <div className="dash-hero-progress-track">
+            <div className="dash-hero-progress-fill" style={{ width: `${earningsPct}%` }} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Today's Goal ── */}
+      <div className="dash-goal-card">
+        <div className="dash-goal-header">
+          <div className="dash-goal-title-row">
+            <Flame size={17} className={streak > 0 ? 'dash-goal-flame--active' : 'dash-goal-flame'} />
+            <span className="dash-goal-title">Today's Goal</span>
+            {streakDone && (
+              <span className="dash-goal-done-badge"><Trophy size={11} /> Done!</span>
+            )}
+          </div>
+          <span className="dash-goal-progress-count">{completedCount}/{STREAK_TASK_GOAL}</span>
+        </div>
+
         <div className="dash-goal-bar">
           <div
             className={`dash-goal-fill${streakDone ? ' dash-goal-fill--done' : ''}`}
@@ -284,7 +227,12 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Streak stats row */}
+        <p className="dash-goal-hint">
+          {streakDone
+            ? 'Streak earned — come back tomorrow 🎉'
+            : `${STREAK_TASK_GOAL - completedCount} more task${STREAK_TASK_GOAL - completedCount !== 1 ? 's' : ''} for your streak`}
+        </p>
+
         <div className="dash-goal-stats">
           <div className="dash-goal-stat">
             <span className="dash-goal-stat-value">{streak}</span>
@@ -292,8 +240,8 @@ export default function Dashboard() {
           </div>
           <div className="dash-goal-stat-divider" />
           <div className="dash-goal-stat">
-            <span className="dash-goal-stat-value">{nextBonusIn === 7 ? '7' : nextBonusIn}</span>
-            <span className="dash-goal-stat-label">Days to +50 coins</span>
+            <span className="dash-goal-stat-value">{nextBonusIn}</span>
+            <span className="dash-goal-stat-label">Days to bonus</span>
           </div>
           <div className="dash-goal-stat-divider" />
           <div className="dash-goal-stat">
@@ -306,27 +254,59 @@ export default function Dashboard() {
       {/* ── KYC banner ── */}
       {user?.kyc_status === 'none' && (
         <Link to="/kyc" className="dash-kyc-banner">
-          <BadgeCheck size={20} className="dash-kyc-icon" />
+          <BadgeCheck size={18} className="dash-kyc-icon" />
           <div className="dash-kyc-body">
-            <p className="dash-kyc-title">Verify your identity to enable withdrawals</p>
-            <p className="dash-kyc-sub">Takes only 2 minutes</p>
+            <p className="dash-kyc-title">Verify identity to unlock withdrawals</p>
+            <p className="dash-kyc-sub">Takes 2 minutes</p>
           </div>
-          <ChevronRight size={18} className="dash-kyc-chevron" />
+          <ChevronRight size={16} className="dash-kyc-chevron" />
         </Link>
       )}
 
-      {/* ── Quick actions ── */}
+      {/* ── Quick Actions 2×2 grid ── */}
       <section className="section">
         <h2 className="section-title">Quick Actions</h2>
-        <div className="dash-quick-actions">
-          <QuickAction to="/tasks"     Icon={CheckSquare}   label="Tasks"     desc={`${availableCount} available`} />
-          <QuickAction to="/withdraw"  Icon={ArrowUpCircle} label="Withdraw"  desc={`₱${balance.toFixed(2)} ready`} />
-          <QuickAction to="/referrals" Icon={UserPlus}      label="Referrals" desc="Earn ₱10 per signup" />
-          <QuickAction to="/plans"     Icon={Star}          label="Plans"     desc="Upgrade for more tasks" />
+        <div className="dash-actions-grid">
+          <Link to="/tasks" className="dash-action-card">
+            <span className="dash-action-icon dash-action-icon--blue">
+              <CheckSquare size={20} />
+            </span>
+            <div className="dash-action-body">
+              <span className="dash-action-label">Tasks</span>
+              <span className="dash-action-desc">{availableCount} available</span>
+            </div>
+          </Link>
+          <Link to="/withdraw" className="dash-action-card">
+            <span className="dash-action-icon dash-action-icon--green">
+              <ArrowUpCircle size={20} />
+            </span>
+            <div className="dash-action-body">
+              <span className="dash-action-label">Withdraw</span>
+              <span className="dash-action-desc">₱{balance.toFixed(2)} ready</span>
+            </div>
+          </Link>
+          <Link to="/referrals" className="dash-action-card">
+            <span className="dash-action-icon dash-action-icon--purple">
+              <UserPlus size={20} />
+            </span>
+            <div className="dash-action-body">
+              <span className="dash-action-label">Referrals</span>
+              <span className="dash-action-desc">Earn ₱10/signup</span>
+            </div>
+          </Link>
+          <Link to="/plans" className="dash-action-card">
+            <span className="dash-action-icon dash-action-icon--orange">
+              <Star size={20} />
+            </span>
+            <div className="dash-action-body">
+              <span className="dash-action-label">Plans</span>
+              <span className="dash-action-desc">More tasks &amp; limits</span>
+            </div>
+          </Link>
         </div>
       </section>
 
-      {/* ── Recent earnings ── */}
+      {/* ── Recent Earnings ── */}
       <section className="section">
         <div className="section-header">
           <h2 className="section-title">Recent Earnings</h2>
@@ -358,6 +338,7 @@ export default function Dashboard() {
           </div>
         )}
       </section>
+
     </div>
   );
 }
