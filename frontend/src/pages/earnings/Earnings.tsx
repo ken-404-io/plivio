@@ -140,6 +140,42 @@ export default function Earnings() {
     setPage(1);
   }
 
+  if (loading && !data) return (
+    <div className="page">
+      <div className="sk-section">
+        <span className="sk sk-line sk-line--xl skeleton" style={{ width: '45%' }} />
+      </div>
+      {/* summary cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+        {[0,1,2].map(i => (
+          <div key={i} className="sk-card sk-section">
+            <span className="sk sk-line--sm skeleton" style={{ width: '70%' }} />
+            <span className="sk sk-line--lg skeleton" style={{ width: '80%' }} />
+          </div>
+        ))}
+      </div>
+      {/* filters */}
+      <div className="sk-row" style={{ gap: 8 }}>
+        <span className="sk skeleton" style={{ height: 36, flex: 1, borderRadius: 8 }} />
+        <span className="sk skeleton" style={{ height: 36, flex: 1, borderRadius: 8 }} />
+      </div>
+      {/* earning rows */}
+      {[0,1,2,3,4,5].map(i => (
+        <div key={i} className="sk-card sk-row">
+          <span className="sk skeleton sk-circle" style={{ width: 36, height: 36, flexShrink: 0 }} />
+          <div className="sk-col">
+            <span className="sk sk-line skeleton" style={{ width: '65%' }} />
+            <div className="sk-row" style={{ gap: 8 }}>
+              <span className="sk sk-line--sm skeleton" style={{ width: 60 }} />
+              <span className="sk sk-line--sm skeleton" style={{ width: 80 }} />
+            </div>
+          </div>
+          <span className="sk sk-line skeleton" style={{ width: 52, flexShrink: 0 }} />
+        </div>
+      ))}
+    </div>
+  );
+
   const rows       = data?.data ?? [];
   const summary    = data?.summary;
   const total      = data?.meta.total ?? 0;
@@ -189,9 +225,7 @@ export default function Earnings() {
       </div>
 
       {/* List */}
-      {loading ? (
-        <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>
-      ) : error ? (
+      {error ? (
         <div className="empty-state">
           <p style={{ color: 'var(--error)', marginBottom: 12 }}>
             Failed to load earnings. Please check your connection and try again.

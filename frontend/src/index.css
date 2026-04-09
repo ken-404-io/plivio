@@ -137,6 +137,19 @@ a, button, [role="button"], [tabindex] {
   user-select: none;
 }
 
+/* Skeleton utility helpers */
+.sk           { display: block; border-radius: var(--radius-sm); }
+.sk-line      { height: 14px; }
+.sk-line--sm  { height: 11px; }
+.sk-line--lg  { height: 20px; }
+.sk-line--xl  { height: 28px; }
+.sk-circle    { border-radius: 50%; }
+.sk-card      { border-radius: var(--radius); padding: 16px; background: var(--bg-surface); border: 1px solid var(--border); }
+.sk-row       { display: flex; align-items: center; gap: 12px; }
+.sk-col       { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.sk-section   { display: flex; flex-direction: column; gap: 12px; }
+.sk-page      { display: flex; flex-direction: column; gap: 20px; padding: 0 16px; }
+
 /* ─── App Shell ─────────────────────────────────────────────────────────────── */
 .app-shell {
   display: flex;
@@ -633,6 +646,42 @@ a, button, [role="button"], [tabindex] {
 .auth-subtitle { color: var(--text-muted); font-size: 14px; margin-top: 6px; }
 .auth-desc     { font-size: 14px; color: var(--text-muted); text-align: center; }
 .auth-footer   { text-align: center; font-size: 14px; margin: 0; }
+
+/* ─── Auth page — staggered entrance ─────────────────────────────────────── */
+@keyframes auth-fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.auth-card > * {
+  animation: auth-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.auth-card > *:nth-child(1) { animation-delay: 0.04s; }
+.auth-card > *:nth-child(2) { animation-delay: 0.10s; }
+.auth-card > *:nth-child(3) { animation-delay: 0.16s; }
+.auth-card > *:nth-child(4) { animation-delay: 0.22s; }
+.auth-card > *:nth-child(5) { animation-delay: 0.28s; }
+.auth-card > *:nth-child(6) { animation-delay: 0.34s; }
+.auth-card > *:nth-child(7) { animation-delay: 0.40s; }
+.auth-card > *:nth-child(8) { animation-delay: 0.46s; }
+
+/* ─── Page content — staggered entrance ──────────────────────────────────── */
+@keyframes page-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.page > * {
+  animation: page-fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.page > *:nth-child(1)  { animation-delay: 0.04s; }
+.page > *:nth-child(2)  { animation-delay: 0.09s; }
+.page > *:nth-child(3)  { animation-delay: 0.14s; }
+.page > *:nth-child(4)  { animation-delay: 0.19s; }
+.page > *:nth-child(5)  { animation-delay: 0.24s; }
+.page > *:nth-child(6)  { animation-delay: 0.29s; }
+.page > *:nth-child(7)  { animation-delay: 0.34s; }
+.page > *:nth-child(8)  { animation-delay: 0.39s; }
+.page > *:nth-child(9)  { animation-delay: 0.44s; }
+.page > *:nth-child(10) { animation-delay: 0.49s; }
 
 /* ─── Password input with show/hide toggle ──────────────────────────────────── */
 .input-password-wrap {

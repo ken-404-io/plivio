@@ -190,7 +190,38 @@ export default function Plans() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
+  if (loading) return (
+    <div className="page">
+      <div className="sk-section">
+        <span className="sk sk-line sk-line--xl skeleton" style={{ width: '40%' }} />
+        <span className="sk sk-line--sm skeleton" style={{ width: '55%' }} />
+      </div>
+      {/* tab row */}
+      <div className="sk-row" style={{ gap: 8 }}>
+        {[0,1,2].map(i => (
+          <span key={i} className="sk skeleton" style={{ height: 38, flex: 1, borderRadius: 20 }} />
+        ))}
+      </div>
+      {/* plan card */}
+      <div className="sk-card sk-section" style={{ padding: 24, gap: 16 }}>
+        <span className="sk sk-line skeleton" style={{ width: '35%' }} />
+        <span className="sk sk-line--xl skeleton" style={{ width: '55%' }} />
+        <span className="sk sk-line--sm skeleton" style={{ width: '60%' }} />
+        <span className="sk skeleton" style={{ height: 44, borderRadius: 8, width: '100%' }} />
+      </div>
+      {/* compare table */}
+      <div className="sk-card sk-section">
+        {[0,1,2,3,4,5].map(i => (
+          <div key={i} className="sk-row" style={{ justifyContent: 'space-between', paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+            <span className="sk sk-line--sm skeleton" style={{ width: '40%' }} />
+            <div className="sk-row" style={{ gap: 16 }}>
+              {[0,1,2].map(j => <span key={j} className="sk skeleton" style={{ width: 20, height: 20, borderRadius: 4 }} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const sortedPlans = PLAN_ORDER
     .filter((k) => k in plans)
