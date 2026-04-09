@@ -347,9 +347,10 @@ export async function getReferrals(
         [userId],
       ),
       pool.query(
-        `SELECT COALESCE(SUM(reward_earned), 0) AS total
-         FROM task_completions
-         WHERE user_id = $1 AND type = 'referral' AND status = 'approved'`,
+        `SELECT COALESCE(SUM(tc.reward_earned), 0) AS total
+         FROM task_completions tc
+         JOIN tasks t ON t.id = tc.task_id
+         WHERE tc.user_id = $1 AND t.type = 'referral' AND tc.status = 'approved'`,
         [userId],
       ),
     ]);
