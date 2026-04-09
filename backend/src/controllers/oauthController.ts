@@ -178,8 +178,8 @@ async function upsertOAuthUser(
 
   const { rows } = await pool.query(
     `INSERT INTO users
-       (username, email, ${idCol}, avatar_url, referral_code, is_email_verified)
-     VALUES ($1, $2, $3, $4, $5, $6)
+       (username, email, password_hash, ${idCol}, avatar_url, referral_code, is_email_verified)
+     VALUES ($1, $2, '$oauth$', $3, $4, $5, $6)
      RETURNING id, username, is_admin`,
     [username, email, profile.providerUserId, profile.avatarUrl, referralCode, profile.isVerified],
   );
