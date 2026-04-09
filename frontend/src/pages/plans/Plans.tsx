@@ -105,6 +105,12 @@ export default function Plans() {
 
   async function handleSubscribe(planKey: string) {
     setSubscribing(planKey);
+
+    // Open the tab immediately (synchronous user-gesture context) so mobile
+    // browsers don't treat it as a blocked popup. We'll redirect it after the
+    // API call returns the checkout URL.
+    const payWin = window.open('', '_blank');
+
     try {
       const returnBase = `${window.location.origin}/plans`;
       const { data } = await api.post<{ checkout_url: string | null; demo?: boolean }>(
@@ -117,14 +123,21 @@ export default function Plans() {
         },
       );
       if (data.demo || !data.checkout_url) {
+        payWin?.close();
         toast.error('Payment gateway not configured yet. Please contact admin.');
         return;
       }
-      // Open PayMongo in a new tab — user stays on this page
-      window.open(data.checkout_url, '_blank');
+      if (payWin) {
+        // Redirect the already-opened tab to PayMongo
+        payWin.location.href = data.checkout_url;
+      } else {
+        // Popup was blocked (should be rare) — fall back to same-tab redirect
+        window.location.href = data.checkout_url;
+      }
       setAwaitingPayment(true);
       startPolling();
     } catch (err: unknown) {
+      payWin?.close();
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       toast.error(msg ?? 'Failed to create checkout. Please try again.');
     } finally {
