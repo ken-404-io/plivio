@@ -3110,6 +3110,204 @@ a, button, [role="button"], [tabindex] {
 .dash-kyc-sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .dash-kyc-chevron { color: var(--warning); flex-shrink: 0; }
 
+/* ─── Dashboard redesign — greeting ─────────────────────────────────────────── */
+.dash-greeting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dash-greeting-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-heading);
+  line-height: 1.1;
+  margin: 0;
+}
+.dash-greeting-sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.dash-greeting-exp {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ─── Hero balance card ──────────────────────────────────────────────────────── */
+.dash-hero-card {
+  position: relative;
+  background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+  border-radius: 20px;
+  padding: 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #fff;
+}
+.dash-hero-circle {
+  position: absolute;
+  top: -48px;
+  right: -48px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  pointer-events: none;
+}
+.dash-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dash-hero-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.dash-hero-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.dash-hero-coins:hover { background: rgba(255,255,255,0.28); }
+.dash-hero-balance {
+  font-size: 36px;
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.dash-hero-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.2);
+  margin: 2px 0;
+}
+.dash-hero-today-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dash-hero-today-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+}
+.dash-hero-today-amount {
+  font-weight: 700;
+  color: #fff;
+}
+.dash-hero-today-of {
+  color: rgba(255,255,255,0.6);
+}
+.dash-hero-withdraw-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.dash-hero-withdraw-btn:hover { background: rgba(255,255,255,0.32); }
+.dash-hero-progress-track {
+  height: 5px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+.dash-hero-progress-fill {
+  height: 100%;
+  background: rgba(255,255,255,0.85);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+/* ─── Dashboard goal hint ────────────────────────────────────────────────────── */
+.dash-goal-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: -4px 0 0;
+}
+
+/* ─── Quick actions 2×2 grid ─────────────────────────────────────────────────── */
+.dash-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.dash-action-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.dash-action-card:hover {
+  border-color: var(--accent-border);
+  background: var(--bg-elevated);
+}
+.dash-action-card:active { transform: scale(0.97); }
+.dash-action-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dash-action-icon--blue   { background: rgba(59,130,246,0.12); color: #3b82f6; }
+.dash-action-icon--green  { background: rgba(34,197,94,0.12);  color: #22c55e; }
+.dash-action-icon--purple { background: rgba(168,85,247,0.12); color: #a855f7; }
+.dash-action-icon--orange { background: rgba(249,115,22,0.12); color: #f97316; }
+.dash-action-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dash-action-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1.2;
+}
+.dash-action-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ─── Earnings summary bar ───────────────────────────────────────────────────── */
 .earnings-summary-bar {
   display: flex;
