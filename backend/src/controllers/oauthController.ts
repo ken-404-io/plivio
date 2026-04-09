@@ -88,6 +88,22 @@ function setStateCookie(res: Response, provider: Provider): string {
   return state;
 }
 
+function setRefCookie(res: Response, provider: Provider, ref: string | undefined): void {
+  if (!ref) return;
+  res.cookie(`oauth_ref_${provider}`, ref.slice(0, 16).toUpperCase(), {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge:   10 * 60 * 1000,
+  });
+}
+
+function popRefCookie(req: Request, res: Response, provider: Provider): string | null {
+  const val = req.cookies?.[`oauth_ref_${provider}`] as string | undefined;
+  res.clearCookie(`oauth_ref_${provider}`);
+  return val ?? null;
+}
+
 function validateState(req: Request, res: Response, provider: Provider, state: string): boolean {
   const cookie = req.cookies?.[`oauth_state_${provider}`] as string | undefined;
   res.clearCookie(`oauth_state_${provider}`);
@@ -139,6 +155,7 @@ interface OAuthProfile {
 async function upsertOAuthUser(
   provider: Provider,
   profile: OAuthProfile,
+  refCode: string | null,
 ): Promise<{ id: string; username: string; is_admin: boolean }> {
   const idCol = `${provider}_id`;
 
@@ -176,15 +193,67 @@ async function upsertOAuthUser(
   const referralCode = makeReferralCode();
   const email        = profile.email?.toLowerCase() ?? `${provider}_${profile.providerUserId}@oauth.local`;
 
-  const { rows } = await pool.query(
-    `INSERT INTO users
-       (username, email, password_hash, ${idCol}, avatar_url, referral_code, is_email_verified)
-     VALUES ($1, $2, '$oauth$', $3, $4, $5, $6)
-     RETURNING id, username, is_admin`,
-    [username, email, profile.providerUserId, profile.avatarUrl, referralCode, profile.isVerified],
-  );
+  // Resolve referral code → referrer ID
+  let referredById: string | null = null;
+  if (refCode) {
+    const refRes = await pool.query<{ id: string }>(
+      'SELECT id FROM users WHERE referral_code = $1 LIMIT 1',
+      [refCode.toUpperCase()],
+    );
+    if (refRes.rowCount && refRes.rowCount > 0) referredById = refRes.rows[0].id;
+  }
 
-  return rows[0] as { id: string; username: string; is_admin: boolean };
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query<{ id: string; username: string; is_admin: boolean }>(
+      `INSERT INTO users
+         (username, email, password_hash, ${idCol}, avatar_url, referral_code,
+          is_email_verified, referred_by)
+       VALUES ($1, $2, '$oauth$', $3, $4, $5, $6, $7)
+       RETURNING id, username, is_admin`,
+      [username, email, profile.providerUserId, profile.avatarUrl, referralCode,
+       profile.isVerified, referredById],
+    );
+
+    const newUser = rows[0];
+
+    // OAuth emails are verified by the provider — credit referral bonus immediately
+    if (referredById) {
+      try {
+        const refTaskRes = await client.query<{ id: string; reward_amount: string }>(
+          `SELECT id, reward_amount FROM tasks
+           WHERE type = 'referral' AND is_active = TRUE
+             AND (min_plan IS NULL OR min_plan = 'free')
+           ORDER BY reward_amount ASC LIMIT 1`,
+        );
+        if (refTaskRes.rowCount && refTaskRes.rowCount > 0) {
+          const refTask = refTaskRes.rows[0];
+          await client.query(
+            'UPDATE users SET balance = balance + $1 WHERE id = $2',
+            [refTask.reward_amount, referredById],
+          );
+          await client.query(
+            `INSERT INTO task_completions
+               (user_id, task_id, type, status, reward_earned, completed_at, proof, server_data)
+             VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
+            [referredById, refTask.id, refTask.reward_amount],
+          );
+        }
+      } catch {
+        // Non-fatal — new account still created
+      }
+    }
+
+    await client.query('COMMIT');
+    return newUser;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ─── GOOGLE ────────────────────────────────────────────────────────────────
@@ -193,6 +262,7 @@ export function googleRedirect(req: Request, res: Response): void {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) { res.status(503).json({ error: 'Google OAuth not configured' }); return; }
 
+  setRefCookie(res, 'google', req.query['ref'] as string | undefined);
   const state       = setStateCookie(res, 'google');
   const redirectUri = `${BACKEND_URL}/api/auth/google/callback`;
   const params      = new URLSearchParams({
@@ -242,7 +312,7 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
       name:           (info.name as string) || (info.given_name as string) || 'User',
       avatarUrl:      info.picture as string | null,
       isVerified:     Boolean(info.verified_email),
-    });
+    }, popRefCookie(req, res, 'google'));
 
     issueTokenCookies(res, user);
     res.redirect(`${APP_URL}/dashboard`);
@@ -258,6 +328,7 @@ export function facebookRedirect(req: Request, res: Response): void {
   const appId = process.env.FACEBOOK_APP_ID;
   if (!appId) { res.status(503).json({ error: 'Facebook OAuth not configured' }); return; }
 
+  setRefCookie(res, 'facebook', req.query['ref'] as string | undefined);
   const state       = setStateCookie(res, 'facebook');
   const redirectUri = `${BACKEND_URL}/api/auth/facebook/callback`;
   const params      = new URLSearchParams({
@@ -305,7 +376,7 @@ export async function facebookCallback(req: Request, res: Response): Promise<voi
       name:           (info.name as string) || 'User',
       avatarUrl:      picData?.url as string | null ?? null,
       isVerified:     false, // Facebook doesn't provide verified status
-    });
+    }, popRefCookie(req, res, 'facebook'));
 
     issueTokenCookies(res, user);
     res.redirect(`${APP_URL}/dashboard`);
@@ -321,6 +392,7 @@ export function githubRedirect(req: Request, res: Response): void {
   const clientId = process.env.GITHUB_CLIENT_ID;
   if (!clientId) { res.status(503).json({ error: 'GitHub OAuth not configured' }); return; }
 
+  setRefCookie(res, 'github', req.query['ref'] as string | undefined);
   const state       = setStateCookie(res, 'github');
   const redirectUri = `${BACKEND_URL}/api/auth/github/callback`;
   const params      = new URLSearchParams({
@@ -377,7 +449,7 @@ export async function githubCallback(req: Request, res: Response): Promise<void>
       name:           (profile.name as string) || (profile.login as string) || 'User',
       avatarUrl:      profile.avatar_url as string | null,
       isVerified:     Boolean(primaryMail), // verified if we got a verified email
-    });
+    }, popRefCookie(req, res, 'github'));
 
     issueTokenCookies(res, user);
     res.redirect(`${APP_URL}/dashboard`);
