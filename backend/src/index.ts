@@ -67,7 +67,12 @@ app.use(cors({
   exposedHeaders: ['X-CSRF-Token'],
 }));
 
-app.use(express.json({ limit: '16kb' }));
+// Skip JSON body parsing for the PayMongo webhook — it needs the raw Buffer
+// for HMAC signature verification. Any other route gets the JSON parser.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === 'POST' && req.path === '/api/subscriptions/webhook') return next();
+  express.json({ limit: '16kb' })(req, res, next);
+});
 app.use(express.urlencoded({ extended: false, limit: '16kb' }));
 app.use(cookieParser());
 app.use(rateLimiter());

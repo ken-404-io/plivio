@@ -65,43 +65,62 @@ export default function Plans() {
       .finally(() => setLoading(false));
   }, []);
 
+  const refreshPlans = async () => {
+    const [planRes, subRes] = await Promise.all([
+      api.get<PlansResponse>('/subscriptions/plans'),
+      api.get<{ subscription: Subscription | null }>('/subscriptions/current'),
+    ]);
+    setPlans(planRes.data.plans);
+    setSub(subRes.data.subscription);
+  };
+
+  async function checkActivation(): Promise<boolean> {
+    try {
+      const { data } = await api.post<{ activated: boolean; plan?: string }>('/subscriptions/verify-payment');
+      if (data.activated) {
+        setAwaitingPayment(false);
+        if (pollTimer.current) { clearTimeout(pollTimer.current); pollTimer.current = null; }
+        toast.success(`Plan activated! Welcome to ${data.plan ?? 'your new plan'}.`);
+        await fetchMe();
+        await refreshPlans();
+        return true;
+      }
+    } catch { /* keep going */ }
+    return false;
+  }
+
   function startPolling() {
     if (pollTimer.current) clearTimeout(pollTimer.current);
     let attempts = 0;
-    const MAX = 60; // 3 minutes (60 × 3s)
-
-    const refreshPlans = async () => {
-      const [planRes, subRes] = await Promise.all([
-        api.get<PlansResponse>('/subscriptions/plans'),
-        api.get<{ subscription: Subscription | null }>('/subscriptions/current'),
-      ]);
-      setPlans(planRes.data.plans);
-      setSub(subRes.data.subscription);
-    };
+    const MAX = 120; // 6 minutes (120 × 3s)
 
     const poll = async () => {
-      try {
-        const { data } = await api.post<{ activated: boolean; plan?: string }>('/subscriptions/verify-payment');
-        if (data.activated) {
-          setAwaitingPayment(false);
-          toast.success(`Plan activated! Welcome to ${data.plan ?? 'your new plan'}.`);
-          await fetchMe();
-          await refreshPlans();
-          return;
-        }
-      } catch { /* keep polling */ }
-
+      const done = await checkActivation();
+      if (done) return;
       attempts++;
       if (attempts < MAX) {
         pollTimer.current = setTimeout(() => { void poll(); }, 3000);
       } else {
         setAwaitingPayment(false);
-        toast.error('Verification timed out. Refresh the page if you already paid.');
+        toast.error('Verification timed out. Please tap "Check payment" if you already paid.');
       }
     };
 
     void poll();
   }
+
+  // When user switches back to this tab (e.g. after paying in PayMongo tab),
+  // immediately check — don't wait for the next 3s tick
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && awaitingPayment) {
+        void checkActivation();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingPayment]);
 
   async function handleSubscribe(planKey: string) {
     setSubscribing(planKey);
@@ -186,7 +205,10 @@ export default function Plans() {
       {awaitingPayment && (
         <div className="payment-awaiting-banner">
           <Loader size={18} className="spin" />
-          <span>Waiting for payment confirmation… Complete payment in the PayMongo tab.</span>
+          <span>Complete payment in the PayMongo tab — plan activates automatically.</span>
+          <button className="payment-awaiting-check" onClick={() => { void checkActivation(); }}>
+            Check
+          </button>
           <button className="payment-awaiting-dismiss" onClick={() => { setAwaitingPayment(false); if (pollTimer.current) clearTimeout(pollTimer.current); }}>
             <X size={15} />
           </button>
