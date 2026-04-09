@@ -15,18 +15,16 @@ import {
   Flame,
   CheckSquare,
   ArrowUpCircle,
-  UserPlus,
-  Star,
-  TrendingUp,
   ChevronRight,
   Trophy,
   Coins,
+  TrendingUp,
 } from 'lucide-react';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function EarningTypeIcon({ type }: { type: string }) {
-  const size = 16;
+  const size = 15;
   switch (type) {
     case 'captcha':  return <ShieldCheck size={size} />;
     case 'video':    return <Play size={size} />;
@@ -72,52 +70,57 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="page">
-        <div className="sk-section">
-          <span className="sk sk-line sk-line--xl skeleton" style={{ width: '55%' }} />
-          <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
+        {/* Greeting */}
+        <div className="sk-section" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="sk-col" style={{ gap: 6 }}>
+            <span className="sk sk-line skeleton" style={{ width: 140 }} />
+            <span className="sk sk-line--sm skeleton" style={{ width: 90 }} />
+          </div>
+          <span className="sk skeleton" style={{ width: 72, height: 30, borderRadius: 8 }} />
         </div>
-        <div className="sk-card sk-section" style={{ padding: 20, gap: 16, borderRadius: 16 }}>
-          <span className="sk sk-line--sm skeleton" style={{ width: '40%' }} />
-          <span className="sk skeleton" style={{ height: 40, width: '65%', borderRadius: 8 }} />
-          <span className="sk skeleton" style={{ height: 6, width: '100%', borderRadius: 99 }} />
+        {/* Balance card */}
+        <div className="sk-card sk-section" style={{ gap: 14 }}>
+          <div className="sk-row" style={{ justifyContent: 'space-between' }}>
+            <span className="sk sk-line--sm skeleton" style={{ width: 80 }} />
+            <span className="sk skeleton" style={{ width: 64, height: 22, borderRadius: 99 }} />
+          </div>
+          <span className="sk skeleton" style={{ height: 38, width: '60%', borderRadius: 6 }} />
           <div className="sk-row" style={{ justifyContent: 'space-between' }}>
             <span className="sk sk-line--sm skeleton" style={{ width: '45%' }} />
+            <span className="sk skeleton" style={{ width: 80, height: 28, borderRadius: 99 }} />
+          </div>
+          <span className="sk skeleton" style={{ height: 4, borderRadius: 99 }} />
+        </div>
+        {/* Tasks CTA */}
+        <span className="sk skeleton" style={{ height: 64, borderRadius: 12 }} />
+        {/* Goal card */}
+        <div className="sk-card sk-section" style={{ gap: 10 }}>
+          <div className="sk-row" style={{ justifyContent: 'space-between' }}>
+            <span className="sk sk-line skeleton" style={{ width: '40%' }} />
             <span className="sk sk-line--sm skeleton" style={{ width: '20%' }} />
           </div>
-        </div>
-        <div className="sk-card sk-section">
-          <div className="sk-row">
-            <span className="sk skeleton" style={{ width: 18, height: 18, borderRadius: 4 }} />
-            <span className="sk sk-line skeleton" style={{ width: '40%' }} />
-          </div>
-          <span className="sk skeleton" style={{ height: 8, borderRadius: 4, width: '100%' }} />
-          <div className="sk-row" style={{ justifyContent: 'space-between' }}>
+          <span className="sk skeleton" style={{ height: 5, borderRadius: 99 }} />
+          <span className="sk sk-line--sm skeleton" style={{ width: '55%' }} />
+          <div className="sk-row" style={{ justifyContent: 'space-between', paddingTop: 6 }}>
             {[0, 1, 2].map(i => (
-              <div key={i} className="sk-col" style={{ alignItems: 'center', gap: 6 }}>
-                <span className="sk sk-line--lg skeleton" style={{ width: 32 }} />
-                <span className="sk sk-line--sm skeleton" style={{ width: 56 }} />
+              <div key={i} className="sk-col" style={{ alignItems: 'center', gap: 4 }}>
+                <span className="sk sk-line--lg skeleton" style={{ width: 28 }} />
+                <span className="sk sk-line--sm skeleton" style={{ width: 52 }} />
               </div>
             ))}
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {[0, 1, 2, 3].map(i => (
-            <div key={i} className="sk-card sk-section" style={{ minHeight: 90 }}>
-              <span className="sk skeleton sk-circle" style={{ width: 36, height: 36 }} />
-              <span className="sk sk-line skeleton" style={{ width: '60%' }} />
-            </div>
-          ))}
-        </div>
+        {/* Recent earnings */}
         <div className="sk-section">
           <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
           {[0, 1, 2].map(i => (
             <div key={i} className="sk-card sk-row">
-              <span className="sk skeleton sk-circle" style={{ width: 36, height: 36, flexShrink: 0 }} />
-              <div className="sk-col">
+              <span className="sk skeleton sk-circle" style={{ width: 34, height: 34, flexShrink: 0 }} />
+              <div className="sk-col" style={{ flex: 1 }}>
                 <span className="sk sk-line skeleton" style={{ width: '65%' }} />
-                <span className="sk sk-line--sm skeleton" style={{ width: '45%' }} />
+                <span className="sk sk-line--sm skeleton" style={{ width: '40%' }} />
               </div>
-              <span className="sk sk-line skeleton" style={{ width: 48, flexShrink: 0 }} />
+              <span className="sk sk-line skeleton" style={{ width: 44, flexShrink: 0 }} />
             </div>
           ))}
         </div>
@@ -150,9 +153,9 @@ export default function Dashboard() {
       {/* ── Greeting ── */}
       <header className="dash-greeting">
         <div>
-          <h1 className="dash-greeting-title">Hi, {user?.username} 👋</h1>
+          <h1 className="dash-greeting-title">Hi, {user?.username}</h1>
           <p className="dash-greeting-sub">
-            <span className={`plan-badge plan-badge--${user?.plan ?? 'free'}`} style={{ fontSize: 11 }}>
+            <span className={`plan-badge plan-badge--${user?.plan ?? 'free'}`}>
               {(user?.plan ?? 'free').toUpperCase()}
             </span>
             {user?.active_sub_plan && user.sub_expires_at && (
@@ -163,58 +166,77 @@ export default function Dashboard() {
           </p>
         </div>
         {isFreePlan && (
-          <Link to="/plans" className="btn btn-primary btn-sm">Upgrade</Link>
+          <Link to="/plans" className="btn btn-outline btn-sm">Upgrade</Link>
         )}
       </header>
 
-      {/* ── Hero balance card ── */}
-      <div className="dash-hero-card">
-        {/* decorative circle */}
-        <div className="dash-hero-circle" aria-hidden="true" />
-
-        <div className="dash-hero-top">
-          <span className="dash-hero-label">Total Balance</span>
-          <Link to="/coins" className="dash-hero-coins">
-            <Coins size={13} />
+      {/* ── Balance card ── */}
+      <div className="dash-balance-card">
+        <div className="dash-balance-top">
+          <span className="dash-balance-label">Total Balance</span>
+          <Link to="/coins" className="dash-coins-chip">
+            <Coins size={12} />
             {coins.toLocaleString()}
           </Link>
         </div>
 
-        <div className="dash-hero-balance">
+        <div className="dash-balance-amount">
           ₱{balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
 
-        <div className="dash-hero-divider" />
-
-        <div className="dash-hero-today-row">
-          <span className="dash-hero-today-label">
+        <div className="dash-balance-footer">
+          <span className="dash-balance-today">
             Today&nbsp;
-            <strong className="dash-hero-today-amount">₱{todayEarned.toFixed(2)}</strong>
-            {dailyLimit && (
-              <span className="dash-hero-today-of"> / ₱{dailyLimit}</span>
-            )}
+            <strong>+₱{todayEarned.toFixed(2)}</strong>
+            {dailyLimit && <span className="dash-balance-limit"> / ₱{dailyLimit}</span>}
           </span>
-          <Link to="/withdraw" className="dash-hero-withdraw-btn">
-            <ArrowUpCircle size={14} />
+          <Link to="/withdraw" className="dash-withdraw-btn">
+            <ArrowUpCircle size={13} />
             Withdraw
           </Link>
         </div>
 
         {dailyLimit && (
-          <div className="dash-hero-progress-track">
-            <div className="dash-hero-progress-fill" style={{ width: `${earningsPct}%` }} />
+          <div className="dash-limit-track">
+            <div className="dash-limit-fill" style={{ width: `${earningsPct}%` }} />
           </div>
         )}
       </div>
+
+      {/* ── Tasks CTA — the one primary action ── */}
+      {availableCount > 0 && (
+        <Link to="/tasks" className="dash-tasks-cta">
+          <span className="dash-tasks-cta-icon">
+            <CheckSquare size={18} />
+          </span>
+          <div className="dash-tasks-cta-body">
+            <span className="dash-tasks-cta-count">{availableCount} tasks available</span>
+            <span className="dash-tasks-cta-sub">Start earning now</span>
+          </div>
+          <ChevronRight size={18} className="dash-tasks-cta-arrow" />
+        </Link>
+      )}
+
+      {/* ── KYC banner ── */}
+      {user?.kyc_status === 'none' && (
+        <Link to="/kyc" className="dash-kyc-banner">
+          <BadgeCheck size={17} className="dash-kyc-icon" />
+          <div className="dash-kyc-body">
+            <p className="dash-kyc-title">Verify identity to unlock withdrawals</p>
+            <p className="dash-kyc-sub">Takes 2 minutes</p>
+          </div>
+          <ChevronRight size={15} className="dash-kyc-chevron" />
+        </Link>
+      )}
 
       {/* ── Today's Goal ── */}
       <div className="dash-goal-card">
         <div className="dash-goal-header">
           <div className="dash-goal-title-row">
-            <Flame size={17} className={streak > 0 ? 'dash-goal-flame--active' : 'dash-goal-flame'} />
+            <Flame size={16} className={streak > 0 ? 'dash-goal-flame--active' : 'dash-goal-flame'} />
             <span className="dash-goal-title">Today's Goal</span>
             {streakDone && (
-              <span className="dash-goal-done-badge"><Trophy size={11} /> Done!</span>
+              <span className="dash-goal-done-badge"><Trophy size={10} /> Done!</span>
             )}
           </div>
           <span className="dash-goal-progress-count">{completedCount}/{STREAK_TASK_GOAL}</span>
@@ -245,73 +267,18 @@ export default function Dashboard() {
           </div>
           <div className="dash-goal-stat-divider" />
           <div className="dash-goal-stat">
-            <span className="dash-goal-stat-value">{availableCount}</span>
-            <span className="dash-goal-stat-label">Tasks ready</span>
+            <span className="dash-goal-stat-value">{completedCount}</span>
+            <span className="dash-goal-stat-label">Done today</span>
           </div>
         </div>
       </div>
-
-      {/* ── KYC banner ── */}
-      {user?.kyc_status === 'none' && (
-        <Link to="/kyc" className="dash-kyc-banner">
-          <BadgeCheck size={18} className="dash-kyc-icon" />
-          <div className="dash-kyc-body">
-            <p className="dash-kyc-title">Verify identity to unlock withdrawals</p>
-            <p className="dash-kyc-sub">Takes 2 minutes</p>
-          </div>
-          <ChevronRight size={16} className="dash-kyc-chevron" />
-        </Link>
-      )}
-
-      {/* ── Quick Actions 2×2 grid ── */}
-      <section className="section">
-        <h2 className="section-title">Quick Actions</h2>
-        <div className="dash-actions-grid">
-          <Link to="/tasks" className="dash-action-card">
-            <span className="dash-action-icon dash-action-icon--blue">
-              <CheckSquare size={20} />
-            </span>
-            <div className="dash-action-body">
-              <span className="dash-action-label">Tasks</span>
-              <span className="dash-action-desc">{availableCount} available</span>
-            </div>
-          </Link>
-          <Link to="/withdraw" className="dash-action-card">
-            <span className="dash-action-icon dash-action-icon--green">
-              <ArrowUpCircle size={20} />
-            </span>
-            <div className="dash-action-body">
-              <span className="dash-action-label">Withdraw</span>
-              <span className="dash-action-desc">₱{balance.toFixed(2)} ready</span>
-            </div>
-          </Link>
-          <Link to="/referrals" className="dash-action-card">
-            <span className="dash-action-icon dash-action-icon--purple">
-              <UserPlus size={20} />
-            </span>
-            <div className="dash-action-body">
-              <span className="dash-action-label">Referrals</span>
-              <span className="dash-action-desc">Earn ₱10/signup</span>
-            </div>
-          </Link>
-          <Link to="/plans" className="dash-action-card">
-            <span className="dash-action-icon dash-action-icon--orange">
-              <Star size={20} />
-            </span>
-            <div className="dash-action-body">
-              <span className="dash-action-label">Plans</span>
-              <span className="dash-action-desc">More tasks &amp; limits</span>
-            </div>
-          </Link>
-        </div>
-      </section>
 
       {/* ── Recent Earnings ── */}
       <section className="section">
         <div className="section-header">
           <h2 className="section-title">Recent Earnings</h2>
           <Link to="/earnings" className="link link--sm">
-            View all <TrendingUp size={13} />
+            View all <TrendingUp size={12} />
           </Link>
         </div>
 
