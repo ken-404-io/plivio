@@ -73,7 +73,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 app.use(express.urlencoded({ extended: false, limit: '16kb' }));
 app.use(cookieParser());
-app.use(rateLimiter());
+// Skip rate-limiting for PayMongo webhook — server-to-server, may retry rapidly
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === 'POST' && req.path === '/api/subscriptions/webhook') return next();
+  return rateLimiter()(req, res, next);
+});
 app.use(csrfMiddleware);
 
 app.get('/health', (_req: Request, res: Response) => {
