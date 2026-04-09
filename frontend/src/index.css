@@ -75,7 +75,17 @@
 /* ─── Base ───────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html {
+  /* Block pinch-to-zoom on iOS (user-scalable=no is ignored since iOS 10;
+     touch-action is respected). pan-x pan-y = allow scrolling, block zoom. */
+  touch-action: pan-x pan-y;
+  /* Stop rubber-band / overscroll bounce */
+  overscroll-behavior: none;
+  height: 100%;
+}
+
 body {
+  height: 100%;
   min-height: 100svh;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
@@ -86,6 +96,7 @@ body {
   /* Prevent text size adjustment on orientation change (iOS) */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  overscroll-behavior: none;
 }
 
 #root { min-height: 100svh; }
@@ -129,7 +140,8 @@ a, button, [role="button"], [tabindex] {
 /* ─── App Shell ─────────────────────────────────────────────────────────────── */
 .app-shell {
   display: flex;
-  min-height: 100svh;
+  height: 100svh;
+  overflow: hidden; /* the shell itself never scrolls */
 }
 
 .main-content {
@@ -137,6 +149,8 @@ a, button, [role="button"], [tabindex] {
   min-width: 0;
   padding: 0 32px 40px;
   overflow-y: auto;
+  /* contain scroll inside — don't propagate to body when hitting top/bottom */
+  overscroll-behavior-y: contain;
 }
 
 /* Desktop: topbar provides top padding; no need for extra padding on main-content */
@@ -154,6 +168,12 @@ a, button, [role="button"], [tabindex] {
   /* Give main content breathing room above the bottom bar */
   .main-content {
     padding: 0 0 calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Prevent iOS Safari from zooming in when tapping on inputs.
+     iOS zooms when the focused input font-size < 16px. */
+  input, select, textarea {
+    font-size: max(16px, 1em) !important;
   }
 
   /* Bottom nav bar */
