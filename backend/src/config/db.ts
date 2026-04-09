@@ -1,6 +1,11 @@
 import pg from 'pg';
 import { logger } from '../utils/logger.ts';
 
+// Return DATE columns as YYYY-MM-DD strings instead of Date objects.
+// The default postgres-date parser uses new Date(year, month, day) (local time),
+// which means === comparisons against ISO date strings always fail.
+pg.types.setTypeParser(1082, (val: string) => val);
+
 const { Pool } = pg;
 
 const pool = process.env.DATABASE_URL
