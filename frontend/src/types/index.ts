@@ -263,6 +263,7 @@ export interface RegisterPayload {
   email: string;
   password: string;
   referral_code?: string;
+  device_id?: string;
 }
 
 export interface AuthContextValue {

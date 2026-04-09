@@ -62,6 +62,20 @@ function GitHubLogo() {
   );
 }
 
+/** Returns a persistent device UUID stored in localStorage. */
+function getDeviceId(): string {
+  const KEY = 'plivio_did';
+  let id = localStorage.getItem(KEY);
+  if (!id) {
+    // crypto.randomUUID is available in all modern browsers
+    id = typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
 export default function Register() {
   const { register }   = useAuth();
   const navigate       = useNavigate();
@@ -85,7 +99,7 @@ export default function Register() {
     if (form.password.length < 8) { setError('Password must be at least 8 characters'); return; }
     setLoading(true);
     try {
-      await register(form);
+      await register({ ...form, device_id: getDeviceId() });
       navigate('/dashboard');
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;

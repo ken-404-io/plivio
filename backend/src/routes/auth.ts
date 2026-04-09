@@ -30,7 +30,9 @@ const router = Router();
 router.get('/csrf', (_req, res) => { res.json({ ok: true }); });
 
 // ── Registration & login ───────────────────────────────────────────────────
+// Strict registration limit: 3 new accounts per IP per hour
 router.post('/register',
+  rateLimiter({ max: 3, windowMs: 60 * 60_000, keyPrefix: 'reg' }),
   validateBody({
     username: { required: true, type: 'username' },
     email:    { required: true, type: 'email' },
