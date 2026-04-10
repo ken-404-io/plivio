@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { adminIpWhitelist } from '../middleware/adminAuth.ts';
 import { authenticate, requireAdmin } from '../middleware/auth.ts';
 import { validateBody, validateParam } from '../middleware/validate.ts';
 import { rateLimiter } from '../middleware/rateLimiter.ts';
@@ -25,7 +24,6 @@ const router = Router();
 // Also rate-limited separately from the public limiter so normal traffic doesn't
 // consume the admin budget.
 router.use(
-  adminIpWhitelist,
   authenticate,
   requireAdmin,
   rateLimiter({ max: 200, windowMs: 60_000, keyPrefix: 'admin' }),
