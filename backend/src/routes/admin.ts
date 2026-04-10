@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate, requireAdmin } from '../middleware/auth.ts';
-import { validateBody, validateParam } from '../middleware/validate.ts';
+import { validateBody, validateParam, validateIntParam } from '../middleware/validate.ts';
 import { rateLimiter } from '../middleware/rateLimiter.ts';
 import {
   getStats,
@@ -77,7 +77,7 @@ router.delete('/tasks/:id',          validateParam('id'), deleteTask);
 
 router.get('/withdrawals', listPendingWithdrawals);
 router.put('/withdrawals/:id',
-  validateParam('id'),
+  validateIntParam('id'),
   validateBody({ action: { required: true, enum: ['approve', 'reject'] } }),
   processWithdrawal,
 );
