@@ -1,34 +1,130 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Users, ListTodo, Clock, TrendingUp, UserPlus, CheckSquare, ShieldCheck, Coins, Bell, Send, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import {
+  Users, ArrowUpCircle, ShieldCheck, TrendingUp,
+  UserPlus, LayoutDashboard, Bell, Send,
+  ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
+  XCircle, Eye, EyeOff, Coins, MessageSquare, Clock,
+} from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
-import type { AdminUser, AdminTask, AdminWithdrawal, AdminStats, AdNetwork, AdminKycSubmission } from '../../types/index.ts';
+import type {
+  AdminUser, AdminWithdrawal, AdminStats, AdminKycSubmission,
+} from '../../types/index.ts';
 
-const TABS = ['overview', 'users', 'tasks', 'ads', 'withdrawals', 'kyc'] as const;
+const TABS = ['overview', 'users', 'withdrawals', 'kyc'] as const;
 type Tab = typeof TABS[number];
 
-const PRESET_NETWORKS = ['Adsterra', 'Monetag', 'PropellerAds', 'Custom'] as const;
+const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
+  overview:    { label: 'Overview',    Icon: LayoutDashboard },
+  users:       { label: 'Users',       Icon: Users           },
+  withdrawals: { label: 'Withdrawals', Icon: ArrowUpCircle   },
+  kyc:         { label: 'KYC',         Icon: ShieldCheck     },
+};
 
-interface AdNetworkDraft {
-  name: string;
-  weight: number;
-  embed_code: string;
+// ─── Rejection modal ──────────────────────────────────────────────────────────
+function RejectModal({ onConfirm, onCancel }: {
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  return (
+    <div className="adm-modal-overlay" onClick={onCancel}>
+      <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title">Rejection Reason</h3>
+        <p className="adm-modal-hint">This message will be shown to the user.</p>
+        <textarea
+          className="form-input adm-modal-textarea"
+          placeholder="e.g. ID photo is blurry, please resubmit…"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={3}
+          autoFocus
+        />
+        <div className="adm-modal-actions">
+          <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+          <button
+            className="btn btn-danger btn-sm"
+            disabled={!reason.trim()}
+            onClick={() => { if (reason.trim()) onConfirm(reason.trim()); }}
+          >
+            Confirm Reject
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function emptyDraft(): AdNetworkDraft {
-  return { name: 'Adsterra', weight: 50, embed_code: '' };
+// ─── Notify modal ─────────────────────────────────────────────────────────────
+function NotifyModal({ username, onSend, onCancel }: {
+  username: string;
+  onSend:   (title: string, message: string, link: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({ title: '', message: '', link: '' });
+  const [busy, setBusy] = useState(false);
+
+  async function handle(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title.trim() || !form.message.trim()) return;
+    setBusy(true);
+    await onSend(form.title, form.message, form.link);
+    setBusy(false);
+  }
+
+  return (
+    <div className="adm-modal-overlay" onClick={onCancel}>
+      <div className="adm-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title">
+          <Bell size={15} style={{ marginRight: 6 }} />
+          Notify {username}
+        </h3>
+        <form onSubmit={(e) => { void handle(e); }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input
+            className="form-input"
+            placeholder="Title"
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            maxLength={200}
+            required
+            autoFocus
+          />
+          <textarea
+            className="form-input adm-modal-textarea"
+            placeholder="Message"
+            value={form.message}
+            onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+            maxLength={2000}
+            rows={3}
+            required
+          />
+          <input
+            className="form-input"
+            placeholder="Link (optional, e.g. /kyc)"
+            value={form.link}
+            onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
+            maxLength={500}
+          />
+          <div className="adm-modal-actions">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              disabled={busy || !form.title.trim() || !form.message.trim()}
+            >
+              <Send size={13} />
+              {busy ? 'Sending…' : 'Send'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
-interface TaskForm {
-  title:         string;
-  type:          string;
-  reward_amount: string;
-  min_plan:      string;
-}
-
-// ─── KYC image loader with auth ───────────────────────────────────────────────
+// ─── KYC image with auth ──────────────────────────────────────────────────────
 function KycImage({ kycId, field, alt }: { kycId: string; field: 'id_front' | 'id_selfie'; alt: string }) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [src, setSrc]   = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -55,163 +151,62 @@ function KycImage({ kycId, field, alt }: { kycId: string; field: 'id_front' | 'i
   );
 }
 
-// ─── Rejection modal ───────────────────────────────────────────────────────────
-interface RejectModalProps {
-  onConfirm: (reason: string) => void;
-  onCancel: () => void;
-}
-
-function RejectModal({ onConfirm, onCancel }: RejectModalProps) {
-  const [reason, setReason] = useState('');
+// ─── Stat card ────────────────────────────────────────────────────────────────
+function StatCard({
+  icon: Icon, label, value, sub, color,
+}: {
+  icon: React.ElementType; label: string; value: string | number; sub?: string; color: string;
+}) {
   return (
-    <div className="reject-modal-overlay" onClick={onCancel}>
-      <div className="reject-modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="reject-modal-title">Rejection Reason</h3>
-        <p className="reject-modal-hint">This message will be shown to the user.</p>
-        <textarea
-          className="form-input reject-modal-textarea"
-          placeholder="e.g. ID photo is blurry, please resubmit…"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
-          autoFocus
-        />
-        <div className="reject-modal-actions">
-          <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
-          <button
-            className="btn btn-danger btn-sm"
-            disabled={!reason.trim()}
-            onClick={() => { if (reason.trim()) onConfirm(reason.trim()); }}
-          >
-            Reject KYC
-          </button>
-        </div>
+    <div className="adm-stat-card">
+      <div className={`adm-stat-icon adm-stat-icon--${color}`}><Icon size={16} /></div>
+      <div className="adm-stat-body">
+        <span className="adm-stat-label">{label}</span>
+        <span className="adm-stat-value">{value}</span>
+        {sub && <span className="adm-stat-sub">{sub}</span>}
       </div>
     </div>
   );
 }
 
-// ─── Notify user modal ────────────────────────────────────────────────────────
-interface NotifyModalProps {
-  username: string;
-  onSend:   (title: string, message: string, link: string) => Promise<void>;
-  onCancel: () => void;
-}
-
-function NotifyModal({ username, onSend, onCancel }: NotifyModalProps) {
-  const [form, setForm]   = useState({ title: '', message: '', link: '' });
-  const [busy, setBusy]   = useState(false);
-
-  async function handle(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.title.trim() || !form.message.trim()) return;
-    setBusy(true);
-    await onSend(form.title, form.message, form.link);
-    setBusy(false);
-  }
-
-  return (
-    <div className="reject-modal-overlay" onClick={onCancel}>
-      <div className="reject-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
-        <h3 className="reject-modal-title">
-          <Bell size={16} style={{ marginRight: 6 }} />
-          Notify {username}
-        </h3>
-        <form onSubmit={(e) => { void handle(e); }}>
-          <input
-            className="form-input"
-            placeholder="Title"
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            maxLength={200}
-            required
-            autoFocus
-            style={{ marginBottom: 8 }}
-          />
-          <textarea
-            className="form-input reject-modal-textarea"
-            placeholder="Message"
-            value={form.message}
-            onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-            maxLength={2000}
-            rows={3}
-            required
-            style={{ marginBottom: 8 }}
-          />
-          <input
-            className="form-input"
-            placeholder="Link (optional, e.g. /kyc)"
-            value={form.link}
-            onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
-            maxLength={500}
-            style={{ marginBottom: 12 }}
-          />
-          <div className="reject-modal-actions">
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
-            <button
-              type="submit"
-              className="btn btn-primary btn-sm"
-              disabled={busy || !form.title.trim() || !form.message.trim()}
-            >
-              <Send size={14} />
-              {busy ? 'Sending…' : 'Send'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const toast = useToast();
 
-  const [tab,         setTab]         = useState<Tab>('overview');
-  const [stats,       setStats]       = useState<AdminStats | null>(null);
-  const [users,       setUsers]       = useState<AdminUser[]>([]);
-  const [usersMeta,   setUsersMeta]   = useState({ page: 1, total: 0, limit: 25 });
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [userSearch,  setUserSearch]  = useState('');
-  const [userPage,    setUserPage]    = useState(1);
-  const [tasks,       setTasks]       = useState<AdminTask[]>([]);
-  const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
-  const [kycList,     setKycList]     = useState<AdminKycSubmission[]>([]);
-  const [loading,     setLoading]     = useState(true);
+  const [tab,           setTab]           = useState<Tab>('overview');
+  const [stats,         setStats]         = useState<AdminStats | null>(null);
+  const [users,         setUsers]         = useState<AdminUser[]>([]);
+  const [usersMeta,     setUsersMeta]     = useState({ page: 1, total: 0, limit: 25 });
+  const [usersLoading,  setUsersLoading]  = useState(false);
+  const [userSearch,    setUserSearch]    = useState('');
+  const [userPage,      setUserPage]      = useState(1);
+  const [withdrawals,   setWithdrawals]   = useState<AdminWithdrawal[]>([]);
+  const [kycList,       setKycList]       = useState<AdminKycSubmission[]>([]);
+  const [loading,       setLoading]       = useState(true);
 
-  // Notify — target user + broadcast form
-  const [notifyTarget,     setNotifyTarget]     = useState<{ id: string; username: string } | null>(null);
-  const [broadcasting,     setBroadcasting]     = useState(false);
-  const [broadcastForm,    setBroadcastForm]    = useState({ title: '', message: '' });
+  const [notifyTarget,  setNotifyTarget]  = useState<{ id: string; username: string } | null>(null);
+  const [broadcasting,  setBroadcasting]  = useState(false);
+  const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '' });
 
-  // Expand user management row
   const [expandedUser,  setExpandedUser]  = useState<string | null>(null);
   const [adjustDraft,   setAdjustDraft]   = useState<Record<string, { delta: string; plan: string }>>({});
 
-  // KYC — which card has images expanded
-  const [expandedKyc,     setExpandedKyc]     = useState<string | null>(null);
-  // KYC — rejection modal target
-  const [rejectTarget,    setRejectTarget]    = useState<string | null>(null);
-  // Withdrawal — rejection modal target
-  const [wdRejectTarget,  setWdRejectTarget]  = useState<string | null>(null);
+  const [expandedKyc,   setExpandedKyc]   = useState<string | null>(null);
+  const [rejectTarget,  setRejectTarget]  = useState<string | null>(null);
+  const [wdRejectTarget,setWdRejectTarget]= useState<string | null>(null);
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [taskForm, setTaskForm] = useState<TaskForm>({
-    title: '', type: 'captcha', reward_amount: '', min_plan: 'free',
-  });
-
-  // Load non-user data once on mount
+  // Load non-user data once
   useEffect(() => {
     async function load() {
       try {
-        const [statsRes, tasksRes, wdRes, kycRes] = await Promise.all([
+        const [statsRes, wdRes, kycRes] = await Promise.all([
           api.get<{ stats: AdminStats }>('/admin/stats'),
-          api.get<{ tasks: AdminTask[] }>('/admin/tasks'),
           api.get<{ withdrawals: AdminWithdrawal[] }>('/admin/withdrawals'),
           api.get<{ submissions: AdminKycSubmission[] }>('/admin/kyc'),
         ]);
         setStats(statsRes.data.stats);
-        setTasks(tasksRes.data.tasks);
         setWithdrawals(wdRes.data.withdrawals);
         setKycList(kycRes.data.submissions);
       } catch {
@@ -224,7 +219,6 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load users with search + pagination
   const loadUsers = useCallback(async (search: string, page: number) => {
     setUsersLoading(true);
     try {
@@ -242,10 +236,8 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Initial user load + re-load on page change
   useEffect(() => { void loadUsers(userSearch, userPage); }, [loadUsers, userPage]);
 
-  // Debounced search — reset to page 1 on new query
   function handleUserSearch(value: string) {
     setUserSearch(value);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
@@ -261,21 +253,18 @@ export default function AdminDashboard() {
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: !isBanned } : u));
       toast.success(`User ${isBanned ? 'unbanned' : 'banned'}.`);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Action failed.');
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
     }
   }
 
   async function applyUserAdjustment(userId: string) {
     const draft = adjustDraft[userId];
     if (!draft) return;
-
     const payload: Record<string, unknown> = {};
     const delta = parseFloat(draft.delta);
     if (draft.delta.trim() !== '' && !isNaN(delta)) payload.balance_adjustment = delta;
     if (draft.plan) payload.plan = draft.plan;
     if (Object.keys(payload).length === 0) { toast.error('No changes to apply.'); return; }
-
     try {
       const { data } = await api.put<{ user: AdminUser }>(`/admin/users/${userId}`, payload);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, ...data.user } : u));
@@ -283,8 +272,7 @@ export default function AdminDashboard() {
       setExpandedUser(null);
       toast.success('User updated.');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Update failed.');
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Update failed.');
     }
   }
 
@@ -294,8 +282,7 @@ export default function AdminDashboard() {
       toast.success('Notification sent.');
       setNotifyTarget(null);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Failed to send notification.');
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Failed to send.');
     }
   }
 
@@ -308,82 +295,9 @@ export default function AdminDashboard() {
       toast.success(`Broadcast sent to ${data.sent_to} users.`);
       setBroadcastForm({ title: '', message: '' });
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Broadcast failed.');
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Broadcast failed.');
     } finally {
       setBroadcasting(false);
-    }
-  }
-
-  async function toggleTask(taskId: string, isActive: boolean) {
-    try {
-      await api.put(`/admin/tasks/${taskId}`, { is_active: !isActive });
-      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, is_active: !isActive } : t));
-      toast.success(`Task ${isActive ? 'deactivated' : 'activated'}.`);
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Action failed.');
-    }
-  }
-
-  async function createTask(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const { data } = await api.post<{ task: AdminTask }>('/admin/tasks', taskForm);
-      setTasks((prev) => [data.task, ...prev]);
-      setTaskForm({ title: '', type: 'captcha', reward_amount: '', min_plan: 'free' });
-      toast.success('Task created.');
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Failed to create task.');
-    }
-  }
-
-  // Ad network state — keyed by task id
-  const [adNetworks, setAdNetworks] = useState<Record<string, AdNetwork[]>>({});
-  const [adDrafts,   setAdDrafts]   = useState<Record<string, AdNetworkDraft[]>>({});
-  const [savingAds,  setSavingAds]  = useState<string | null>(null);
-
-  function getNetworksForTask(taskId: string): AdNetworkDraft[] {
-    return adDrafts[taskId] ?? adNetworks[taskId]?.map((n) => ({ ...n })) ?? [];
-  }
-
-  function setNetworksForTask(taskId: string, nets: AdNetworkDraft[]) {
-    setAdDrafts((prev) => ({ ...prev, [taskId]: nets }));
-  }
-
-  function addNetwork(taskId: string) {
-    setNetworksForTask(taskId, [...getNetworksForTask(taskId), emptyDraft()]);
-  }
-
-  function removeNetwork(taskId: string, idx: number) {
-    const nets = [...getNetworksForTask(taskId)];
-    nets.splice(idx, 1);
-    setNetworksForTask(taskId, nets);
-  }
-
-  function updateNetwork(taskId: string, idx: number, patch: Partial<AdNetworkDraft>) {
-    const nets = getNetworksForTask(taskId).map((n, i) => i === idx ? { ...n, ...patch } : n);
-    setNetworksForTask(taskId, nets);
-  }
-
-  async function saveNetworks(taskId: string) {
-    const nets = getNetworksForTask(taskId);
-    if (nets.some((n) => !n.embed_code.trim())) {
-      toast.error('All networks must have an embed code.');
-      return;
-    }
-    setSavingAds(taskId);
-    try {
-      await api.put(`/admin/tasks/${taskId}/ad-networks`, { networks: nets });
-      setAdNetworks((prev) => ({ ...prev, [taskId]: nets }));
-      setAdDrafts((prev) => { const n = { ...prev }; delete n[taskId]; return n; });
-      toast.success('Ad networks saved.');
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Failed to save ad networks.');
-    } finally {
-      setSavingAds(null);
     }
   }
 
@@ -393,8 +307,7 @@ export default function AdminDashboard() {
       setWithdrawals((prev) => prev.filter((w) => w.id !== id));
       toast.success(`Withdrawal ${action === 'approve' ? 'approved' : 'rejected'}.`);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Action failed.');
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
     }
   }
 
@@ -405,35 +318,46 @@ export default function AdminDashboard() {
       setExpandedKyc(null);
       toast.success(`KYC ${action}d.`);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Action failed.');
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
     }
   }
 
-  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="sk-section">
+          <span className="sk sk-line skeleton" style={{ width: 160 }} />
+          <span className="sk sk-line--sm skeleton" style={{ width: 100 }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {[0,1,2,3,4,5,6,7].map(i => (
+            <div key={i} className="sk-card sk-section" style={{ minHeight: 80, gap: 8 }}>
+              <span className="sk skeleton sk-circle" style={{ width: 32, height: 32 }} />
+              <span className="sk sk-line--sm skeleton" style={{ width: '55%' }} />
+              <span className="sk sk-line--lg skeleton" style={{ width: '70%' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
+
+      {/* Modals */}
       {rejectTarget && (
         <RejectModal
-          onConfirm={(reason) => {
-            void reviewKyc(rejectTarget, 'reject', reason);
-            setRejectTarget(null);
-          }}
+          onConfirm={(reason) => { void reviewKyc(rejectTarget, 'reject', reason); setRejectTarget(null); }}
           onCancel={() => setRejectTarget(null)}
         />
       )}
-
       {wdRejectTarget && (
         <RejectModal
-          onConfirm={(reason) => {
-            void processWithdrawal(wdRejectTarget, 'reject', reason);
-            setWdRejectTarget(null);
-          }}
+          onConfirm={(reason) => { void processWithdrawal(wdRejectTarget, 'reject', reason); setWdRejectTarget(null); }}
           onCancel={() => setWdRejectTarget(null)}
         />
       )}
-
       {notifyTarget && (
         <NotifyModal
           username={notifyTarget.username}
@@ -442,91 +366,57 @@ export default function AdminDashboard() {
         />
       )}
 
-      <header className="page-header">
-        <h1 className="page-title">Admin Panel</h1>
+      {/* Header */}
+      <header className="adm-header">
+        <div>
+          <h1 className="adm-title">Admin Panel</h1>
+          <p className="adm-subtitle">{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+        </div>
       </header>
 
-      <div className="tabs">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            className={`tab-btn${tab === t ? ' tab-btn--active' : ''}`}
-            onClick={() => setTab(t)}
-          >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-            {t === 'kyc' && stats && stats.pending_kyc > 0 && (
-              <span className="tab-badge">{stats.pending_kyc}</span>
-            )}
-            {t === 'withdrawals' && stats && stats.pending_withdrawals > 0 && (
-              <span className="tab-badge">{stats.pending_withdrawals}</span>
-            )}
-          </button>
-        ))}
+      {/* Tab bar */}
+      <div className="adm-tabs">
+        {TABS.map((t) => {
+          const { label, Icon } = TAB_META[t];
+          const badge = t === 'kyc' ? stats?.pending_kyc
+                      : t === 'withdrawals' ? stats?.pending_withdrawals
+                      : 0;
+          return (
+            <button
+              key={t}
+              className={`adm-tab${tab === t ? ' adm-tab--active' : ''}`}
+              onClick={() => setTab(t)}
+            >
+              <Icon size={15} />
+              <span>{label}</span>
+              {badge != null && badge > 0 && <span className="adm-tab-badge">{badge}</span>}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Overview ── */}
       {tab === 'overview' && stats && (
         <>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-card-icon stat-card-icon--purple"><Users size={18} /></div>
-              <span className="stat-label">Total Users</span>
-              <span className="stat-value">{stats.total_users.toLocaleString()}</span>
-              {stats.new_users_today > 0 && (
-                <span className="stat-sub stat-sub--positive">+{stats.new_users_today} today</span>
-              )}
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-icon stat-card-icon--blue"><ListTodo size={18} /></div>
-              <span className="stat-label">Active Tasks</span>
-              <span className="stat-value">{stats.active_tasks}</span>
-              {stats.completed_tasks_today > 0 && (
-                <span className="stat-sub">{stats.completed_tasks_today} done today</span>
-              )}
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-icon stat-card-icon--orange"><Clock size={18} /></div>
-              <span className="stat-label">Pending Withdrawals</span>
-              <span className="stat-value">{stats.pending_withdrawals}</span>
-              <span className="stat-sub">₱{Number(stats.pending_withdrawal_total).toFixed(2)} total</span>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-icon stat-card-icon--green"><TrendingUp size={18} /></div>
-              <span className="stat-label">Total Approved Earnings</span>
-              <span className="stat-value">₱{Number(stats.total_approved_earnings).toFixed(2)}</span>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-icon stat-card-icon--teal"><UserPlus size={18} /></div>
-              <span className="stat-label">New Users Today</span>
-              <span className="stat-value">{stats.new_users_today}</span>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-icon stat-card-icon--indigo"><CheckSquare size={18} /></div>
-              <span className="stat-label">Tasks Done Today</span>
-              <span className="stat-value">{stats.completed_tasks_today}</span>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-icon stat-card-icon--red"><ShieldCheck size={18} /></div>
-              <span className="stat-label">Pending KYC</span>
-              <span className="stat-value">{stats.pending_kyc}</span>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-icon stat-card-icon--yellow"><Coins size={18} /></div>
-              <span className="stat-label">Coins Distributed</span>
-              <span className="stat-value">{Number(stats.total_coins_distributed).toLocaleString()}</span>
-            </div>
+          <div className="adm-stats-grid">
+            <StatCard icon={Users}        label="Total Users"         value={stats.total_users.toLocaleString()}                   sub={stats.new_users_today > 0 ? `+${stats.new_users_today} today` : undefined} color="blue"   />
+            <StatCard icon={MessageSquare}label="Quiz Sessions Today" value={stats.completed_tasks_today.toLocaleString()}         color="indigo" />
+            <StatCard icon={ArrowUpCircle}label="Pending Withdrawals" value={stats.pending_withdrawals}                            sub={`₱${Number(stats.pending_withdrawal_total).toFixed(2)} total`}              color="orange" />
+            <StatCard icon={ShieldCheck}  label="Pending KYC"         value={stats.pending_kyc}                                    color="red"    />
+            <StatCard icon={TrendingUp}   label="Total Paid Out"      value={`₱${Number(stats.total_approved_earnings).toFixed(2)}`}                                                                                 color="green"  />
+            <StatCard icon={UserPlus}     label="New Users Today"     value={stats.new_users_today}                                color="teal"   />
+            <StatCard icon={Coins}        label="Coins Distributed"   value={Number(stats.total_coins_distributed).toLocaleString()}                                                                                 color="yellow" />
+            <StatCard icon={Clock}        label="Active Tasks"        value={stats.active_tasks}                                   color="purple" />
           </div>
 
-          {/* Broadcast notification panel */}
-          <section className="card" style={{ marginTop: 20 }}>
-            <div className="card-title-row">
-              <Bell size={18} />
-              <h2 className="card-title">Broadcast Notification</h2>
+          {/* Broadcast */}
+          <div className="adm-section">
+            <div className="adm-section-header">
+              <Bell size={15} />
+              <h2 className="adm-section-title">Broadcast Notification</h2>
             </div>
-            <p className="text-muted" style={{ fontSize: 13, marginBottom: 12 }}>
-              Send an in-app notification to all active (non-banned) users.
-            </p>
-            <form onSubmit={(e) => { void sendBroadcast(e); }} className="admin-broadcast-form">
+            <p className="adm-section-hint">Send an in-app notification to all active users.</p>
+            <form onSubmit={(e) => { void sendBroadcast(e); }} className="adm-broadcast-form">
               <input
                 className="form-input"
                 placeholder="Title"
@@ -548,107 +438,101 @@ export default function AdminDashboard() {
                 type="submit"
                 className="btn btn-primary"
                 disabled={broadcasting || !broadcastForm.title.trim() || !broadcastForm.message.trim()}
-                style={{ alignSelf: 'flex-start' }}
               >
-                <Send size={15} />
+                <Send size={14} />
                 {broadcasting ? 'Sending…' : 'Send to all users'}
               </button>
             </form>
-          </section>
+          </div>
         </>
       )}
 
       {/* ── Users ── */}
       {tab === 'users' && (
         <>
-          {/* Search bar */}
-          <div className="admin-search-wrap">
-            <span className="admin-search-icon"><Search size={16} /></span>
+          <div className="adm-search-wrap">
+            <Search size={15} className="adm-search-icon" />
             <input
-              className="form-input admin-search-input"
-              placeholder="Search by username or email…"
+              className="form-input adm-search-input"
+              placeholder="Search username or email…"
               value={userSearch}
               onChange={(e) => handleUserSearch(e.target.value)}
             />
           </div>
 
-          <div className="admin-list" style={{ opacity: usersLoading ? 0.6 : 1, transition: 'opacity 0.15s' }}>
+          <div className="adm-list" style={{ opacity: usersLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
             {users.length === 0 && !usersLoading ? (
               <div className="empty-state"><p>No users found.</p></div>
             ) : users.map((u) => {
               const isExpanded = expandedUser === u.id;
               const draft = adjustDraft[u.id] ?? { delta: '', plan: '' };
               return (
-                <div key={u.id} className={`admin-card${isExpanded ? ' admin-card--expanded' : ''}`}>
-                  <div className="admin-card-body">
-                    <div className="admin-card-main">
-                      <span className="admin-card-title">{u.username}</span>
-                      <span className="admin-card-sub">{u.email}</span>
+                <div key={u.id} className={`adm-user-row${isExpanded ? ' adm-user-row--expanded' : ''}`}>
+                  {/* Main row */}
+                  <div className="adm-user-main">
+                    <div className="adm-user-avatar">
+                      {u.username[0]?.toUpperCase()}
                     </div>
-                    <div className="admin-card-meta">
-                      <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan.toUpperCase()}</span>
-                      <span className="admin-card-balance">₱{Number(u.balance).toFixed(2)}</span>
-                      <span className={`status-dot status-dot--${u.is_banned ? 'rejected' : 'approved'}`}>
+                    <div className="adm-user-info">
+                      <span className="adm-user-name">{u.username}</span>
+                      <span className="adm-user-email">{u.email}</span>
+                    </div>
+                    <div className="adm-user-badges">
+                      <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan}</span>
+                      <span className={`adm-status-chip ${u.is_banned ? 'adm-status-chip--banned' : 'adm-status-chip--active'}`}>
+                        {u.is_banned ? <Ban size={10} /> : <CheckCircle2 size={10} />}
                         {u.is_banned ? 'Banned' : 'Active'}
                       </span>
                     </div>
-                  </div>
-                  <div className="admin-card-actions">
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
-                      title="Send notification"
-                    >
-                      <Bell size={14} />
-                    </button>
-                    <button
-                      className={`btn btn-sm btn-ghost${isExpanded ? ' btn-ghost--active' : ''}`}
-                      onClick={() => setExpandedUser(isExpanded ? null : u.id)}
-                      title="Manage user"
-                    >
-                      Manage
-                    </button>
-                    <button
-                      className={`btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={() => { void toggleBan(u.id, u.is_banned); }}
-                    >
-                      {u.is_banned ? 'Unban' : 'Ban'}
-                    </button>
+                    <span className="adm-user-balance">₱{Number(u.balance).toFixed(2)}</span>
+                    <div className="adm-user-actions">
+                      <button
+                        className="adm-icon-btn"
+                        onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
+                        title="Send notification"
+                      >
+                        <Bell size={14} />
+                      </button>
+                      <button
+                        className={`adm-icon-btn${isExpanded ? ' adm-icon-btn--active' : ''}`}
+                        onClick={() => setExpandedUser(isExpanded ? null : u.id)}
+                        title="Manage user"
+                      >
+                        <ChevronRight size={14} style={{ transform: isExpanded ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s' }} />
+                      </button>
+                      <button
+                        className={`adm-action-btn ${u.is_banned ? 'adm-action-btn--unban' : 'adm-action-btn--ban'}`}
+                        onClick={() => { void toggleBan(u.id, u.is_banned); }}
+                      >
+                        {u.is_banned ? 'Unban' : 'Ban'}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Expandable management panel */}
+                  {/* Expanded management */}
                   {isExpanded && (
-                    <div className="admin-user-manage">
-                      <div className="admin-user-manage-row">
-                        <label className="admin-user-manage-label">Balance adjustment</label>
-                        <div className="admin-user-manage-input-wrap">
-                          <span className="admin-user-manage-prefix">₱</span>
+                    <div className="adm-user-manage">
+                      <div className="adm-manage-field">
+                        <label className="adm-manage-label">Balance adjustment</label>
+                        <div className="adm-manage-input-row">
+                          <span className="adm-manage-prefix">₱</span>
                           <input
                             type="number"
-                            className="form-input admin-user-manage-input"
+                            className="form-input adm-manage-input"
                             placeholder="e.g. 50 or -10"
                             step="0.01"
                             value={draft.delta}
-                            onChange={(e) => setAdjustDraft((prev) => ({
-                              ...prev,
-                              [u.id]: { ...draft, delta: e.target.value },
-                            }))}
+                            onChange={(e) => setAdjustDraft((prev) => ({ ...prev, [u.id]: { ...draft, delta: e.target.value } }))}
                           />
+                          <span className="adm-manage-hint">Current: ₱{Number(u.balance).toFixed(2)}</span>
                         </div>
-                        <span className="admin-user-manage-hint text-muted">
-                          Current: ₱{Number(u.balance).toFixed(2)}
-                        </span>
                       </div>
-
-                      <div className="admin-user-manage-row">
-                        <label className="admin-user-manage-label">Set plan</label>
+                      <div className="adm-manage-field">
+                        <label className="adm-manage-label">Set plan</label>
                         <select
-                          className="form-input admin-user-manage-select"
+                          className="form-input adm-manage-select"
                           value={draft.plan}
-                          onChange={(e) => setAdjustDraft((prev) => ({
-                            ...prev,
-                            [u.id]: { ...draft, plan: e.target.value },
-                          }))}
+                          onChange={(e) => setAdjustDraft((prev) => ({ ...prev, [u.id]: { ...draft, plan: e.target.value } }))}
                         >
                           <option value="">— no change —</option>
                           <option value="free">Free</option>
@@ -656,20 +540,19 @@ export default function AdminDashboard() {
                           <option value="elite">Elite</option>
                         </select>
                       </div>
-
-                      <div className="admin-user-manage-actions">
+                      <div className="adm-manage-actions">
                         <button
-                          className="btn btn-sm btn-ghost"
+                          className="btn btn-ghost btn-sm"
                           onClick={() => { setExpandedUser(null); setAdjustDraft((p) => { const n = {...p}; delete n[u.id]; return n; }); }}
                         >
                           Cancel
                         </button>
                         <button
-                          className="btn btn-sm btn-primary"
+                          className="btn btn-primary btn-sm"
                           onClick={() => { void applyUserAdjustment(u.id); }}
                           disabled={!draft.delta && !draft.plan}
                         >
-                          Apply
+                          Apply changes
                         </button>
                       </div>
                     </div>
@@ -679,245 +562,66 @@ export default function AdminDashboard() {
             })}
           </div>
 
-          {/* Pagination */}
           {usersMeta.total > usersMeta.limit && (
-            <div className="admin-pagination">
+            <div className="adm-pagination">
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={userPage <= 1}
                 onClick={() => setUserPage((p) => p - 1)}
               >
-                <ChevronLeft size={16} /> Prev
+                <ChevronLeft size={15} /> Prev
               </button>
-              <span className="admin-pagination-info">
-                Page {usersMeta.page} · {usersMeta.total} users
+              <span className="adm-pagination-info">
+                Page {usersMeta.page} of {Math.ceil(usersMeta.total / usersMeta.limit)} · {usersMeta.total} users
               </span>
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={userPage * usersMeta.limit >= usersMeta.total}
                 onClick={() => setUserPage((p) => p + 1)}
               >
-                Next <ChevronRight size={16} />
+                Next <ChevronRight size={15} />
               </button>
             </div>
           )}
         </>
       )}
 
-      {/* ── Tasks ── */}
-      {tab === 'tasks' && (
-        <>
-          <section className="card" style={{ marginBottom: 16 }}>
-            <h2 className="card-title">Create task</h2>
-            <form onSubmit={(e) => { void createTask(e); }} className="admin-task-form">
-              <input
-                className="form-input"
-                placeholder="Task title"
-                value={taskForm.title}
-                onChange={(e) => setTaskForm((f) => ({ ...f, title: e.target.value }))}
-                required
-              />
-              <select
-                className="form-input"
-                value={taskForm.type}
-                onChange={(e) => setTaskForm((f) => ({ ...f, type: e.target.value }))}
-              >
-                <option value="captcha">Captcha</option>
-                <option value="video">Video</option>
-                <option value="ad_click">Ad Click</option>
-                <option value="survey">Survey</option>
-                <option value="referral">Referral</option>
-              </select>
-              <input
-                className="form-input"
-                type="number"
-                placeholder="Reward (PHP)"
-                value={taskForm.reward_amount}
-                onChange={(e) => setTaskForm((f) => ({ ...f, reward_amount: e.target.value }))}
-                min={0.01}
-                step={0.01}
-                required
-              />
-              <select
-                className="form-input"
-                value={taskForm.min_plan}
-                onChange={(e) => setTaskForm((f) => ({ ...f, min_plan: e.target.value }))}
-              >
-                <option value="free">Free+</option>
-                <option value="premium">Premium+</option>
-                <option value="elite">Elite only</option>
-              </select>
-              <button type="submit" className="btn btn-primary btn-full">Add Task</button>
-            </form>
-          </section>
-
-          <div className="admin-list">
-            {tasks.length === 0 ? (
-              <div className="empty-state"><p>No tasks yet.</p></div>
-            ) : tasks.map((t) => (
-              <div key={t.id} className="admin-card">
-                <div className="admin-card-body">
-                  <div className="admin-card-main">
-                    <span className="admin-card-title">{t.title}</span>
-                    <div className="admin-card-meta" style={{ marginTop: 4 }}>
-                      <span className="badge">{t.type}</span>
-                      <span className="text-muted" style={{ fontSize: 12 }}>{t.min_plan}</span>
-                    </div>
-                  </div>
-                  <div className="admin-card-right">
-                    <span className="admin-card-balance">₱{Number(t.reward_amount).toFixed(2)}</span>
-                    <span className={`status-dot status-dot--${t.is_active ? 'approved' : 'rejected'}`}>
-                      {t.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                </div>
-                <div className="admin-card-actions">
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => { void toggleTask(t.id, t.is_active); }}
-                  >
-                    {t.is_active ? 'Deactivate' : 'Activate'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* ── Ads ── */}
-      {tab === 'ads' && (
-        <div className="ads-tab">
-          <p className="ads-tab-hint text-muted">
-            Configure ad network embed codes for video / ad-click tasks. Networks are selected at
-            random (weighted) each time a user starts the task.
-          </p>
-
-          {tasks.filter((t) => t.type === 'video' || t.type === 'ad_click').length === 0 ? (
-            <p className="text-muted">No video or ad-click tasks found.</p>
-          ) : (
-            tasks
-              .filter((t) => t.type === 'video' || t.type === 'ad_click')
-              .map((task) => {
-                const nets = getNetworksForTask(task.id);
-                const isDirty = !!adDrafts[task.id];
-                return (
-                  <div key={task.id} className="card ad-task-card">
-                    <div className="ad-task-header">
-                      <div>
-                        <span className="ad-task-title">{task.title}</span>
-                        <span className="badge ml-2">{task.type}</span>
-                      </div>
-                      <div className="ad-task-actions">
-                        <button
-                          className="btn btn-sm btn-ghost"
-                          onClick={() => addNetwork(task.id)}
-                        >
-                          + Add Network
-                        </button>
-                        <button
-                          className={`btn btn-sm btn-primary${!isDirty ? ' btn-disabled' : ''}`}
-                          disabled={!isDirty || savingAds === task.id}
-                          onClick={() => { void saveNetworks(task.id); }}
-                        >
-                          {savingAds === task.id ? 'Saving…' : 'Save'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {nets.length === 0 ? (
-                      <p className="text-muted ad-empty-hint">No ad networks configured. Click "+ Add Network" to start.</p>
-                    ) : (
-                      <div className="ad-network-list">
-                        {nets.map((net, idx) => (
-                          <div key={idx} className="ad-network-row">
-                            <div className="ad-network-row-top">
-                              <select
-                                className="form-input ad-network-name"
-                                value={net.name}
-                                onChange={(e) => updateNetwork(task.id, idx, { name: e.target.value })}
-                              >
-                                {PRESET_NETWORKS.map((p) => (
-                                  <option key={p} value={p}>{p}</option>
-                                ))}
-                              </select>
-                              <label className="ad-weight-label">
-                                Weight
-                                <input
-                                  className="form-input ad-weight-input"
-                                  type="number"
-                                  min={1}
-                                  max={100}
-                                  value={net.weight}
-                                  onChange={(e) =>
-                                    updateNetwork(task.id, idx, { weight: Number(e.target.value) })
-                                  }
-                                />
-                              </label>
-                              <button
-                                className="btn btn-sm btn-ghost btn-danger"
-                                onClick={() => removeNetwork(task.id, idx)}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                            <textarea
-                              className="form-input ad-embed-textarea"
-                              placeholder="Paste embed code from ad network (script or iframe tag)"
-                              value={net.embed_code}
-                              onChange={(e) =>
-                                updateNetwork(task.id, idx, { embed_code: e.target.value })
-                              }
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-          )}
-        </div>
-      )}
-
       {/* ── Withdrawals ── */}
       {tab === 'withdrawals' && (
-        <div className="admin-list">
+        <div className="adm-list">
           {withdrawals.length === 0 ? (
             <div className="empty-state"><p>No pending withdrawals.</p></div>
           ) : withdrawals.map((w) => (
-            <div key={w.id} className="admin-card">
-              <div className="admin-card-body">
-                <div className="admin-card-main">
-                  <span className="admin-card-title">{w.username}</span>
-                  <span className="admin-card-sub">{w.email}</span>
-                  <div className="admin-card-meta" style={{ marginTop: 6 }}>
-                    <span className="badge">{w.method.toUpperCase()}</span>
-                    <span className="text-muted" style={{ fontSize: 12 }}>
-                      {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
-                  </div>
-                  {/* Payment destination — critical info for admin */}
-                  <div className="wd-payment-info">
-                    <span className="wd-payment-label">Send to:</span>
-                    <span className="wd-payment-name">{w.account_name}</span>
-                    <span className="wd-payment-number">{w.account_number}</span>
-                  </div>
+            <div key={w.id} className="adm-wd-card">
+              <div className="adm-wd-top">
+                <div className="adm-wd-user">
+                  <span className="adm-wd-username">{w.username}</span>
+                  <span className="adm-wd-email">{w.email}</span>
                 </div>
-                <span className="admin-card-amount">₱{Number(w.amount).toFixed(2)}</span>
+                <div className="adm-wd-amount">₱{Number(w.amount).toFixed(2)}</div>
               </div>
-              <div className="admin-card-actions">
+              <div className="adm-wd-payment">
+                <span className="adm-wd-method">{w.method.toUpperCase()}</span>
+                <div className="adm-wd-account">
+                  <span className="adm-wd-account-name">{w.account_name}</span>
+                  <span className="adm-wd-account-num">{w.account_number}</span>
+                </div>
+                <span className="adm-wd-date">
+                  {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
+              <div className="adm-wd-actions">
                 <button
-                  className="btn btn-sm btn-primary"
+                  className="btn btn-primary btn-sm"
                   onClick={() => { void processWithdrawal(w.id, 'approve'); }}
                 >
-                  Approve
+                  <CheckCircle2 size={13} /> Approve
                 </button>
                 <button
-                  className="btn btn-sm btn-ghost btn-danger"
+                  className="btn btn-danger btn-sm"
                   onClick={() => setWdRejectTarget(w.id)}
                 >
-                  Reject
+                  <XCircle size={13} /> Reject
                 </button>
               </div>
             </div>
@@ -927,38 +631,35 @@ export default function AdminDashboard() {
 
       {/* ── KYC ── */}
       {tab === 'kyc' && (
-        <div className="admin-list">
+        <div className="adm-list">
           {kycList.length === 0 ? (
             <div className="empty-state"><p>No pending KYC submissions.</p></div>
           ) : kycList.map((k) => (
-            <div key={k.id} className="admin-card kyc-card">
-              <div className="admin-card-body">
-                <div className="admin-card-main">
-                  <span className="admin-card-title">{k.username}</span>
-                  <span className="admin-card-sub">{k.email}</span>
-                  <div className="admin-card-meta" style={{ marginTop: 4 }}>
-                    <span className="text-muted" style={{ fontSize: 12 }}>
-                      {k.id_type.replace('_', ' ')} · {new Date(k.submitted_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
-                    <span className={`badge ${
-                      k.status === 'approved' ? 'badge--success' :
-                      k.status === 'rejected' ? 'badge--error' :
-                      k.status === 'pending'  ? 'badge--warning' : ''
-                    }`}>{k.status}</span>
-                  </div>
+            <div key={k.id} className="adm-kyc-card">
+              <div className="adm-kyc-top">
+                <div className="adm-kyc-user">
+                  <span className="adm-kyc-username">{k.username}</span>
+                  <span className="adm-kyc-email">{k.email}</span>
+                </div>
+                <div className="adm-kyc-meta">
+                  <span className={`adm-kyc-badge adm-kyc-badge--${k.status}`}>{k.status}</span>
+                  <span className="adm-kyc-type">{k.id_type.replace('_', ' ')}</span>
+                  <span className="adm-kyc-date">
+                    {new Date(k.submitted_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                  </span>
                 </div>
               </div>
 
-              {/* Image preview toggle */}
               <button
-                className="btn btn-sm btn-ghost kyc-preview-toggle"
+                className="adm-docs-toggle"
                 onClick={() => setExpandedKyc(expandedKyc === k.id ? null : k.id)}
               >
-                {expandedKyc === k.id ? 'Hide Documents' : 'View Documents'}
+                {expandedKyc === k.id ? <EyeOff size={13} /> : <Eye size={13} />}
+                {expandedKyc === k.id ? 'Hide documents' : 'View documents'}
               </button>
 
               {expandedKyc === k.id && (
-                <div className="kyc-images-row">
+                <div className="adm-kyc-docs">
                   <div className="kyc-img-wrap">
                     <span className="kyc-img-label">ID Front</span>
                     <KycImage kycId={k.id} field="id_front" alt="ID front" />
@@ -970,24 +671,25 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              <div className="admin-card-actions">
+              <div className="adm-kyc-actions">
                 <button
-                  className="btn btn-sm btn-primary"
+                  className="btn btn-primary btn-sm"
                   onClick={() => { void reviewKyc(k.id, 'approve'); }}
                 >
-                  Approve
+                  <CheckCircle2 size={13} /> Approve
                 </button>
                 <button
-                  className="btn btn-sm btn-ghost btn-danger"
+                  className="btn btn-danger btn-sm"
                   onClick={() => setRejectTarget(k.id)}
                 >
-                  Reject
+                  <XCircle size={13} /> Reject
                 </button>
               </div>
             </div>
           ))}
         </div>
       )}
+
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import api from '../../services/api.ts';
 import { useAuth } from '../../store/authStore.tsx';
-import { useToast } from '../../components/common/Toast.tsx';
 import { useAchievement } from '../../components/common/Achievement.tsx';
 import {
   Bot, X, CheckCircle2, XCircle,
@@ -70,7 +69,6 @@ function categoryColor(cat: string) {
 
 export default function ChatTask({ onClose }: Props) {
   const { fetchMe } = useAuth();
-  const toast       = useToast();
   const achievement = useAchievement();
 
   const [status,         setStatus]         = useState<QuizStatus | null>(null);
@@ -163,15 +161,9 @@ export default function ChatTask({ onClose }: Props) {
       if (data.is_correct) setSessionCorrect((n) => n + 1);
       setPhase('feedback');
 
-      // Real-time balance update + achievement popup for correct answers
+      // Real-time balance update for correct answers
       if (data.is_correct && data.reward_earned > 0) {
         void fetchMe();
-        achievement.showAchievement({
-          emoji:    '✅',
-          title:    `+₱${data.reward_earned.toFixed(2)} earned!`,
-          subtitle: 'Correct answer — keep it up!',
-          type:     'task',
-        });
       }
 
       // Refresh quiz status
