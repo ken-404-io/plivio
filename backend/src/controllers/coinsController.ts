@@ -24,11 +24,11 @@ export async function getCoins(req: Request, res: Response, next: NextFunction):
 
     const u = rows[0];
 
-    // Use server-side UTC date so all timezone comparisons are consistent
+    // Use Philippine Standard Time (UTC+8) so the streak resets at 12am PH time
     const { rows: dateRows } = await pool.query<{ today: string; yesterday: string }>(
       `SELECT
-         (NOW() AT TIME ZONE 'UTC')::date::text          AS today,
-         ((NOW() AT TIME ZONE 'UTC')::date - 1)::text    AS yesterday`,
+         (NOW() AT TIME ZONE 'Asia/Manila')::date::text          AS today,
+         ((NOW() AT TIME ZONE 'Asia/Manila')::date - 1)::text    AS yesterday`,
     );
     const today     = dateRows[0].today;
     const yesterday = dateRows[0].yesterday;
@@ -44,7 +44,7 @@ export async function getCoins(req: Request, res: Response, next: NextFunction):
       const { rows: qRows } = await pool.query<{ count: string }>(
         `SELECT COUNT(*) FROM user_question_answers
          WHERE user_id = $1
-           AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
+           AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'Asia/Manila')`,
         [userId],
       );
       todayCompletions = Number(qRows[0]?.count ?? 0);
@@ -88,11 +88,11 @@ export async function checkIn(req: Request, res: Response, next: NextFunction): 
 
     const u = rows[0];
 
-    // Compute today/yesterday in UTC on the DB server — avoids JS timezone drift
+    // Compute today/yesterday in PH time (UTC+8) — streak resets at 12am Philippines
     const { rows: dateRows } = await client.query<{ today: string; yesterday: string }>(
       `SELECT
-         (NOW() AT TIME ZONE 'UTC')::date::text       AS today,
-         ((NOW() AT TIME ZONE 'UTC')::date - 1)::text AS yesterday`,
+         (NOW() AT TIME ZONE 'Asia/Manila')::date::text       AS today,
+         ((NOW() AT TIME ZONE 'Asia/Manila')::date - 1)::text AS yesterday`,
     );
     const today     = dateRows[0].today;
     const yesterday = dateRows[0].yesterday;
@@ -217,7 +217,7 @@ export async function recoverStreak(req: Request, res: Response, next: NextFunct
     const u = rows[0];
 
     const { rows: dateRows } = await client.query<{ today: string }>(
-      `SELECT (NOW() AT TIME ZONE 'UTC')::date::text AS today`,
+      `SELECT (NOW() AT TIME ZONE 'Asia/Manila')::date::text AS today`,
     );
     const today = dateRows[0].today;
 
