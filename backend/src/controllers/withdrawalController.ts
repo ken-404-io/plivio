@@ -140,7 +140,7 @@ export async function cancelWithdrawal(
     const userId = req.user!.id;
     const { id } = req.params as Record<string, string>;
 
-    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new ValidationError('Invalid withdrawal id');
+    if (!/^\d+$/.test(id) || Number(id) < 1) throw new ValidationError('Invalid withdrawal id');
 
     await client.query('BEGIN');
 
