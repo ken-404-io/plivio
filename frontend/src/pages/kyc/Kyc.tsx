@@ -130,7 +130,36 @@ export default function Kyc() {
   const canSubmit = currentStatus === 'none' || currentStatus === 'rejected';
   const cfg       = STATUS_CONFIG[currentStatus];
 
-  if (loading) return <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>;
+  if (loading) return (
+    <div className="page">
+      <div className="sk-section">
+        <span className="sk sk-line sk-line--xl skeleton" style={{ width: '40%' }} />
+        <span className="sk sk-line--sm skeleton" style={{ width: '55%' }} />
+      </div>
+      {/* Status banner skeleton */}
+      <div className="sk-card sk-row" style={{ padding: 16, gap: 12 }}>
+        <span className="sk skeleton sk-circle" style={{ width: 40, height: 40, flexShrink: 0 }} />
+        <div className="sk-col" style={{ gap: 6 }}>
+          <span className="sk sk-line skeleton" style={{ width: '60%' }} />
+          <span className="sk sk-line--sm skeleton" style={{ width: '40%' }} />
+        </div>
+      </div>
+      {/* Upload form skeleton */}
+      <div className="sk-card sk-section" style={{ padding: 20, gap: 16 }}>
+        <span className="sk sk-line skeleton" style={{ width: '45%' }} />
+        <span className="sk sk-line--sm skeleton" style={{ width: '70%' }} />
+        <div className="sk-col" style={{ gap: 8 }}>
+          <span className="sk sk-line--sm skeleton" style={{ width: '20%' }} />
+          <span className="sk skeleton" style={{ height: 44, borderRadius: 8, width: '100%' }} />
+        </div>
+        <div className="sk-row" style={{ gap: 12 }}>
+          <span className="sk skeleton" style={{ flex: 1, height: 130, borderRadius: 10 }} />
+          <span className="sk skeleton" style={{ flex: 1, height: 130, borderRadius: 10 }} />
+        </div>
+        <span className="sk skeleton" style={{ height: 44, borderRadius: 8, width: '100%' }} />
+      </div>
+    </div>
+  );
 
   return (
     <div className="page">

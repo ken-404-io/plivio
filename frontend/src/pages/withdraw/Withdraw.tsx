@@ -126,6 +126,7 @@ export default function Withdraw() {
     account_number: '',
   });
   const [history,    setHistory]    = useState<Withdrawal[]>([]);
+  const [loading,    setLoading]    = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [cancelling,  setCancelling]  = useState<string | null>(null);
@@ -135,6 +136,7 @@ export default function Withdraw() {
       const { data } = await api.get<{ data: Withdrawal[] }>('/withdrawals');
       setHistory(data.data);
     } catch { /* silent */ }
+    finally { setLoading(false); }
   }
 
   useEffect(() => { void loadHistory(); }, []);
@@ -209,6 +211,62 @@ export default function Withdraw() {
   const accountNumberLabel = form.method === 'gcash'
     ? 'GCash Number'
     : 'PayPal Email';
+
+  if (loading) return (
+    <div className="page">
+      <div className="sk-section">
+        <span className="sk sk-line sk-line--xl skeleton" style={{ width: '35%' }} />
+        <span className="sk sk-line--sm skeleton" style={{ width: '55%' }} />
+      </div>
+      {/* Balance card skeleton */}
+      <div className="sk-card sk-row" style={{ padding: 20, justifyContent: 'space-between' }}>
+        <div className="sk-col" style={{ gap: 8 }}>
+          <span className="sk sk-line--sm skeleton" style={{ width: 120 }} />
+          <span className="sk sk-line--xl skeleton" style={{ width: 100 }} />
+        </div>
+        <div className="sk-col" style={{ alignItems: 'flex-end', gap: 8 }}>
+          <span className="sk skeleton" style={{ width: 32, height: 32, borderRadius: 8 }} />
+          <span className="sk sk-line--sm skeleton" style={{ width: 90 }} />
+        </div>
+      </div>
+      {/* Form skeleton */}
+      <div className="sk-card sk-section" style={{ padding: 20, gap: 16 }}>
+        <span className="sk sk-line skeleton" style={{ width: '40%' }} />
+        <div className="sk-row" style={{ gap: 8 }}>
+          <span className="sk skeleton" style={{ flex: 1, height: 56, borderRadius: 8 }} />
+          <span className="sk skeleton" style={{ flex: 1, height: 56, borderRadius: 8 }} />
+        </div>
+        <div className="sk-col" style={{ gap: 8 }}>
+          <span className="sk sk-line--sm skeleton" style={{ width: '30%' }} />
+          <span className="sk skeleton" style={{ height: 44, borderRadius: 8, width: '100%' }} />
+        </div>
+        <div className="sk-col" style={{ gap: 8 }}>
+          <span className="sk sk-line--sm skeleton" style={{ width: '25%' }} />
+          <span className="sk skeleton" style={{ height: 44, borderRadius: 8, width: '100%' }} />
+        </div>
+        <span className="sk skeleton" style={{ height: 44, borderRadius: 8, width: '100%' }} />
+      </div>
+      {/* History skeleton */}
+      <div className="sk-section" style={{ gap: 10 }}>
+        <span className="sk sk-line skeleton" style={{ width: '40%' }} />
+        {[0,1,2].map(i => (
+          <div key={i} className="sk-card sk-section" style={{ padding: 14, gap: 10 }}>
+            <div className="sk-row" style={{ justifyContent: 'space-between' }}>
+              <div className="sk-row" style={{ gap: 8 }}>
+                <span className="sk skeleton" style={{ width: 20, height: 20, borderRadius: 4 }} />
+                <span className="sk sk-line skeleton" style={{ width: 60 }} />
+              </div>
+              <span className="sk sk-line skeleton" style={{ width: 70 }} />
+            </div>
+            <div className="sk-row" style={{ justifyContent: 'space-between' }}>
+              <span className="sk sk-line--sm skeleton" style={{ width: '45%' }} />
+              <span className="sk sk-line--sm skeleton" style={{ width: 60 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="page">

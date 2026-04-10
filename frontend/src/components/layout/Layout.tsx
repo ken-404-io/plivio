@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link, Outlet } from 'react-router-dom';
-import { Flame } from 'lucide-react';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Flame, AlertTriangle } from 'lucide-react';
 import Sidebar           from './Sidebar.tsx';
 import BottomNav         from './BottomNav.tsx';
 import NotificationBell  from '../common/NotificationBell.tsx';
@@ -14,7 +14,8 @@ interface LayoutProps {
 }
 
 export default function Layout({ isAdmin = false }: LayoutProps) {
-  const { user } = useAuth();
+  const { user, transition, sessionConflict, dismissSessionConflict } = useAuth();
+  const navigate = useNavigate();
   const [showOnboarding, setShowOnboarding] = useState(false);
   usePushNotifications(user?.id);
 
@@ -29,6 +30,11 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+  function handleSessionConflictDismiss() {
+    dismissSessionConflict();
+    navigate('/login');
+  }
 
   return (
     <AchievementProvider>
@@ -53,12 +59,6 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
             <Link to="/plans" className="topbar-plan-badge" aria-label="My plan">
               {user?.plan ?? 'Free'}
             </Link>
-          </div>
-
-          {/* Centre: logo mark (mobile) + brand text (desktop) */}
-          <div className="topbar-center">
-            <img src="/logo-mark.svg" alt="Plivio" className="topbar-logo-mark" aria-hidden="true" />
-            <span className="topbar-brand">Plivio</span>
           </div>
 
           {/* Right side */}
@@ -93,6 +93,40 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
           email={user.email}
           onDone={() => setShowOnboarding(false)}
         />
+      )}
+
+      {/* Auth transition overlay */}
+      {transition && (
+        <div className="auth-transition-overlay">
+          <div className="auth-transition-content">
+            <div className="auth-transition-spinner" />
+            <p className="auth-transition-text">
+              {transition === 'logging-in' ? 'Logging in...' : 'Logging out...'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Session conflict overlay */}
+      {sessionConflict && (
+        <div className="session-conflict-overlay">
+          <div className="session-conflict-modal">
+            <div className="session-conflict-icon">
+              <AlertTriangle size={40} />
+            </div>
+            <h2 className="session-conflict-title">Session Conflict</h2>
+            <p className="session-conflict-desc">
+              Another account has been signed in from this browser.
+              Only one account can be active per browser at a time.
+            </p>
+            <button
+              className="btn btn-primary btn-full"
+              onClick={handleSessionConflictDismiss}
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
       )}
     </div>
     </AchievementProvider>

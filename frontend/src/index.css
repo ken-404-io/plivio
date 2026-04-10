@@ -3879,25 +3879,7 @@ a, button, [role="button"], [tabindex] {
   padding: 12px 32px 0;
   gap: 12px;
 }
-.topbar-center {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  justify-content: flex-start;
-}
-.topbar-logo-mark {
-  display: none; /* shown on mobile only */
-  width: 22px;
-  height: 22px;
-}
-.topbar-brand {
-  display: none; /* hidden on mobile — shown on desktop via sidebar logic */
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--accent);
-  letter-spacing: -0.5px;
-}
+/* topbar-center removed — logo no longer shown in header */
 .topbar-right {
   display: flex;
   align-items: center;
@@ -4433,19 +4415,11 @@ a, button, [role="button"], [tabindex] {
     z-index: 50;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    justify-content: space-between;
   }
   .topbar-brand { display: none; }
   .topbar-mobile-left { display: flex; }
   .topbar-stats { display: flex; }
-  /* Logo mark truly centred via absolute positioning */
-  .topbar-center {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    flex: unset;
-    justify-content: center;
-  }
-  .topbar-logo-mark { display: block; }
 
   /* Slightly larger avatar for easier tap */
   .topbar-avatar { width: 38px; height: 38px; }
@@ -6050,4 +6024,114 @@ a, button, [role="button"], [tabindex] {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+
+/* ─── Auth Transition Overlay ──────────────────────────────────────────────── */
+
+.auth-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  animation: authTransitionFadeIn 0.3s ease-out;
+}
+
+.auth-transition-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  animation: authTransitionPulse 1.5s ease-in-out infinite;
+}
+
+.auth-transition-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: authTransitionSpin 0.8s linear infinite;
+}
+
+.auth-transition-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-heading);
+  letter-spacing: 0.3px;
+}
+
+@keyframes authTransitionFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes authTransitionSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes authTransitionPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
+}
+
+/* ─── Session Conflict Overlay ─────────────────────────────────────────────── */
+
+.session-conflict-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 20px;
+  animation: authTransitionFadeIn 0.3s ease-out;
+}
+
+.session-conflict-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px 24px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  animation: sessionConflictSlideUp 0.35s ease-out;
+}
+
+.session-conflict-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  background: rgba(239, 68, 68, 0.12);
+  border-radius: 50%;
+  color: var(--error);
+}
+
+.session-conflict-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-heading);
+  margin-bottom: 8px;
+}
+
+.session-conflict-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+@keyframes sessionConflictSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }

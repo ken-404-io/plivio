@@ -8,8 +8,6 @@ import BackButton from '../../components/common/BackButton.tsx';
 type Tab = 'account' | 'security' | 'email';
 type TwoFaPhase = 'idle' | 'scanning' | 'disabling';
 
-const API_BASE = import.meta.env.VITE_API_URL as string ?? 'http://localhost:3000';
-
 // ─── 2FA Section ─────────────────────────────────────────────────────────────
 
 interface TwoFaSectionProps {
@@ -381,7 +379,10 @@ function AvatarUpload({ avatarUrl, username, onUploaded }: {
   const inputRef  = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
-  const src = avatarUrl ? `${API_BASE}${avatarUrl}` : null;
+  // Cloudinary URLs are absolute; legacy local paths are relative
+  const src = avatarUrl
+    ? (avatarUrl.startsWith('http') ? avatarUrl : avatarUrl)
+    : null;
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

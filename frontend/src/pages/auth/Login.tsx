@@ -49,7 +49,7 @@ function EyeIcon({ visible }: { visible: boolean }) {
 }
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, transition } = useAuth();
   const navigate  = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -89,6 +89,18 @@ export default function Login() {
 
   return (
     <div className="auth-screen">
+      {/* Auth transition overlay */}
+      {transition && (
+        <div className="auth-transition-overlay">
+          <div className="auth-transition-content">
+            <div className="auth-transition-spinner" />
+            <p className="auth-transition-text">
+              {transition === 'logging-in' ? 'Logging in...' : 'Logging out...'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="auth-card">
         <div className="auth-header">
           <h1 className="brand-name">Plivio</h1>
