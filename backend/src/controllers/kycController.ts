@@ -156,9 +156,17 @@ export async function serveKycDocument(
 
     if (!fileUrl) throw new NotFoundError('Document not found');
 
-    // Cloudinary URLs — redirect to the stored secure URL
+    // Cloudinary URLs — proxy the image to avoid CORS issues with redirects
     if (fileUrl.startsWith('https://')) {
-      res.redirect(fileUrl);
+      const upstream = await fetch(fileUrl);
+      if (!upstream.ok) throw new NotFoundError('Document not found on storage');
+
+      const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'private, max-age=300');
+
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      res.send(buffer);
       return;
     }
 
