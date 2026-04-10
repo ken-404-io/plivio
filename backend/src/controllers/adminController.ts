@@ -220,7 +220,7 @@ export async function listPendingWithdrawals(req: Request, res: Response, next: 
   try {
     const status = (req.query.status as string) || 'pending';
     const { rows } = await pool.query(
-      `SELECT w.id, w.amount, w.method, w.status,
+      `SELECT w.id, w.amount, w.fee_amount, w.net_amount, w.method, w.status,
               w.account_name, w.account_number,
               w.requested_at, w.processed_at,
               u.username, u.email
@@ -258,6 +258,7 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
     );
 
     if (action === 'reject') {
+      // Refund the full requested amount (fee waived on rejection)
       await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [withdrawal.amount, withdrawal.user_id]);
     }
 
@@ -269,16 +270,18 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
 
     await client.query('COMMIT');
 
+    const netAmount = Number(withdrawal.net_amount ?? withdrawal.amount);
+
     // Send email + in-app notification (outside transaction — non-fatal)
     if (userRows.length > 0) {
       const u = userRows[0] as { email: string; username: string };
-      void sendWithdrawalStatusEmail(u.email, u.username, Number(withdrawal.amount), newStatus as 'paid' | 'rejected');
+      void sendWithdrawalStatusEmail(u.email, u.username, netAmount, newStatus as 'paid' | 'rejected');
 
       const isPaid  = newStatus === 'paid';
       const wdTitle = isPaid ? 'Withdrawal Approved' : 'Withdrawal Rejected';
       const wdBody  = isPaid
-        ? `Your withdrawal of ₱${Number(withdrawal.amount).toFixed(2)} has been approved and is on its way.`
-        : `Your withdrawal of ₱${Number(withdrawal.amount).toFixed(2)} was rejected. Your balance has been refunded.`;
+        ? `Your withdrawal of ₱${netAmount.toFixed(2)} has been approved and is being sent to your account.`
+        : `Your withdrawal was rejected. ₱${Number(withdrawal.amount).toFixed(2)} has been refunded to your balance.`;
 
       void createNotification(
         withdrawal.user_id as string,

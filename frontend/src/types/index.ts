@@ -161,6 +161,8 @@ export interface EarningsResponse {
 export interface Withdrawal {
   id: string;
   amount: string | number;
+  fee_amount: string | number;
+  net_amount: string | number;
   method: WithdrawalMethod;
   status: WithdrawalStatus;
   account_name: string;
@@ -225,6 +227,8 @@ export interface AdminTask {
 export interface AdminWithdrawal {
   id: string;
   amount: string | number;
+  fee_amount: string | number;
+  net_amount: string | number;
   method: WithdrawalMethod;
   status: WithdrawalStatus;
   account_name: string;

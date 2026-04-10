@@ -4803,6 +4803,62 @@ a, button, [role="button"], [tabindex] {
 }
 
 /* ─── Admin — withdrawal payment info ────────────────────────────────────────── */
+/* ─── Withdrawal invoice modal ───────────────────────────────────────────────── */
+.wd-invoice-modal { max-width: 380px !important; }
+.wd-invoice {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wd-invoice-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wd-invoice-row--fee .wd-invoice-label { color: var(--text-muted); font-size: 12px; }
+.wd-invoice-row--total { padding-top: 2px; }
+.wd-invoice-row--total .wd-invoice-label { font-weight: 600; font-size: 13px; }
+.wd-invoice-label { font-size: 13px; color: var(--text); }
+.wd-invoice-value { font-size: 13px; font-weight: 600; color: var(--text-heading); }
+.wd-invoice-value--fee { color: var(--error); font-weight: 500; }
+.wd-invoice-divider { height: 1px; background: var(--border); margin: 2px 0; }
+.wd-invoice-net {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 10px 14px;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+}
+.wd-invoice-net-label { font-size: 13px; font-weight: 600; color: var(--accent); }
+.wd-invoice-net-value { font-size: 20px; font-weight: 800; color: var(--accent); }
+.wd-invoice-dest {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.wd-invoice-dest-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.wd-invoice-dest-label { font-size: 12px; color: var(--text-muted); }
+.wd-invoice-dest-value { font-size: 12px; font-weight: 600; color: var(--text-heading); text-align: right; }
+.wd-invoice-note { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+.withdraw-history-gross { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
+
+/* Admin withdrawal amounts */
+.adm-wd-amounts { text-align: right; flex-shrink: 0; }
+.adm-wd-amount-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
 .wd-payment-info {
   display: flex;
   align-items: center;
