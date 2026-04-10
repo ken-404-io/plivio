@@ -46,7 +46,7 @@ export const PLANS: Record<string, PlanInfo> = {
   },
   elite: {
     name:        'Elite',
-    price_php:   499,
+    price_php:   30099,
     daily_limit: null,
     features:    ['All tasks', 'Unlimited daily earnings', 'Exclusive tasks', 'No ads', 'Early access', 'VIP support'],
   },
