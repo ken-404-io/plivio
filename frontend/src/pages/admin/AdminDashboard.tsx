@@ -598,7 +598,12 @@ export default function AdminDashboard() {
                   <span className="adm-wd-username">{w.username}</span>
                   <span className="adm-wd-email">{w.email}</span>
                 </div>
-                <div className="adm-wd-amount">₱{Number(w.amount).toFixed(2)}</div>
+                <div className="adm-wd-amounts">
+                  <div className="adm-wd-amount">₱{Number(w.net_amount || w.amount).toFixed(2)}</div>
+                  <div className="adm-wd-amount-sub">
+                    Requested ₱{Number(w.amount).toFixed(2)} · Fee ₱{Number(w.fee_amount || 0).toFixed(2)}
+                  </div>
+                </div>
               </div>
               <div className="adm-wd-payment">
                 <span className="adm-wd-method">{w.method.toUpperCase()}</span>
