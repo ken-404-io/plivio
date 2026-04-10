@@ -269,9 +269,9 @@ export interface RegisterPayload {
 export interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ requires_2fa: boolean }>;
-  verify2FA: (token: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ requires_2fa: boolean; is_admin: boolean }>;
+  verify2FA: (token: string) => Promise<{ is_admin: boolean }>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
-  fetchMe: () => Promise<void>;
+  fetchMe: () => Promise<User | null>;
 }
