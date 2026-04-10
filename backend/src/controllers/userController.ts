@@ -1,12 +1,14 @@
 import crypto  from 'crypto';
 import bcrypt  from 'bcrypt';
-import fs      from 'fs';
-import path    from 'path';
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { AuthenticationError, NotFoundError, ValidationError, ConflictError, RateLimitError } from '../utils/errors.ts';
 import { sendVerificationEmail } from '../services/email.ts';
-import { AVATARS_DIR } from '../middleware/upload.ts';
+import {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+  extractPublicId,
+} from '../config/cloudinary.ts';
 import { logger } from '../utils/logger.ts';
 
 const BCRYPT_ROUNDS = 12;
@@ -87,27 +89,26 @@ export async function uploadAvatar(
 
     const userId = req.user!.id;
 
-    // Delete old avatar file if it exists
+    // Delete old avatar from Cloudinary if it exists
     const { rows: prev } = await pool.query(
       'SELECT avatar_url FROM users WHERE id = $1',
       [userId],
     );
     const oldUrl = (prev[0] as { avatar_url: string | null })?.avatar_url;
     if (oldUrl) {
-      // oldUrl is like /uploads/avatars/abc.jpg → derive local path
-      const filename    = path.basename(oldUrl);
-      const oldFilePath = path.join(AVATARS_DIR, filename);
-      const resolved    = path.resolve(oldFilePath);
-      if (resolved.startsWith(path.resolve(AVATARS_DIR))) {
-        try { fs.unlinkSync(resolved); } catch { /* may not exist */ }
-      }
+      const publicId = extractPublicId(oldUrl);
+      if (publicId) void deleteFromCloudinary(publicId);
     }
 
-    // Store relative URL (served via express.static)
-    const avatarUrl = `/uploads/avatars/${file.filename}`;
-    await pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [avatarUrl, userId]);
+    // Upload to Cloudinary
+    const result = await uploadToCloudinary(file.buffer, 'plivio/avatars', {
+      public_id:       `user_${userId}_${Date.now()}`,
+      transformation:  [{ width: 256, height: 256, crop: 'fill', gravity: 'face' }],
+    });
 
-    res.json({ success: true, avatar_url: avatarUrl });
+    await pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [result.secure_url, userId]);
+
+    res.json({ success: true, avatar_url: result.secure_url });
   } catch (err) { next(err); }
 }
 

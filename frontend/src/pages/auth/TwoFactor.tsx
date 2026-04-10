@@ -4,7 +4,7 @@ import { useAuth } from '../../store/authStore.tsx';
 import type { AxiosError } from 'axios';
 
 export default function TwoFactor() {
-  const { verify2FA } = useAuth();
+  const { verify2FA, transition } = useAuth();
   const navigate      = useNavigate();
 
   const [token, setToken]     = useState('');
@@ -32,6 +32,17 @@ export default function TwoFactor() {
 
   return (
     <div className="auth-screen">
+      {transition && (
+        <div className="auth-transition-overlay">
+          <div className="auth-transition-content">
+            <div className="auth-transition-spinner" />
+            <p className="auth-transition-text">
+              {transition === 'logging-in' ? 'Logging in...' : 'Logging out...'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="auth-card">
         <div className="auth-header">
           <h1 className="brand-name">Plivio</h1>

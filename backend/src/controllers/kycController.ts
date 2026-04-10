@@ -1,21 +1,25 @@
 /**
  * KYC (Know Your Customer) controller.
  *
+ * Files are uploaded to Cloudinary under the `plivio/kyc/{userId}` folder.
+ * Cloudinary secure URLs are stored in the database.
+ *
  * Security:
- *  – Files stored with crypto-random names outside express.static.
  *  – KYC documents are served only to the owning user or an admin
  *    via an authenticated endpoint — never via a public static URL.
- *  – Old pending submissions are replaced atomically to prevent duplicates.
+ *  – Old pending submissions are cleaned up from Cloudinary to avoid orphans.
  *  – kyc_status column on users is kept in sync for fast lookups.
  */
-import path from 'path';
-import fs   from 'fs';
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { NotFoundError, ValidationError, ForbiddenError } from '../utils/errors.ts';
 import { createNotification } from '../utils/notify.ts';
 import { sendPushToUser }    from '../controllers/pushController.ts';
-import { KYC_DIR } from '../middleware/upload.ts';
+import {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+  extractPublicId,
+} from '../config/cloudinary.ts';
 
 const VALID_ID_TYPES = new Set([
   'passport', 'national_id', 'drivers_license',
@@ -57,26 +61,37 @@ export async function submitKyc(
       if (status === 'approved') {
         throw new ValidationError('Your KYC is already approved');
       }
-      // Delete old rejected/pending submission files to avoid orphans
+      // Delete old rejected/pending submission files from Cloudinary
       const old = await pool.query(
         `DELETE FROM kyc_submissions WHERE user_id = $1 AND status != 'approved'
          RETURNING id_front_path, id_selfie_path`,
         [userId],
       );
       for (const row of old.rows as { id_front_path: string; id_selfie_path: string }[]) {
-        [row.id_front_path, row.id_selfie_path].forEach((p) => {
-          try { if (p) fs.unlinkSync(p); } catch { /* file may not exist */ }
-        });
+        for (const url of [row.id_front_path, row.id_selfie_path]) {
+          if (url) {
+            const publicId = extractPublicId(url);
+            if (publicId) void deleteFromCloudinary(publicId);
+          }
+        }
       }
     }
 
-    const frontPath  = idFront.path;
-    const selfiePath = idSelfie.path;
+    // Upload both documents to Cloudinary
+    const folder = `plivio/kyc/${userId}`;
+    const [frontResult, selfieResult] = await Promise.all([
+      uploadToCloudinary(idFront.buffer, folder, {
+        public_id: `id_front_${Date.now()}`,
+      }),
+      uploadToCloudinary(idSelfie.buffer, folder, {
+        public_id: `id_selfie_${Date.now()}`,
+      }),
+    ]);
 
     await pool.query(
       `INSERT INTO kyc_submissions (user_id, id_type, id_front_path, id_selfie_path)
        VALUES ($1, $2, $3, $4)`,
-      [userId, id_type, frontPath, selfiePath],
+      [userId, id_type, frontResult.secure_url, selfieResult.secure_url],
     );
 
     await pool.query(`UPDATE users SET kyc_status = 'pending' WHERE id = $1`, [userId]);
@@ -104,7 +119,7 @@ export async function getKycStatus(
   } catch (err) { next(err); }
 }
 
-/** GET /kyc/document/:field — serve KYC document to owner or admin */
+/** GET /kyc/document/:field — serve KYC document URL to owner or admin */
 export async function serveKycDocument(
   req: Request,
   res: Response,
@@ -122,7 +137,7 @@ export async function serveKycDocument(
     const isAdmin = req.user!.is_admin;
     const kycId   = req.query.kyc_id as string | undefined;
 
-    let filePath: string | null = null;
+    let fileUrl: string | null = null;
 
     if (isAdmin && kycId) {
       if (!/^[0-9a-f-]{36}$/i.test(kycId)) throw new ValidationError('Invalid kyc_id');
@@ -130,24 +145,25 @@ export async function serveKycDocument(
         `SELECT ${col} FROM kyc_submissions WHERE id = $1`,
         [kycId],
       );
-      filePath = rows[0]?.[col] as string ?? null;
+      fileUrl = rows[0]?.[col] as string ?? null;
     } else {
       const { rows } = await pool.query(
         `SELECT ${col} FROM kyc_submissions WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 1`,
         [req.user!.id],
       );
-      filePath = rows[0]?.[col] as string ?? null;
+      fileUrl = rows[0]?.[col] as string ?? null;
     }
 
-    if (!filePath) throw new NotFoundError('Document not found');
+    if (!fileUrl) throw new NotFoundError('Document not found');
 
-    // Ensure path is inside KYC_DIR (path traversal guard)
-    const resolved = path.resolve(filePath);
-    if (!resolved.startsWith(path.resolve(KYC_DIR))) {
-      throw new ForbiddenError('Access denied');
+    // Cloudinary URLs — redirect to the stored secure URL
+    if (fileUrl.startsWith('https://')) {
+      res.redirect(fileUrl);
+      return;
     }
 
-    res.sendFile(resolved);
+    // Legacy fallback: if it's a local path, deny access (migration required)
+    throw new ForbiddenError('Document storage migration required');
   } catch (err) { next(err); }
 }
 
@@ -220,7 +236,7 @@ export async function reviewKyc(
 
     // In-app notification
     if (action === 'approve') {
-      const title = 'KYC Approved ✓';
+      const title = 'KYC Approved';
       const body  = 'Your identity has been verified. You can now request withdrawals.';
       await createNotification(user_id, 'kyc_approved', title, body, '/withdraw');
       void sendPushToUser(user_id, title, body, '/withdraw');

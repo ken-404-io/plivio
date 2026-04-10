@@ -270,12 +270,17 @@ export interface RegisterPayload {
   device_id?: string;
 }
 
+export type AuthTransition = 'logging-in' | 'logging-out' | null;
+
 export interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  transition: AuthTransition;
+  sessionConflict: boolean;
   login: (email: string, password: string) => Promise<{ requires_2fa: boolean; is_admin: boolean }>;
   verify2FA: (token: string) => Promise<{ is_admin: boolean }>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<User | null>;
+  dismissSessionConflict: () => void;
 }

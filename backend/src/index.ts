@@ -11,7 +11,7 @@ import { logger } from './utils/logger.ts';
 import { AppError } from './utils/errors.ts';
 import { rateLimiter } from './middleware/rateLimiter.ts';
 import { csrfMiddleware } from './middleware/csrf.ts';
-import { AVATARS_DIR } from './middleware/upload.ts';
+// Cloudinary serves avatars/KYC images — no local AVATARS_DIR needed
 
 import authRoutes         from './routes/auth.ts';
 import taskRoutes         from './routes/tasks.ts';
@@ -40,7 +40,7 @@ app.use(helmet({
       defaultSrc:  ["'self'"],
       scriptSrc:   ["'self'"],
       styleSrc:    ["'self'"],           // removed unsafe-inline
-      imgSrc:      ["'self'", 'data:', 'https:'],
+      imgSrc:      ["'self'", 'data:', 'https:', 'https://res.cloudinary.com'],
       connectSrc:  ["'self'"],
       frameSrc:    ["'none'"],           // no iframes on API responses
       objectSrc:   ["'none'"],
@@ -86,11 +86,8 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
-// Serve avatar images publicly (safe — files have random names, no directory listing)
-app.use(
-  '/uploads/avatars',
-  express.static(AVATARS_DIR, { index: false, dotfiles: 'deny', maxAge: '7d' }),
-);
+// Avatars and KYC documents are now served from Cloudinary.
+// Legacy local uploads path kept as a no-op for backwards compatibility.
 
 app.use('/api/auth',          authRoutes);
 app.use('/api/tasks',         taskRoutes);
