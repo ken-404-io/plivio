@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { adminIpWhitelist } from '../middleware/adminAuth.ts';
 import { authenticate, requireAdmin } from '../middleware/auth.ts';
-import { validateBody, validateParam } from '../middleware/validate.ts';
+import { validateBody, validateParam, validateIntParam } from '../middleware/validate.ts';
 import { rateLimiter } from '../middleware/rateLimiter.ts';
 import {
   getStats,
@@ -25,7 +24,6 @@ const router = Router();
 // Also rate-limited separately from the public limiter so normal traffic doesn't
 // consume the admin budget.
 router.use(
-  adminIpWhitelist,
   authenticate,
   requireAdmin,
   rateLimiter({ max: 200, windowMs: 60_000, keyPrefix: 'admin' }),
@@ -79,7 +77,7 @@ router.delete('/tasks/:id',          validateParam('id'), deleteTask);
 
 router.get('/withdrawals', listPendingWithdrawals);
 router.put('/withdrawals/:id',
-  validateParam('id'),
+  validateIntParam('id'),
   validateBody({ action: { required: true, enum: ['approve', 'reject'] } }),
   processWithdrawal,
 );

@@ -4,7 +4,8 @@ import { ValidationError, ForbiddenError, NotFoundError } from '../utils/errors.
 
 const MIN_WITHDRAWAL  = 50;
 const MAX_WITHDRAWAL  = 5000;
-const GCASH_PHONE_RE  = /^09\d{9}$/;          // Philippine mobile: 09XXXXXXXXX
+const FEE_RATE        = 0.05;   // 5% total (1% document + 4% handling)
+const GCASH_PHONE_RE  = /^09\d{9}$/;
 const PAYPAL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─── Request withdrawal ────────────────────────────────────────────────────────
@@ -46,6 +47,10 @@ export async function requestWithdrawal(
       throw new ValidationError('PayPal account must be a valid email address');
     }
 
+    // ── Fee calculation ─────────────────────────────────────────────────────
+    const feeAmount = Math.round(amount * FEE_RATE * 100) / 100;
+    const netAmount = Math.round((amount - feeAmount) * 100) / 100;
+
     await client.query('BEGIN');
 
     // Lock the user row to prevent race conditions on balance
@@ -65,16 +70,17 @@ export async function requestWithdrawal(
       throw new ValidationError(`Insufficient balance. Available: ₱${Number(user.balance).toFixed(2)}`);
     }
 
+    // Deduct full requested amount from user balance
     await client.query(
       'UPDATE users SET balance = balance - $1 WHERE id = $2',
       [amount, userId],
     );
 
     const { rows } = await client.query(
-      `INSERT INTO withdrawals (user_id, amount, method, account_name, account_number)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, amount, method, status, account_name, account_number, requested_at`,
-      [userId, amount, method, accountName, accountNumber],
+      `INSERT INTO withdrawals (user_id, amount, fee_amount, net_amount, method, account_name, account_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, amount, fee_amount, net_amount, method, status, account_name, account_number, requested_at`,
+      [userId, amount, feeAmount, netAmount, method, accountName, accountNumber],
     );
 
     await client.query('COMMIT');
@@ -100,7 +106,7 @@ export async function listWithdrawals(
     const offset = (page - 1) * limit;
 
     const { rows } = await pool.query(
-      `SELECT id, amount, method, status, account_name, account_number,
+      `SELECT id, amount, fee_amount, net_amount, method, status, account_name, account_number,
               rejection_reason, requested_at, processed_at
        FROM withdrawals
        WHERE user_id = $1
@@ -122,7 +128,7 @@ export async function listWithdrawals(
   } catch (err) { next(err); }
 }
 
-// ─── Cancel a pending withdrawal (refunds balance atomically) ──────────────────
+// ─── Cancel a pending withdrawal (refunds full amount) ─────────────────────────
 
 export async function cancelWithdrawal(
   req: Request,
@@ -134,7 +140,7 @@ export async function cancelWithdrawal(
     const userId = req.user!.id;
     const { id } = req.params as Record<string, string>;
 
-    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new ValidationError('Invalid withdrawal id');
+    if (!/^\d+$/.test(id) || Number(id) < 1) throw new ValidationError('Invalid withdrawal id');
 
     await client.query('BEGIN');
 
@@ -154,7 +160,7 @@ export async function cancelWithdrawal(
       ['cancelled', id],
     );
 
-    // Refund the balance
+    // Refund the full requested amount (not net) — fee is waived on cancellation
     await client.query(
       'UPDATE users SET balance = balance + $1 WHERE id = $2',
       [withdrawal.amount, userId],

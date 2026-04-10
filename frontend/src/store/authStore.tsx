@@ -31,12 +31,14 @@ function reducer(state: AuthState, action: AuthAction): AuthState {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const fetchMe = useCallback(async () => {
+  const fetchMe = useCallback(async (): Promise<User | null> => {
     try {
       const { data } = await api.get<{ user: User }>('/users/me');
       dispatch({ type: 'SET_USER', payload: data.user });
+      return data.user;
     } catch {
       dispatch({ type: 'CLEAR_USER' });
+      return null;
     }
   }, []);
 
@@ -53,14 +55,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await api.post<{ requires_2fa?: boolean }>('/auth/login', { email, password });
-    if (data.requires_2fa) return { requires_2fa: true };
-    await fetchMe();
-    return { requires_2fa: false };
+    if (data.requires_2fa) return { requires_2fa: true, is_admin: false };
+    const user = await fetchMe();
+    return { requires_2fa: false, is_admin: user?.is_admin ?? false };
   }, [fetchMe]);
 
   const verify2FA = useCallback(async (token: string) => {
     await api.post('/auth/2fa/verify-login', { token });
-    await fetchMe();
+    const user = await fetchMe();
+    return { is_admin: user?.is_admin ?? false };
   }, [fetchMe]);
 
   const register = useCallback(async (payload: RegisterPayload) => {

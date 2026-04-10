@@ -127,15 +127,63 @@ export async function verifyEmail(
       throw new AuthenticationError('Verification link has expired. Please request a new one.');
     }
 
-    // Mark verified and delete the used token atomically
-    await pool.query('BEGIN');
+    // Mark verified and delete the used token atomically; fetch referred_by for bonus
+    const client = await pool.connect();
     try {
-      await pool.query('UPDATE users SET is_email_verified = TRUE WHERE id = $1', [row.user_id]);
-      await pool.query('DELETE FROM email_verification_tokens WHERE id = $1', [row.id]);
-      await pool.query('COMMIT');
+      await client.query('BEGIN');
+
+      const userRes = await client.query<{
+        referred_by: string | null;
+        is_email_verified: boolean;
+      }>(
+        'SELECT referred_by, is_email_verified FROM users WHERE id = $1 FOR UPDATE',
+        [row.user_id],
+      );
+      const userRow = userRes.rows[0];
+
+      // Idempotency guard — do nothing if already verified
+      if (userRow?.is_email_verified) {
+        await client.query('ROLLBACK');
+        res.json({ success: true, message: 'Email already verified' });
+        return;
+      }
+
+      await client.query('UPDATE users SET is_email_verified = TRUE WHERE id = $1', [row.user_id]);
+      await client.query('DELETE FROM email_verification_tokens WHERE id = $1', [row.id]);
+
+      // ── Credit referral bonus now that we know the email is real ─────────
+      if (userRow?.referred_by) {
+        try {
+          const refTaskRes = await client.query<{ id: string; reward_amount: string }>(
+            `SELECT id, reward_amount FROM tasks
+             WHERE type = 'referral' AND is_active = TRUE
+               AND (min_plan IS NULL OR min_plan = 'free')
+             ORDER BY reward_amount ASC LIMIT 1`,
+          );
+          if (refTaskRes.rowCount && refTaskRes.rowCount > 0) {
+            const refTask = refTaskRes.rows[0];
+            await client.query(
+              'UPDATE users SET balance = balance + $1 WHERE id = $2',
+              [refTask.reward_amount, userRow.referred_by],
+            );
+            await client.query(
+              `INSERT INTO task_completions
+                 (user_id, task_id, type, status, reward_earned, completed_at, proof, server_data)
+               VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
+              [userRow.referred_by, refTask.id, refTask.reward_amount],
+            );
+          }
+        } catch {
+          // Non-fatal — verification still succeeds even if bonus insert fails
+        }
+      }
+
+      await client.query('COMMIT');
     } catch (inner) {
-      await pool.query('ROLLBACK');
+      await client.query('ROLLBACK');
       throw inner;
+    } finally {
+      client.release();
     }
 
     res.json({ success: true, message: 'Email verified successfully' });

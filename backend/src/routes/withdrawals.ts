@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate }  from '../middleware/auth.ts';
 import { rateLimiter }   from '../middleware/rateLimiter.ts';
-import { validateParam } from '../middleware/validate.ts';
+import { validateIntParam } from '../middleware/validate.ts';
 import { requestWithdrawal, listWithdrawals, cancelWithdrawal } from '../controllers/withdrawalController.ts';
 
 const router = Router();
@@ -17,7 +17,7 @@ router.post('/',
 );
 
 router.delete('/:id',
-  validateParam('id'),
+  validateIntParam('id'),
   cancelWithdrawal,
 );
 

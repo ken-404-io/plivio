@@ -9,8 +9,11 @@ import type { Withdrawal } from '../../types/index.ts';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const MIN_AMOUNT    = 50;
-const MAX_AMOUNT    = 5000;
+const MIN_AMOUNT       = 50;
+const MAX_AMOUNT       = 5000;
+const DOC_FEE_RATE     = 0.01;   // 1% document fee
+const HANDLING_FEE_RATE= 0.04;   // 4% handling fee
+const TOTAL_FEE_RATE   = DOC_FEE_RATE + HANDLING_FEE_RATE; // 5%
 const GCASH_RE      = /^09\d{9}$/;
 const PAYPAL_EMAIL  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -39,34 +42,62 @@ interface ConfirmProps {
 }
 
 function ConfirmModal({ form, onConfirm, onCancel, loading }: ConfirmProps) {
-  const label  = form.method === 'gcash' ? 'GCash Number' : 'PayPal Email';
+  const amount      = Number(form.amount);
+  const docFee      = Math.round(amount * DOC_FEE_RATE     * 100) / 100;
+  const handlingFee = Math.round(amount * HANDLING_FEE_RATE * 100) / 100;
+  const totalFee    = Math.round(amount * TOTAL_FEE_RATE   * 100) / 100;
+  const netAmount   = Math.round((amount - totalFee)        * 100) / 100;
+  const acctLabel   = form.method === 'gcash' ? 'GCash Number' : 'PayPal Email';
+
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal-title">Confirm Withdrawal</h3>
-        <p className="modal-subtitle">Please review your details before submitting.</p>
+      <div className="modal wd-invoice-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="modal-title">Withdrawal Invoice</h3>
 
-        <div className="withdraw-confirm-rows">
-          <div className="withdraw-confirm-row">
-            <span className="withdraw-confirm-label">Amount</span>
-            <span className="withdraw-confirm-value">₱{Number(form.amount).toFixed(2)}</span>
+        {/* Fee breakdown */}
+        <div className="wd-invoice">
+          <div className="wd-invoice-row">
+            <span className="wd-invoice-label">Withdrawal amount</span>
+            <span className="wd-invoice-value">₱{amount.toFixed(2)}</span>
           </div>
-          <div className="withdraw-confirm-row">
-            <span className="withdraw-confirm-label">Method</span>
-            <span className="withdraw-confirm-value">{form.method.toUpperCase()}</span>
+          <div className="wd-invoice-divider" />
+          <div className="wd-invoice-row wd-invoice-row--fee">
+            <span className="wd-invoice-label">Document fee (1%)</span>
+            <span className="wd-invoice-value wd-invoice-value--fee">-₱{docFee.toFixed(2)}</span>
           </div>
-          <div className="withdraw-confirm-row">
-            <span className="withdraw-confirm-label">Account Name</span>
-            <span className="withdraw-confirm-value">{form.account_name}</span>
+          <div className="wd-invoice-row wd-invoice-row--fee">
+            <span className="wd-invoice-label">Handling fee (4%)</span>
+            <span className="wd-invoice-value wd-invoice-value--fee">-₱{handlingFee.toFixed(2)}</span>
           </div>
-          <div className="withdraw-confirm-row">
-            <span className="withdraw-confirm-label">{label}</span>
-            <span className="withdraw-confirm-value">{form.account_number}</span>
+          <div className="wd-invoice-divider" />
+          <div className="wd-invoice-row wd-invoice-row--total">
+            <span className="wd-invoice-label">Total fee (5%)</span>
+            <span className="wd-invoice-value wd-invoice-value--fee">-₱{totalFee.toFixed(2)}</span>
+          </div>
+          <div className="wd-invoice-net">
+            <span className="wd-invoice-net-label">You will receive</span>
+            <span className="wd-invoice-net-value">₱{netAmount.toFixed(2)}</span>
           </div>
         </div>
 
-        <p className="withdraw-confirm-note">
-          Make sure the {label.toLowerCase()} is correct. We are not responsible for funds sent to wrong accounts.
+        {/* Destination */}
+        <div className="wd-invoice-dest">
+          <div className="wd-invoice-dest-row">
+            <span className="wd-invoice-dest-label">Method</span>
+            <span className="wd-invoice-dest-value">{form.method.toUpperCase()}</span>
+          </div>
+          <div className="wd-invoice-dest-row">
+            <span className="wd-invoice-dest-label">Account name</span>
+            <span className="wd-invoice-dest-value">{form.account_name}</span>
+          </div>
+          <div className="wd-invoice-dest-row">
+            <span className="wd-invoice-dest-label">{acctLabel}</span>
+            <span className="wd-invoice-dest-value">{form.account_number}</span>
+          </div>
+        </div>
+
+        <p className="wd-invoice-note">
+          Make sure the {acctLabel.toLowerCase()} is correct. We are not responsible for funds sent to wrong accounts.
         </p>
 
         <div className="modal-actions">
@@ -74,7 +105,7 @@ function ConfirmModal({ form, onConfirm, onCancel, loading }: ConfirmProps) {
             Go back
           </button>
           <button className="btn btn-primary" onClick={onConfirm} disabled={loading}>
-            {loading ? 'Submitting…' : 'Confirm & Submit'}
+            {loading ? 'Submitting…' : 'Confirm & Withdraw'}
           </button>
         </div>
       </div>
@@ -341,7 +372,10 @@ export default function Withdraw() {
                       <span>{w.method.toUpperCase()}</span>
                     </div>
                     <span className="withdraw-history-amount">
-                      ₱{Number(w.amount).toFixed(2)}
+                      ₱{Number(w.net_amount || w.amount).toFixed(2)}
+                      {Number(w.fee_amount) > 0 && (
+                        <span className="withdraw-history-gross"> (req. ₱{Number(w.amount).toFixed(2)})</span>
+                      )}
                     </span>
                   </div>
 

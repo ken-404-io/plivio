@@ -21,6 +21,23 @@ export function validateParam(paramName: string) {
   };
 }
 
+/**
+ * Middleware that validates a positive integer route parameter by name.
+ * Use for tables whose PK is BIGSERIAL/INTEGER rather than UUID.
+ *
+ * Usage: router.put('/:id', validateIntParam('id'), handler)
+ */
+export function validateIntParam(paramName: string) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    const value = (req.params as Record<string, string>)[paramName];
+    if (!value || !/^\d+$/.test(value) || Number(value) < 1) {
+      next(new ValidationError(`Invalid ${paramName}`));
+      return;
+    }
+    next();
+  };
+}
+
 type FieldType = 'email' | 'username' | 'int' | 'number' | 'string';
 
 interface FieldRules {

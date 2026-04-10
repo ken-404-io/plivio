@@ -20,8 +20,8 @@ export default function TwoFactor() {
     setError('');
     setLoading(true);
     try {
-      await verify2FA(token);
-      navigate('/dashboard');
+      const result = await verify2FA(token);
+      navigate(result.is_admin ? '/admin' : '/dashboard');
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;
       setError(axErr.response?.data?.error || 'Invalid code. Please try again.');

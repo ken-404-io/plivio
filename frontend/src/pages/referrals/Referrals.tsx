@@ -85,6 +85,46 @@ export default function Referrals() {
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
+  if (loading) return (
+    <div className="page">
+      <div className="sk-section">
+        <span className="sk sk-line sk-line--xl skeleton" style={{ width: '45%' }} />
+        <span className="sk sk-line--sm skeleton" style={{ width: '60%' }} />
+      </div>
+      {/* stats row */}
+      <div className="sk-card sk-row" style={{ justifyContent: 'space-around', padding: 20 }}>
+        {[0,1,2].map(i => (
+          <div key={i} className="sk-col" style={{ alignItems: 'center', gap: 8 }}>
+            <span className="sk sk-line--xl skeleton" style={{ width: 60 }} />
+            <span className="sk sk-line--sm skeleton" style={{ width: 70 }} />
+          </div>
+        ))}
+      </div>
+      {/* code card */}
+      <div className="sk-card sk-row">
+        <div className="sk-col">
+          <span className="sk sk-line--sm skeleton" style={{ width: 60 }} />
+          <span className="sk sk-line--lg skeleton" style={{ width: 110 }} />
+        </div>
+        <span className="sk skeleton" style={{ width: 72, height: 36, borderRadius: 8, marginLeft: 'auto' }} />
+      </div>
+      {/* referred users */}
+      <div className="sk-section">
+        <span className="sk sk-line--sm skeleton" style={{ width: '40%' }} />
+        {[0,1,2,3].map(i => (
+          <div key={i} className="sk-card sk-row">
+            <span className="sk skeleton sk-circle" style={{ width: 36, height: 36, flexShrink: 0 }} />
+            <div className="sk-col">
+              <span className="sk sk-line skeleton" style={{ width: '50%' }} />
+              <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
+            </div>
+            <span className="sk skeleton" style={{ width: 50, height: 22, borderRadius: 12, flexShrink: 0 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="page">
       <header className="page-header">
@@ -205,7 +245,18 @@ export default function Referrals() {
         </div>
 
         {loading ? (
-          <div className="page-loading"><div className="spinner" /><span>Loading…</span></div>
+          <div className="sk-section">
+            {[0,1,2,3].map(i => (
+              <div key={i} className="sk-card sk-row">
+                <span className="sk skeleton sk-circle" style={{ width: 36, height: 36, flexShrink: 0 }} />
+                <div className="sk-col">
+                  <span className="sk sk-line skeleton" style={{ width: '50%' }} />
+                  <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
+                </div>
+                <span className="sk skeleton" style={{ width: 50, height: 22, borderRadius: 12, flexShrink: 0 }} />
+              </div>
+            ))}
+          </div>
         ) : sortedReferrals.length === 0 ? (
           <div className="empty-state">
             <p>No referrals yet.</p>

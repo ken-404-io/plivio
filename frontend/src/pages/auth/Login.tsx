@@ -72,7 +72,8 @@ export default function Login() {
     setLoading(true);
     try {
       const result = await login(form.email, form.password);
-      if (result.requires_2fa) { navigate('/2fa'); }
+      if (result.requires_2fa)  { navigate('/2fa'); }
+      else if (result.is_admin) { navigate('/admin'); }
       else                      { navigate('/dashboard'); }
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;

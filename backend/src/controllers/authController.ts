@@ -130,44 +130,9 @@ export async function register(req: Request, res: Response, next: NextFunction):
 
     const user = rows[0] as Record<string, unknown>;
 
-    // ── Referral bonus: credit referrer for each new sign-up ──────────────
-    if (referredById) {
-      try {
-        // Pick the referral task for a free-plan signup (lowest reward tier).
-        // New users always start on free, so use min_plan = 'free' or unset.
-        // ORDER BY reward_amount ASC ensures we don't accidentally pick the
-        // premium upgrade bonus (₱25) when the new user is still on free (₱10).
-        const refTaskRes = await pool.query(
-          `SELECT id, reward_amount FROM tasks
-           WHERE type = 'referral' AND is_active = TRUE
-             AND (min_plan IS NULL OR min_plan = 'free')
-           ORDER BY reward_amount ASC LIMIT 1`,
-        );
-        if (refTaskRes.rowCount && refTaskRes.rowCount > 0) {
-          const refTask = refTaskRes.rows[0] as { id: string; reward_amount: string };
-          await pool.query('BEGIN');
-          try {
-            await pool.query(
-              `UPDATE users SET balance = balance + $1 WHERE id = $2`,
-              [refTask.reward_amount, referredById],
-            );
-            await pool.query(
-              `INSERT INTO task_completions
-                 (user_id, task_id, type, status, reward_earned, completed_at,
-                  proof, server_data)
-               VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
-              [referredById, refTask.id, refTask.reward_amount],
-            );
-            await pool.query('COMMIT');
-          } catch {
-            await pool.query('ROLLBACK');
-            // Non-fatal — registration still succeeds
-          }
-        }
-      } catch {
-        // Non-fatal — do not block registration if bonus logic fails
-      }
-    }
+    // ── Referral bonus is deferred until email verification ───────────────
+    // (crediting immediately allowed fake-email abuse; bonus now granted
+    //  in emailAuthController.verifyEmail once the address is confirmed)
 
     // ── Send email verification ───────────────────────────────────────────
     try {
