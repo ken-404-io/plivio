@@ -36,19 +36,19 @@ export const PLANS: Record<string, PlanInfo> = {
     name:        'Free',
     price_php:   0,
     daily_limit: 20,
-    features:    ['Basic tasks', 'PHP 20 daily limit', 'GCash & PayPal withdrawals'],
+    features:    ['20 Questions', 'PHP 20 daily limit', 'GCash & PayPal withdrawals'],
   },
   premium: {
     name:        'Premium',
     price_php:   249,
     daily_limit: 100,
-    features:    ['All tasks', 'PHP 100 daily limit', 'Exclusive tasks', 'No ads', 'Priority support'],
+    features:    [ 'PHP 100 daily limit', '200 Questions', 'Priority support'],
   },
   elite: {
     name:        'Elite',
-    price_php:   30099,
+    price_php:   499,
     daily_limit: null,
-    features:    ['All tasks', 'Unlimited daily earnings', 'Exclusive tasks', 'No ads', 'Early access', 'VIP support'],
+    features:    ['Unlimited daily earnings', 'Unlimited Questions', 'Early access', 'VIP support'],
   },
 };
 
