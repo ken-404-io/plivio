@@ -32,6 +32,18 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction):
   // Exempt PayMongo webhook — server-to-server call, no CSRF token
   if (req.path === '/api/subscriptions/webhook') { next(); return; }
 
+  // Exempt email-token flows. The link comes from an email the user just
+  // received, so the very first request from a fresh browser tab does not
+  // yet have the CSRF cookie/token pair established. The token in the body
+  // is itself a single-use, cryptographically-random secret (64-char hex,
+  // SHA-256 hashed in DB), which already provides CSRF protection — an
+  // attacker can't forge a request without knowing the token.
+  if (
+    req.path === '/api/auth/verify-email' ||
+    req.path === '/api/auth/reset-password' ||
+    req.path === '/api/users/me/confirm-email-change'
+  ) { next(); return; }
+
   const headerToken = req.headers[CSRF_HEADER] as string | undefined;
   if (!headerToken || headerToken !== token) {
     res.status(403).json({ success: false, error: 'Invalid CSRF token.' });

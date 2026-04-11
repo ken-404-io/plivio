@@ -338,12 +338,16 @@ export async function getReferrals(
   try {
     const userId = req.user!.id;
 
-    // Referred users list + total referral earnings in parallel
+    // Referred users list + total referral earnings in parallel.
+    // Only show referred users who have completed email verification —
+    // unverified accounts should never appear in the "earned referrals"
+    // list (we also only grant the referral bonus after verification).
     const [listResult, earningsResult] = await Promise.all([
       pool.query(
         `SELECT u.username, u.plan, u.created_at
          FROM users u
          WHERE u.referred_by = $1
+           AND u.is_email_verified = TRUE
          ORDER BY u.created_at DESC`,
         [userId],
       ),

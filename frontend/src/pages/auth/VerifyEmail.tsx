@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api.ts';
 
@@ -11,12 +11,20 @@ export default function VerifyEmail() {
   const [status,  setStatus]  = useState<Status>('verifying');
   const [message, setMessage] = useState('');
 
+  // Guard against React 19 StrictMode double-invoking the effect in dev,
+  // which would cause the second call to fail ("token already used") even
+  // though the first call succeeded.
+  const calledRef = useRef(false);
+
   useEffect(() => {
     if (!token) {
       setStatus('error');
       setMessage('No token found. Please use the link from your email.');
       return;
     }
+
+    if (calledRef.current) return;
+    calledRef.current = true;
 
     api.post('/auth/verify-email', { token })
       .then(() => {

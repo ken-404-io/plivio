@@ -1,29 +1,35 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api.ts';
 import { useAuth } from '../../store/authStore.tsx';
 import { useAchievement } from '../../components/common/Achievement.tsx';
 import {
   Bot, X, CheckCircle2, XCircle,
   ChevronRight, Trophy, Zap, BookOpen, Flame,
+  Sparkles, Crown,
 } from 'lucide-react';
 
 const STREAK_QUIZ_GOAL = 15;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type DoneMode = 'upgrade' | 'earnings-capped' | 'generic';
+
 interface QuizStatus {
   success: boolean;
   plan: string;
-  question_limit: number;
+  question_limit: number | null;
   total_answered: number;
   total_correct: number;
-  questions_left: number;
+  questions_left: number | null;
   total_earned: number;
   today_earned: number;
   today_answered: number;
   daily_limit: number | null;
   daily_remaining: number | null;
   can_earn_more: boolean;
+  free_lifetime_exhausted?: boolean;
+  earnings_capped?: boolean;
 }
 
 interface QuizQuestion {
@@ -78,6 +84,7 @@ export default function ChatTask({ onClose }: Props) {
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionCount,   setSessionCount]   = useState(0);
   const [limitMsg,       setLimitMsg]       = useState('');
+  const [doneMode,       setDoneMode]       = useState<DoneMode>('generic');
   const [submitting,     setSubmitting]     = useState(false);
 
   const streakTriggeredRef = useRef(false);
@@ -108,6 +115,31 @@ export default function ChatTask({ onClose }: Props) {
     }
   }, []);
 
+  // Pick the right "done" screen + message for the given status
+  const computeDoneState = useCallback((s: QuizStatus): { mode: DoneMode; msg: string } => {
+    if (s.plan === 'free' && s.free_lifetime_exhausted) {
+      return {
+        mode: 'upgrade',
+        msg:  `You've used all ${s.question_limit ?? 100} questions on the free plan. Upgrade to Premium or Elite to keep earning from the quiz bot.`,
+      };
+    }
+    if (s.earnings_capped || (s.daily_limit !== null && (s.daily_remaining ?? 0) <= 0)) {
+      return {
+        mode: 'earnings-capped',
+        msg:  s.plan === 'free'
+          ? `Come back tomorrow — you've reached your ₱${s.daily_limit} daily limit.`
+          : `Come back tomorrow — you've reached your ₱${s.daily_limit} daily quiz limit.`,
+      };
+    }
+    if (s.questions_left !== null && s.questions_left <= 0) {
+      return {
+        mode: 'generic',
+        msg:  `You've used your ${s.question_limit ?? 0} questions for today. Your quota resets at 12:00 AM PST.`,
+      };
+    }
+    return { mode: 'generic', msg: 'No more questions available right now.' };
+  }, []);
+
   // Init
   useEffect(() => {
     void (async () => {
@@ -121,16 +153,15 @@ export default function ChatTask({ onClose }: Props) {
         }
 
         if (!s.can_earn_more) {
-          setLimitMsg(
-            s.questions_left === 0
-              ? `You've used all ${s.question_limit} questions on the ${s.plan} plan. Upgrade to answer more!`
-              : `Daily earning limit of ₱${s.daily_limit} reached. Come back tomorrow!`,
-          );
+          const { mode, msg } = computeDoneState(s);
+          setDoneMode(mode);
+          setLimitMsg(msg);
           setPhase('done');
           return;
         }
         await loadNextQuestion();
       } catch {
+        setDoneMode('generic');
         setLimitMsg('Failed to load quiz.');
         setPhase('done');
       }
@@ -199,17 +230,16 @@ export default function ChatTask({ onClose }: Props) {
         } catch { /* silent */ }
       }
 
-      if (!s.can_earn_more || s.questions_left === 0) {
-        setLimitMsg(
-          s.questions_left === 0
-            ? `You've used all ${s.question_limit} questions on the ${s.plan} plan. Upgrade to earn more!`
-            : `Daily earning limit of ₱${s.daily_limit} reached. Come back tomorrow!`,
-        );
+      if (!s.can_earn_more || (s.questions_left !== null && s.questions_left <= 0)) {
+        const { mode, msg } = computeDoneState(s);
+        setDoneMode(mode);
+        setLimitMsg(msg);
         // Stay on feedback for a moment then show done
         setTimeout(() => setPhase('done'), 2500);
       }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setDoneMode('generic');
       setLimitMsg(msg ?? 'Failed to submit answer.');
       setPhase('done');
     } finally {
@@ -221,11 +251,19 @@ export default function ChatTask({ onClose }: Props) {
   const todayEarned   = status?.today_earned  ?? 0;
   const todayAnswered = status?.today_answered ?? 0;
   const totalAnswered = status?.total_answered ?? 0;
-  const qLimit        = status?.question_limit ?? 0;
-  const qLeft         = status?.questions_left ?? 0;
-  const planPct       = qLimit > 0 ? Math.min(100, (totalAnswered / qLimit) * 100) : 0;
+  const isElite       = status?.plan === 'elite';
+  const isFree        = status?.plan === 'free';
+  const qLimit        = status?.question_limit ?? null;
+  const qLeft         = status?.questions_left ?? null;
+  // For free → lifetime progress; for premium → today's progress; for elite → no bar.
+  const planPct = (() => {
+    if (qLimit === null || qLimit === 0) return 0;
+    const used = isFree ? totalAnswered : todayAnswered;
+    return Math.min(100, (used / qLimit) * 100);
+  })();
   const streakPct     = Math.min(100, (todayAnswered / STREAK_QUIZ_GOAL) * 100);
   const streakDone    = todayAnswered >= STREAK_QUIZ_GOAL;
+  const progressUsed  = isFree ? totalAnswered : todayAnswered;
 
   // Choice button state helper
   function choiceState(choice: string): 'default' | 'correct' | 'wrong' | 'dim' {
@@ -248,7 +286,11 @@ export default function ChatTask({ onClose }: Props) {
             <div>
               <div className="cq-title">Quiz Bot</div>
               <div className="cq-subtitle">
-                {status ? `${status.plan.toUpperCase()} · ${qLeft} questions left` : 'Loading…'}
+                {status
+                  ? qLeft === null
+                    ? `${status.plan.toUpperCase()} · Unlimited questions`
+                    : `${status.plan.toUpperCase()} · ${qLeft} questions left`
+                  : 'Loading…'}
               </div>
             </div>
           </div>
@@ -261,14 +303,16 @@ export default function ChatTask({ onClose }: Props) {
           </div>
         </div>
 
-        {/* ── Plan progress bar ── */}
-        <div className="cq-progress-wrap">
-          <span className="cq-progress-label">Progress</span>
-          <div className="cq-progress-bar">
-            <div className="cq-progress-fill" style={{ width: `${planPct}%` }} />
+        {/* ── Plan progress bar (hidden for elite = unlimited) ── */}
+        {!isElite && qLimit !== null && (
+          <div className="cq-progress-wrap">
+            <span className="cq-progress-label">Progress</span>
+            <div className="cq-progress-bar">
+              <div className="cq-progress-fill" style={{ width: `${planPct}%` }} />
+            </div>
+            <span className="cq-progress-label">{progressUsed}/{qLimit}</span>
           </div>
-          <span className="cq-progress-label">{totalAnswered}/{qLimit}</span>
-        </div>
+        )}
 
         {/* ── Streak bar ── */}
         <div className="cq-streak-bar">
@@ -359,8 +403,66 @@ export default function ChatTask({ onClose }: Props) {
             </div>
           )}
 
-          {/* Done screen */}
-          {phase === 'done' && (
+          {/* Done screen — Free plan lifetime exhausted → Upgrade prompt */}
+          {phase === 'done' && doneMode === 'upgrade' && (
+            <div className="cq-done cq-done--upgrade">
+              <div className="cq-upgrade-badge">
+                <Sparkles size={28} />
+              </div>
+              <div className="cq-done-title">You've unlocked everything free!</div>
+              <p className="cq-done-msg">{limitMsg}</p>
+
+              <div className="cq-upgrade-benefits">
+                <div className="cq-upgrade-benefit">
+                  <Crown size={16} />
+                  <span><strong>Premium:</strong> 100 questions / day &middot; ₱100 daily cap</span>
+                </div>
+                <div className="cq-upgrade-benefit">
+                  <Sparkles size={16} />
+                  <span><strong>Elite:</strong> Unlimited questions, no daily cap</span>
+                </div>
+              </div>
+
+              <Link to="/plans" className="btn btn-primary btn-full" onClick={onClose}>
+                Upgrade now
+              </Link>
+              <button className="cq-close-btn" onClick={onClose}>Maybe later</button>
+            </div>
+          )}
+
+          {/* Done screen — ₱20 cap hit (free) or daily quiz cap hit */}
+          {phase === 'done' && doneMode === 'earnings-capped' && (
+            <div className="cq-done">
+              <div className="cq-done-icon">⏰</div>
+              <div className="cq-done-title">Daily limit reached</div>
+              <p className="cq-done-msg">{limitMsg}</p>
+              {sessionCount > 0 && (
+                <div className="cq-done-stats">
+                  <div className="cq-done-stat">
+                    <span className="cq-done-stat-val">{sessionCount}</span>
+                    <span className="cq-done-stat-lbl">Answered</span>
+                  </div>
+                  <div className="cq-done-stat">
+                    <span className="cq-done-stat-val">{sessionCorrect}</span>
+                    <span className="cq-done-stat-lbl">Correct</span>
+                  </div>
+                  <div className="cq-done-stat">
+                    <span className="cq-done-stat-val">₱{(sessionCorrect * 0.50).toFixed(2)}</span>
+                    <span className="cq-done-stat-lbl">Earned</span>
+                  </div>
+                </div>
+              )}
+              {isFree && (
+                <p className="cq-done-sub">
+                  You can still earn referral bonuses — invite friends from the Referrals page.
+                </p>
+              )}
+              <button className="cq-close-btn" onClick={onClose}>Close</button>
+            </div>
+          )}
+
+          {/* Done screen — generic (premium daily questions exhausted, etc.) */}
+          {phase === 'done' && doneMode === 'generic' && (
             <div className="cq-done">
               <div className="cq-done-icon">🎉</div>
               <div className="cq-done-title">Session ended</div>

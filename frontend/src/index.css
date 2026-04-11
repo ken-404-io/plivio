@@ -5774,6 +5774,41 @@ a, button, [role="button"], [tabindex] {
 }
 .cq-close-btn:hover { background: var(--bg-hover); }
 
+/* Done screen — Free plan upgrade prompt variant */
+.cq-done--upgrade { padding: 12px 8px; gap: 14px; }
+.cq-done--upgrade .cq-done-msg { max-width: 320px; }
+.cq-done--upgrade .btn { margin-top: 6px; }
+.cq-done-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 280px;
+  text-align: center;
+  margin-top: 2px;
+}
+.cq-upgrade-badge {
+  width: 68px; height: 68px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.35);
+}
+.cq-upgrade-benefits {
+  display: flex; flex-direction: column; gap: 8px;
+  width: 100%; max-width: 320px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 4px;
+}
+.cq-upgrade-benefit {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--text);
+  text-align: left;
+}
+.cq-upgrade-benefit svg { flex-shrink: 0; color: #8b5cf6; }
+
 
 /* ─── Referral section ───────────────────────────────────────────────────────── */
 .ref-code-card {
