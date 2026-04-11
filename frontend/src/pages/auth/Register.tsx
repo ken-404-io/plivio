@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useRef, useState, type ChangeEvent, type KeyboardEvent, type ClipboardEvent } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import type { AxiosError } from 'axios';
@@ -78,56 +78,133 @@ function getDeviceId(): string {
 }
 
 export default function Register() {
-  const { register, transition } = useAuth();
+  const { register, fetchMe, transition } = useAuth();
+  const navigate       = useNavigate();
   const [searchParams] = useSearchParams();
 
   const [form, setForm] = useState({
     username: '', email: '', password: '',
     referral_code: searchParams.get('ref') ?? '',
   });
-  const [showPass, setShowPass] = useState(false);
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [showPass,   setShowPass]   = useState(false);
+  const [fieldError, setFieldError] = useState<Record<string, string>>({});
+  const [loading,    setLoading]    = useState(false);
 
-  // After a successful manual registration the user sees a "check your
-  // email" screen instead of being dropped into /dashboard. They only get
-  // a session after clicking the verification link in their inbox.
-  const [verifyEmail, setVerifyEmail] = useState<string | null>(null);
-  const [resending,    setResending]   = useState(false);
-  const [resent,       setResent]      = useState(false);
-  const [resendError,  setResendError] = useState('');
+  // OTP verification screen state — shown after successful registration.
+  const [verifyEmail,    setVerifyEmail]    = useState<string | null>(null);
+  const [otpDigits,      setOtpDigits]      = useState<string[]>(['', '', '', '', '', '']);
+  const [otpError,       setOtpError]       = useState('');
+  const [otpSubmitting,  setOtpSubmitting]  = useState(false);
+  const [resending,      setResending]      = useState(false);
+  const [resent,         setResent]         = useState(false);
+  const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    // Clear field-level error as the user types
+    if (fieldError[e.target.name]) {
+      setFieldError((prev) => {
+        const next = { ...prev };
+        delete next[e.target.name];
+        return next;
+      });
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
-    if (form.password.length < 8) { setError('Password must be at least 8 characters'); return; }
+    const errs: Record<string, string> = {};
+    if (!form.username.trim())      errs.username = 'Username is required';
+    if (!form.email.trim())         errs.email    = 'Email is required';
+    if (form.password.length < 8)   errs.password = 'Password must be at least 8 characters';
+    if (Object.keys(errs).length > 0) { setFieldError(errs); return; }
+
+    setFieldError({});
     setLoading(true);
     try {
       const result = await register({ ...form, device_id: getDeviceId() });
-      // Manual sign-ups must verify their email before they can log in.
       setVerifyEmail(result.email);
+      // Auto-focus the first OTP input once the verify screen mounts
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 50);
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;
-      setError(axErr.response?.data?.error || 'Registration failed. Please try again.');
+      setFieldError({ form: axErr.response?.data?.error || 'Registration failed. Please try again.' });
     } finally {
       setLoading(false);
+    }
+  }
+
+  // ── OTP input handlers ──────────────────────────────────────────────────
+  function handleOtpChange(index: number, value: string) {
+    // Accept only digits; take the last char if multiple typed
+    const digit = value.replace(/\D/g, '').slice(-1);
+    const next = [...otpDigits];
+    next[index] = digit;
+    setOtpDigits(next);
+    setOtpError('');
+    // Auto-advance to the next field
+    if (digit && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+    // Auto-submit when all 6 digits are filled
+    if (next.every((d) => d.length === 1)) {
+      void submitOtp(next.join(''));
+    }
+  }
+
+  function handleOtpKeyDown(index: number, e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+    if (e.key === 'ArrowLeft' && index > 0)  otpInputRefs.current[index - 1]?.focus();
+    if (e.key === 'ArrowRight' && index < 5) otpInputRefs.current[index + 1]?.focus();
+  }
+
+  function handleOtpPaste(e: ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!text) return;
+    e.preventDefault();
+    const next = text.padEnd(6, '').split('').slice(0, 6);
+    while (next.length < 6) next.push('');
+    setOtpDigits(next);
+    setOtpError('');
+    const lastFilled = Math.min(text.length, 5);
+    otpInputRefs.current[lastFilled]?.focus();
+    if (text.length === 6) void submitOtp(text);
+  }
+
+  async function submitOtp(code: string) {
+    if (!verifyEmail || otpSubmitting) return;
+    setOtpSubmitting(true);
+    setOtpError('');
+    try {
+      await api.post<{ auto_login?: boolean }>('/auth/verify-email', {
+        email: verifyEmail, code,
+      });
+      await fetchMe();
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      const axErr = err as AxiosError<{ error: string }>;
+      setOtpError(axErr.response?.data?.error || 'Invalid or expired code.');
+      // Clear the inputs so the user can retry
+      setOtpDigits(['', '', '', '', '', '']);
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 10);
+    } finally {
+      setOtpSubmitting(false);
     }
   }
 
   async function handleResend() {
     if (!verifyEmail || resending || resent) return;
     setResending(true);
-    setResendError('');
+    setOtpError('');
     try {
       await api.post('/auth/verify-email/resend', { email: verifyEmail });
       setResent(true);
+      setTimeout(() => setResent(false), 30_000);
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;
-      setResendError(axErr.response?.data?.error || 'Could not send email. Please try again later.');
+      setOtpError(axErr.response?.data?.error || 'Could not send code. Try again later.');
     } finally {
       setResending(false);
     }
@@ -139,51 +216,79 @@ export default function Register() {
     window.location.href = `${API_BASE}/auth/${provider}${ref ? `?ref=${ref}` : ''}`;
   }
 
-  // ── Post-registration "check your email" screen ──────────────────────
+  // ── Post-registration OTP screen ─────────────────────────────────────
   if (verifyEmail) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
           <div className="auth-header">
             <h1 className="brand-name">Plivio</h1>
-            <p className="auth-subtitle">Verify your email</p>
+            <p className="auth-subtitle">Enter your verification code</p>
           </div>
 
-          <div className="alert alert--success" role="status" style={{ marginBottom: 16 }}>
-            <strong>Almost there!</strong>
-            <p style={{ margin: '6px 0 0', fontSize: 14 }}>
-              We sent a verification link to <strong>{verifyEmail}</strong>.
-              Click the link in that email to activate your account — you'll
-              be signed in automatically afterwards.
-            </p>
-          </div>
-
-          <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>
-            Don't see the email? Check your spam folder, or request a new link below.
+          <p className="text-muted" style={{ fontSize: 14, marginBottom: 18, textAlign: 'center' }}>
+            We sent a 6-digit code to<br />
+            <strong style={{ color: 'var(--text)' }}>{verifyEmail}</strong>
           </p>
 
-          {resent ? (
-            <div className="alert alert--success" role="status" style={{ marginBottom: 12 }}>
-              A new verification link has been sent. Please check your inbox.
-            </div>
-          ) : resendError ? (
-            <div className="alert alert--error" role="alert" style={{ marginBottom: 12 }}>
-              {resendError}
-            </div>
-          ) : null}
+          <div className="otp-input-row" role="group" aria-label="One-time code">
+            {otpDigits.map((d, i) => (
+              <input
+                key={i}
+                ref={(el) => { otpInputRefs.current[i] = el; }}
+                type="text"
+                inputMode="numeric"
+                autoComplete={i === 0 ? 'one-time-code' : 'off'}
+                maxLength={1}
+                className={`otp-input${otpError ? ' otp-input--error' : ''}`}
+                value={d}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleOtpChange(i, e.target.value)}
+                onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                onPaste={handleOtpPaste}
+                disabled={otpSubmitting}
+                aria-label={`Digit ${i + 1}`}
+              />
+            ))}
+          </div>
 
+          {otpError && (
+            <p className="form-field-error" role="alert" style={{ marginTop: 10, textAlign: 'center' }}>
+              {otpError}
+            </p>
+          )}
+
+          {otpSubmitting && (
+            <p className="text-muted" style={{ fontSize: 13, textAlign: 'center', marginTop: 12 }}>
+              Verifying…
+            </p>
+          )}
+
+          <p className="text-muted" style={{ fontSize: 13, textAlign: 'center', marginTop: 18 }}>
+            Didn't get a code? Check your spam folder or
+          </p>
           <button
             type="button"
             className="btn btn-outline btn-full"
             onClick={() => { void handleResend(); }}
             disabled={resending || resent}
+            style={{ marginTop: 6 }}
           >
-            {resending ? 'Sending…' : resent ? 'Email sent' : 'Resend verification email'}
+            {resending ? 'Sending…' : resent ? 'Code sent — try again in 30s' : 'Resend code'}
           </button>
 
           <p className="auth-footer" style={{ marginTop: 20 }}>
-            Already verified?{' '}
-            <Link to="/login" className="link">Sign in</Link>
+            Wrong email?{' '}
+            <button
+              type="button"
+              className="link"
+              onClick={() => {
+                setVerifyEmail(null);
+                setOtpDigits(['', '', '', '', '', '']);
+                setOtpError('');
+              }}
+            >
+              Start over
+            </button>
           </p>
         </div>
       </div>
@@ -210,28 +315,34 @@ export default function Register() {
           <p className="auth-subtitle">Create your free account</p>
         </div>
 
-        {error && <div className="alert alert--error" role="alert">{error}</div>}
+        {fieldError.form && (
+          <p className="form-field-error" role="alert" style={{ marginBottom: 12 }}>
+            {fieldError.form}
+          </p>
+        )}
 
         <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
           <div className="form-group">
             <label className="form-label" htmlFor="username">Username</label>
             <input
               id="username" name="username" type="text"
-              className="form-input"
+              className={`form-input${fieldError.username ? ' form-input--error' : ''}`}
               value={form.username} onChange={handleChange}
-              required autoComplete="username" placeholder="myusername"
+              autoComplete="username" placeholder="myusername"
               minLength={3} maxLength={50}
             />
+            {fieldError.username && <p className="form-field-error">{fieldError.username}</p>}
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="email">Email</label>
             <input
               id="email" name="email" type="email"
-              className="form-input"
+              className={`form-input${fieldError.email ? ' form-input--error' : ''}`}
               value={form.email} onChange={handleChange}
-              required autoComplete="email" placeholder="you@example.com"
+              autoComplete="email" placeholder="you@example.com"
             />
+            {fieldError.email && <p className="form-field-error">{fieldError.email}</p>}
           </div>
 
           <div className="form-group">
@@ -240,9 +351,9 @@ export default function Register() {
               <input
                 id="password" name="password"
                 type={showPass ? 'text' : 'password'}
-                className="form-input"
+                className={`form-input${fieldError.password ? ' form-input--error' : ''}`}
                 value={form.password} onChange={handleChange}
-                required autoComplete="new-password" placeholder="Min. 8 characters"
+                autoComplete="new-password" placeholder="Min. 8 characters"
                 minLength={8}
               />
               <button
@@ -273,6 +384,7 @@ export default function Register() {
                 </div>
               );
             })()}
+            {fieldError.password && <p className="form-field-error">{fieldError.password}</p>}
           </div>
 
           <div className="form-group">

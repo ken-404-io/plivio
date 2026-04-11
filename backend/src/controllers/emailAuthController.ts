@@ -35,9 +35,18 @@ const BCRYPT_ROUNDS = 12;
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
-/** Returns a URL-safe 64-char hex token. */
+/** Returns a URL-safe 64-char hex token (password reset links). */
 function generateToken(): string {
   return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * Generates a 6-digit numeric OTP used for email verification.
+ * Uses `crypto.randomInt` so the value is uniformly distributed and
+ * unbiased, which `Math.random()` is not.
+ */
+function generateOtp(): string {
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
 }
 
 /** Returns the SHA-256 hex digest used for DB storage. */
@@ -45,7 +54,44 @@ function hashToken(raw: string): string {
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
-// ─── 1. Send / resend email verification ─────────────────────────────────────
+/**
+ * Returns a user-scoped hash of a 6-digit OTP. Scoping the hash to a
+ * specific user_id means two users who happen to draw the same OTP will
+ * produce different hashes and therefore never collide on the DB's
+ * UNIQUE(token_hash) constraint.
+ */
+function hashOtp(userId: string, otp: string): string {
+  return crypto.createHash('sha256').update(`${userId}:${otp}`).digest('hex');
+}
+
+// ─── OTP generation helper (shared by register / resend endpoints) ──────────
+// Generates a fresh 6-digit code, purges any previous tokens for the user,
+// stores the user-scoped hash in email_verification_tokens with a 15-minute
+// expiry, and sends it via email. Returns the raw OTP only so the caller
+// can log / debug — never return it in an HTTP response.
+
+export async function issueVerificationOtp(
+  userId: string,
+  email: string,
+  username: string,
+): Promise<string> {
+  const otp  = generateOtp();
+  const hash = hashOtp(userId, otp);
+
+  // Purge old tokens for this user so only one code is valid at a time.
+  await pool.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [userId]);
+
+  await pool.query(
+    `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+     VALUES ($1, $2, NOW() + INTERVAL '15 minutes')`,
+    [userId, hash],
+  );
+
+  await sendVerificationEmail(email, username, otp);
+  return otp;
+}
+
+// ─── 1. Send / resend email verification (authenticated) ────────────────────
 
 export async function sendEmailVerification(
   req: Request,
@@ -69,31 +115,19 @@ export async function sendEmailVerification(
       return;
     }
 
-    // Rate-limit: max 3 tokens in the last hour per user
+    // Rate-limit: max 3 codes in the last hour per user
     const recentCount = await pool.query(
       `SELECT COUNT(*) FROM email_verification_tokens
        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '1 hour'`,
       [userId],
     );
     if (Number((recentCount.rows[0] as { count: string }).count) >= 3) {
-      throw new RateLimitError('Too many verification emails sent. Please wait before requesting again.');
+      throw new RateLimitError('Too many verification codes sent. Please wait before requesting again.');
     }
 
-    // Delete any existing tokens for this user (only one valid at a time)
-    await pool.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [userId]);
+    await issueVerificationOtp(user.id, user.email, user.username);
 
-    const raw       = generateToken();
-    const tokenHash = hashToken(raw);
-
-    await pool.query(
-      `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
-       VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
-      [userId, tokenHash],
-    );
-
-    await sendVerificationEmail(user.email, user.username, raw);
-
-    res.json({ success: true, message: 'Verification email sent' });
+    res.json({ success: true, message: 'Verification code sent' });
   } catch (err) { next(err); }
 }
 
@@ -108,7 +142,7 @@ export async function resendVerificationPublic(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const SAFE_MSG = 'If that email is registered and unverified, a new verification link has been sent.';
+  const SAFE_MSG = 'If that email is registered and unverified, a new verification code has been sent.';
 
   try {
     const { email } = req.body as { email?: string };
@@ -140,7 +174,7 @@ export async function resendVerificationPublic(
       return;
     }
 
-    // Rate-limit: max 3 tokens per hour per user
+    // Rate-limit: max 3 codes per hour per user
     const recentCount = await pool.query(
       `SELECT COUNT(*) FROM email_verification_tokens
        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '1 hour'`,
@@ -152,25 +186,17 @@ export async function resendVerificationPublic(
       return;
     }
 
-    // Purge any old tokens for this user and issue a fresh one
-    await pool.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [user.id]);
-
-    const raw       = generateToken();
-    const tokenHash = hashToken(raw);
-
-    await pool.query(
-      `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
-       VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
-      [user.id, tokenHash],
-    );
-
-    await sendVerificationEmail(user.email, user.username, raw);
+    await issueVerificationOtp(user.id, user.email, user.username);
 
     res.json({ success: true, message: SAFE_MSG });
   } catch (err) { next(err); }
 }
 
-// ─── 2. Verify email with token ───────────────────────────────────────────────
+// ─── 2. Verify email with OTP ────────────────────────────────────────────────
+// Takes { email, code } where `code` is the 6-digit OTP the user received
+// by email. On success we issue session cookies so the user is logged in
+// immediately — they never need to visit the login page again after
+// registering.
 
 export async function verifyEmail(
   req: Request,
@@ -178,28 +204,44 @@ export async function verifyEmail(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { token } = req.body as { token?: string };
+    const { email, code } = req.body as { email?: string; code?: string };
 
-    if (!token || typeof token !== 'string' || token.length !== 64 || !/^[a-f0-9]+$/.test(token)) {
-      throw new ValidationError('Invalid verification token');
+    if (!email || typeof email !== 'string') {
+      throw new ValidationError('Email is required');
+    }
+    if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
+      throw new ValidationError('Enter the 6-digit code from your email');
     }
 
-    const tokenHash = hashToken(token);
+    const normalisedEmail = email.toLowerCase().trim();
+
+    // Look up user by email so we can compute the user-scoped hash.
+    const userRes = await pool.query(
+      'SELECT id FROM users WHERE email = $1 LIMIT 1',
+      [normalisedEmail],
+    );
+    if (userRes.rowCount === 0) {
+      // Do not reveal whether the email exists — generic failure message.
+      throw new AuthenticationError('Invalid or expired verification code');
+    }
+    const userId = (userRes.rows[0] as { id: string }).id;
+
+    const codeHash = hashOtp(userId, code);
 
     const { rows } = await pool.query(
       `SELECT evt.id, evt.user_id, evt.expires_at
        FROM email_verification_tokens evt
-       WHERE evt.token_hash = $1`,
-      [tokenHash],
+       WHERE evt.token_hash = $1 AND evt.user_id = $2`,
+      [codeHash, userId],
     );
 
-    if (rows.length === 0) throw new AuthenticationError('Invalid or expired verification link');
+    if (rows.length === 0) throw new AuthenticationError('Invalid or expired verification code');
 
     const row = rows[0] as { id: string; user_id: string; expires_at: Date };
 
     if (new Date(row.expires_at) < new Date()) {
       await pool.query('DELETE FROM email_verification_tokens WHERE id = $1', [row.id]);
-      throw new AuthenticationError('Verification link has expired. Please request a new one.');
+      throw new AuthenticationError('Verification code has expired. Please request a new one.');
     }
 
     // Mark verified and delete the used token atomically; fetch referred_by for bonus

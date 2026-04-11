@@ -94,26 +94,33 @@ async function send(to: string, subject: string, html: string): Promise<void> {
 
 // ─── Email types ─────────────────────────────────────────────────────────────
 
+/**
+ * Sends a 6-digit one-time code that the user types into the Register /
+ * Login verification screen. Replaces the older "click-to-verify" link so
+ * users never have to jump between tabs.
+ */
 export async function sendVerificationEmail(
   to: string,
   username: string,
-  token: string,
+  otp: string,
 ): Promise<void> {
-  const link = `${APP_URL}/verify-email?token=${token}`;
   const body = `
     <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
       Verify your email address
     </p>
     <p>Hi <strong>${username}</strong>,</p>
-    <p>Thanks for joining ${APP_NAME}! Please click the button below to verify
-       your email address and activate your account.</p>
-    ${button(link, 'Verify Email')}
+    <p>Thanks for joining ${APP_NAME}! Enter the code below on the verification
+       screen to activate your account.</p>
+    <div style="margin:24px 0;padding:20px 16px;background:#0f0e14;border:1px solid #2a2835;border-radius:10px;text-align:center;">
+      <div style="font-size:12px;color:#6b6880;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Your verification code</div>
+      <div style="font-size:34px;font-weight:800;color:#f1f0f5;letter-spacing:0.35em;font-family:'Courier New',monospace;">${otp}</div>
+    </div>
     <p style="color:#6b6880;font-size:13px;margin-top:8px;">
-      This link expires in <strong>24 hours</strong>.<br />
-      If the button doesn't work, copy and paste this URL into your browser:<br />
-      <a href="${link}" style="color:#aa3bff;word-break:break-all;">${link}</a>
+      This code expires in <strong>15 minutes</strong>. Do not share it with anyone —
+      ${APP_NAME} staff will never ask for it.<br />
+      If you did not request this, you can safely ignore this email.
     </p>`;
-  await send(to, `Verify your ${APP_NAME} account`, wrap('Email Verification', body));
+  await send(to, `Your ${APP_NAME} verification code: ${otp}`, wrap('Verification Code', body));
 }
 
 export async function sendPasswordResetEmail(

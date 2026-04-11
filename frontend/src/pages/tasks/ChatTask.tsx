@@ -284,7 +284,7 @@ export default function ChatTask({ onClose }: Props) {
           <div className="cq-header-left">
             <div className="cq-bot-avatar"><Bot size={20} /></div>
             <div>
-              <div className="cq-title">Quiz Bot</div>
+              <div className="cq-title">Quizly</div>
               <div className="cq-subtitle">
                 {status
                   ? qLeft === null

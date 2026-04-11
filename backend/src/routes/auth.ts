@@ -73,7 +73,12 @@ router.post('/verify-email/send',
 );
 
 router.post('/verify-email',
-  validateBody({ token: { required: true, minLength: 64, maxLength: 64 } }),
+  // 6-digit OTP — rate limited per IP to deter brute force
+  rateLimiter({ max: 15, windowMs: 15 * 60_000, keyPrefix: 'ev-verify' }),
+  validateBody({
+    email: { required: true, type: 'email' },
+    code:  { required: true, minLength: 6, maxLength: 6, pattern: /^\d{6}$/ },
+  }),
   verifyEmail,
 );
 

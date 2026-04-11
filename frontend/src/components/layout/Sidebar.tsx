@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { Flame } from 'lucide-react';
+import { Flame, MessageCircle } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import {
   LayoutDashboard,
@@ -25,6 +25,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/quizly',    label: 'Quizly',    Icon: MessageCircle   },
   { to: '/tasks',     label: 'Tasks',     Icon: CheckSquare     },
   { to: '/earnings',  label: 'Earnings',  Icon: DollarSign      },
   { to: '/withdraw',  label: 'Withdraw',  Icon: ArrowUpCircle   },
@@ -59,16 +60,23 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       </div>
 
       <nav className="sidebar-nav" aria-label="Main navigation">
-        {items.map(({ to, label, Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => `nav-item${isActive ? ' nav-item--active' : ''}`}
-          >
-            <span className="nav-icon" aria-hidden="true"><Icon size={18} /></span>
-            <span className="nav-label">{label}</span>
-          </NavLink>
-        ))}
+        {items.map(({ to, label, Icon }) => {
+          const isQuizly = to === '/quizly';
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `nav-item${isActive ? ' nav-item--active' : ''}${isQuizly ? ' nav-item--quizly' : ''}`
+              }
+            >
+              <span className="nav-icon" aria-hidden="true">
+                <Icon size={isQuizly ? 22 : 18} />
+              </span>
+              <span className="nav-label">{label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="sidebar-footer">

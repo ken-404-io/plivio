@@ -56,27 +56,53 @@ export default function Login() {
 
   const [form,        setForm]        = useState({ email: '', password: '' });
   const [showPass,    setShowPass]    = useState(false);
-  const [error,       setError]       = useState(
+
+  // Field-level validation errors (shown inline directly under each input).
+  // `fieldError.form` is a form-wide error (e.g. network failure) rendered
+  // under the password field so it sits next to the submit button.
+  const initialFormError =
     searchParams.get('error') === 'oauth_failed'
       ? 'Social login failed. Please try again or use email.'
-      : '',
+      : '';
+  const [fieldError, setFieldError] = useState<Record<string, string>>(
+    initialFormError ? { form: initialFormError } : {},
   );
   const [loading, setLoading] = useState(false);
 
   // If the server tells us the account exists but the email isn't verified
-  // yet, we switch the error area into a "resend verification" affordance
-  // instead of a plain error message.
+  // yet, we switch into a "resend verification" affordance instead of a
+  // plain error message.
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [resending,       setResending]       = useState(false);
   const [resent,          setResent]          = useState(false);
 
+  function clearFieldError(name: string) {
+    setFieldError((prev) => {
+      if (!prev[name] && !prev.form) return prev;
+      const next = { ...prev };
+      delete next[name];
+      delete next.form;
+      return next;
+    });
+  }
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    clearFieldError(e.target.name);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    // Client-side validation
+    const errs: Record<string, string> = {};
+    if (!form.email.trim())        errs.email    = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      errs.email = 'Enter a valid email address';
+    }
+    if (!form.password)            errs.password = 'Password is required';
+    if (Object.keys(errs).length > 0) { setFieldError(errs); return; }
+
+    setFieldError({});
     setUnverifiedEmail(null);
     setResent(false);
     setLoading(true);
@@ -90,9 +116,10 @@ export default function Login() {
       const data  = axErr.response?.data;
       if (data?.code === 'email_not_verified') {
         setUnverifiedEmail(data.email ?? form.email);
-        setError('');
       } else {
-        setError(data?.error || 'Login failed. Please try again.');
+        // Inline error shown under the password field — matches the
+        // "Invalid credentials." pattern requested by design.
+        setFieldError({ password: data?.error || 'Invalid credentials.' });
       }
     } finally {
       setLoading(false);
@@ -107,7 +134,7 @@ export default function Login() {
       setResent(true);
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;
-      setError(axErr.response?.data?.error || 'Could not send email. Please try again later.');
+      setFieldError({ form: axErr.response?.data?.error || 'Could not send email. Please try again later.' });
     } finally {
       setResending(false);
     }
@@ -137,18 +164,16 @@ export default function Login() {
           <p className="auth-subtitle">Sign in to start earning</p>
         </div>
 
-        {error && <div className="alert alert--error" role="alert">{error}</div>}
-
         {unverifiedEmail && (
           <div className="alert alert--warning" role="alert" style={{ marginBottom: 16 }}>
             <strong>Verify your email to continue.</strong>
             <p style={{ margin: '6px 0 10px', fontSize: 13 }}>
-              We sent a verification link to <strong>{unverifiedEmail}</strong>.
-              Click it to activate your account. You'll be signed in automatically after verifying.
+              We sent a verification code to <strong>{unverifiedEmail}</strong>.
+              Enter it on the registration screen to activate your account.
             </p>
             {resent ? (
               <p style={{ margin: 0, fontSize: 13 }}>
-                ✓ A new verification link has been sent. Check your inbox.
+                ✓ A new verification code has been sent. Check your inbox.
               </p>
             ) : (
               <button
@@ -157,7 +182,7 @@ export default function Login() {
                 onClick={() => { void handleResend(); }}
                 disabled={resending}
               >
-                {resending ? 'Sending…' : 'Resend verification email'}
+                {resending ? 'Sending…' : 'Resend verification code'}
               </button>
             )}
           </div>
@@ -168,10 +193,11 @@ export default function Login() {
             <label className="form-label" htmlFor="email">Email</label>
             <input
               id="email" name="email" type="email"
-              className="form-input"
+              className={`form-input${fieldError.email ? ' form-input--error' : ''}`}
               value={form.email} onChange={handleChange}
-              required autoComplete="email" placeholder="you@example.com"
+              autoComplete="email" placeholder="you@example.com"
             />
+            {fieldError.email && <p className="form-field-error">{fieldError.email}</p>}
           </div>
 
           <div className="form-group">
@@ -180,9 +206,9 @@ export default function Login() {
               <input
                 id="password" name="password"
                 type={showPass ? 'text' : 'password'}
-                className="form-input"
+                className={`form-input${fieldError.password ? ' form-input--error' : ''}`}
                 value={form.password} onChange={handleChange}
-                required autoComplete="current-password" placeholder="••••••••"
+                autoComplete="current-password" placeholder="••••••••"
               />
               <button
                 type="button"
@@ -193,6 +219,8 @@ export default function Login() {
                 <EyeIcon visible={showPass} />
               </button>
             </div>
+            {fieldError.password && <p className="form-field-error">{fieldError.password}</p>}
+            {fieldError.form && <p className="form-field-error">{fieldError.form}</p>}
           </div>
 
           <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
