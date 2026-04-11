@@ -17,6 +17,7 @@ import {
   verifyEmail,
   forgotPassword,
   resetPassword,
+  resendVerificationPublic,
 } from '../controllers/emailAuthController.ts';
 import {
   googleRedirect,   googleCallback,
@@ -74,6 +75,15 @@ router.post('/verify-email/send',
 router.post('/verify-email',
   validateBody({ token: { required: true, minLength: 64, maxLength: 64 } }),
   verifyEmail,
+);
+
+// Public resend — used by the post-registration "check your email" screen
+// and by the login page when a user tries to sign in with an unverified
+// address. Rate-limited per-IP to prevent abuse.
+router.post('/verify-email/resend',
+  rateLimiter({ max: 5, windowMs: 60 * 60_000, keyPrefix: 'ev-resend' }),
+  validateBody({ email: { required: true, type: 'email' } }),
+  resendVerificationPublic,
 );
 
 // ── Password reset ─────────────────────────────────────────────────────────

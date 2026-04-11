@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
+import api from '../../services/api.ts';
 import type { AxiosError } from 'axios';
 
 // ─── Password strength ────────────────────────────────────────────────────────
@@ -78,7 +79,6 @@ function getDeviceId(): string {
 
 export default function Register() {
   const { register, transition } = useAuth();
-  const navigate       = useNavigate();
   const [searchParams] = useSearchParams();
 
   const [form, setForm] = useState({
@@ -88,6 +88,14 @@ export default function Register() {
   const [showPass, setShowPass] = useState(false);
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
+
+  // After a successful manual registration the user sees a "check your
+  // email" screen instead of being dropped into /dashboard. They only get
+  // a session after clicking the verification link in their inbox.
+  const [verifyEmail, setVerifyEmail] = useState<string | null>(null);
+  const [resending,    setResending]   = useState(false);
+  const [resent,       setResent]      = useState(false);
+  const [resendError,  setResendError] = useState('');
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -99,8 +107,9 @@ export default function Register() {
     if (form.password.length < 8) { setError('Password must be at least 8 characters'); return; }
     setLoading(true);
     try {
-      await register({ ...form, device_id: getDeviceId() });
-      navigate('/dashboard');
+      const result = await register({ ...form, device_id: getDeviceId() });
+      // Manual sign-ups must verify their email before they can log in.
+      setVerifyEmail(result.email);
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;
       setError(axErr.response?.data?.error || 'Registration failed. Please try again.');
@@ -109,10 +118,76 @@ export default function Register() {
     }
   }
 
+  async function handleResend() {
+    if (!verifyEmail || resending || resent) return;
+    setResending(true);
+    setResendError('');
+    try {
+      await api.post('/auth/verify-email/resend', { email: verifyEmail });
+      setResent(true);
+    } catch (err) {
+      const axErr = err as AxiosError<{ error: string }>;
+      setResendError(axErr.response?.data?.error || 'Could not send email. Please try again later.');
+    } finally {
+      setResending(false);
+    }
+  }
+
   function socialLogin(provider: 'google' | 'facebook' | 'github') {
     // Pass referral code through state if present
     const ref = form.referral_code;
     window.location.href = `${API_BASE}/auth/${provider}${ref ? `?ref=${ref}` : ''}`;
+  }
+
+  // ── Post-registration "check your email" screen ──────────────────────
+  if (verifyEmail) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <div className="auth-header">
+            <h1 className="brand-name">Plivio</h1>
+            <p className="auth-subtitle">Verify your email</p>
+          </div>
+
+          <div className="alert alert--success" role="status" style={{ marginBottom: 16 }}>
+            <strong>Almost there!</strong>
+            <p style={{ margin: '6px 0 0', fontSize: 14 }}>
+              We sent a verification link to <strong>{verifyEmail}</strong>.
+              Click the link in that email to activate your account — you'll
+              be signed in automatically afterwards.
+            </p>
+          </div>
+
+          <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>
+            Don't see the email? Check your spam folder, or request a new link below.
+          </p>
+
+          {resent ? (
+            <div className="alert alert--success" role="status" style={{ marginBottom: 12 }}>
+              A new verification link has been sent. Please check your inbox.
+            </div>
+          ) : resendError ? (
+            <div className="alert alert--error" role="alert" style={{ marginBottom: 12 }}>
+              {resendError}
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            className="btn btn-outline btn-full"
+            onClick={() => { void handleResend(); }}
+            disabled={resending || resent}
+          >
+            {resending ? 'Sending…' : resent ? 'Email sent' : 'Resend verification email'}
+          </button>
+
+          <p className="auth-footer" style={{ marginTop: 20 }}>
+            Already verified?{' '}
+            <Link to="/login" className="link">Sign in</Link>
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
+import api from '../../services/api.ts';
 import type { AxiosError } from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -62,6 +63,13 @@ export default function Login() {
   );
   const [loading, setLoading] = useState(false);
 
+  // If the server tells us the account exists but the email isn't verified
+  // yet, we switch the error area into a "resend verification" affordance
+  // instead of a plain error message.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resending,       setResending]       = useState(false);
+  const [resent,          setResent]          = useState(false);
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
@@ -69,6 +77,8 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setUnverifiedEmail(null);
+    setResent(false);
     setLoading(true);
     try {
       const result = await login(form.email, form.password);
@@ -76,10 +86,30 @@ export default function Login() {
       else if (result.is_admin) { navigate('/admin'); }
       else                      { navigate('/dashboard'); }
     } catch (err) {
-      const axErr = err as AxiosError<{ error: string }>;
-      setError(axErr.response?.data?.error || 'Login failed. Please try again.');
+      const axErr = err as AxiosError<{ error: string; code?: string; email?: string }>;
+      const data  = axErr.response?.data;
+      if (data?.code === 'email_not_verified') {
+        setUnverifiedEmail(data.email ?? form.email);
+        setError('');
+      } else {
+        setError(data?.error || 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (!unverifiedEmail || resending || resent) return;
+    setResending(true);
+    try {
+      await api.post('/auth/verify-email/resend', { email: unverifiedEmail });
+      setResent(true);
+    } catch (err) {
+      const axErr = err as AxiosError<{ error: string }>;
+      setError(axErr.response?.data?.error || 'Could not send email. Please try again later.');
+    } finally {
+      setResending(false);
     }
   }
 
@@ -108,6 +138,30 @@ export default function Login() {
         </div>
 
         {error && <div className="alert alert--error" role="alert">{error}</div>}
+
+        {unverifiedEmail && (
+          <div className="alert alert--warning" role="alert" style={{ marginBottom: 16 }}>
+            <strong>Verify your email to continue.</strong>
+            <p style={{ margin: '6px 0 10px', fontSize: 13 }}>
+              We sent a verification link to <strong>{unverifiedEmail}</strong>.
+              Click it to activate your account. You'll be signed in automatically after verifying.
+            </p>
+            {resent ? (
+              <p style={{ margin: 0, fontSize: 13 }}>
+                ✓ A new verification link has been sent. Check your inbox.
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => { void handleResend(); }}
+                disabled={resending}
+              >
+                {resending ? 'Sending…' : 'Resend verification email'}
+              </button>
+            )}
+          </div>
+        )}
 
         <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
           <div className="form-group">

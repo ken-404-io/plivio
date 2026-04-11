@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../services/api.ts';
+import { useAuth } from '../../store/authStore.tsx';
 
 type Status = 'verifying' | 'success' | 'error';
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
+  const navigate       = useNavigate();
+  const { fetchMe }    = useAuth();
   const token          = searchParams.get('token') ?? '';
 
   const [status,  setStatus]  = useState<Status>('verifying');
@@ -26,15 +29,22 @@ export default function VerifyEmail() {
     if (calledRef.current) return;
     calledRef.current = true;
 
-    api.post('/auth/verify-email', { token })
-      .then(() => {
+    api.post<{ auto_login?: boolean }>('/auth/verify-email', { token })
+      .then(async ({ data }) => {
         setStatus('success');
+        // The backend now issues session cookies on successful verification
+        // so the user is signed in automatically. Pull their profile, then
+        // send them straight to the dashboard after a short celebration.
+        if (data.auto_login) {
+          try { await fetchMe(); } catch { /* ignore */ }
+          setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
+        }
       })
       .catch((err: { response?: { data?: { error?: string } } }) => {
         setStatus('error');
         setMessage(err.response?.data?.error ?? 'Verification failed. The link may have expired.');
       });
-  }, [token]);
+  }, [token, fetchMe, navigate]);
 
   return (
     <div className="auth-screen">
@@ -55,7 +65,7 @@ export default function VerifyEmail() {
           <div className="alert alert--success" role="status">
             <strong>Email verified!</strong>
             <p style={{ margin: '6px 0 0', fontSize: '14px' }}>
-              Your email address has been confirmed. You can now access all features.
+              Your email address has been confirmed. Redirecting you to your dashboard…
             </p>
           </div>
         )}

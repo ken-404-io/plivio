@@ -29,6 +29,7 @@ import {
   sendPasswordResetEmail,
 } from '../services/email.ts';
 import { logger } from '../utils/logger.ts';
+import { issueTokenCookies } from './authController.ts';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -96,6 +97,79 @@ export async function sendEmailVerification(
   } catch (err) { next(err); }
 }
 
+// ─── 1b. Public resend verification (pre-login) ──────────────────────────────
+// Lets a user who just registered (and therefore has no session cookie yet)
+// request a fresh verification email. Uses the same per-user rate limit as
+// the authenticated /verify-email/send endpoint and always returns a safe
+// message to avoid user-enumeration.
+
+export async function resendVerificationPublic(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const SAFE_MSG = 'If that email is registered and unverified, a new verification link has been sent.';
+
+  try {
+    const { email } = req.body as { email?: string };
+
+    if (!email || typeof email !== 'string') {
+      res.json({ success: true, message: SAFE_MSG });
+      return;
+    }
+
+    const normalised = email.toLowerCase().trim();
+
+    const { rows } = await pool.query(
+      'SELECT id, username, email, is_email_verified FROM users WHERE email = $1 LIMIT 1',
+      [normalised],
+    );
+
+    if (rows.length === 0) {
+      // Do not reveal whether the email exists
+      res.json({ success: true, message: SAFE_MSG });
+      return;
+    }
+
+    const user = rows[0] as {
+      id: string; username: string; email: string; is_email_verified: boolean;
+    };
+
+    if (user.is_email_verified) {
+      res.json({ success: true, message: SAFE_MSG });
+      return;
+    }
+
+    // Rate-limit: max 3 tokens per hour per user
+    const recentCount = await pool.query(
+      `SELECT COUNT(*) FROM email_verification_tokens
+       WHERE user_id = $1 AND created_at > NOW() - INTERVAL '1 hour'`,
+      [user.id],
+    );
+    if (Number((recentCount.rows[0] as { count: string }).count) >= 3) {
+      // Still return the safe message — do not leak the rate-limit state
+      res.json({ success: true, message: SAFE_MSG });
+      return;
+    }
+
+    // Purge any old tokens for this user and issue a fresh one
+    await pool.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [user.id]);
+
+    const raw       = generateToken();
+    const tokenHash = hashToken(raw);
+
+    await pool.query(
+      `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+       VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
+      [user.id, tokenHash],
+    );
+
+    await sendVerificationEmail(user.email, user.username, raw);
+
+    res.json({ success: true, message: SAFE_MSG });
+  } catch (err) { next(err); }
+}
+
 // ─── 2. Verify email with token ───────────────────────────────────────────────
 
 export async function verifyEmail(
@@ -130,27 +204,54 @@ export async function verifyEmail(
 
     // Mark verified and delete the used token atomically; fetch referred_by for bonus
     const client = await pool.connect();
+    let sessionUser: { id: string; username: string; is_admin: boolean } | null = null;
     try {
       await client.query('BEGIN');
 
       const userRes = await client.query<{
+        id: string;
+        username: string;
+        is_admin: boolean;
+        is_banned: boolean;
         referred_by: string | null;
         is_email_verified: boolean;
       }>(
-        'SELECT referred_by, is_email_verified FROM users WHERE id = $1 FOR UPDATE',
+        `SELECT id, username, is_admin, is_banned, referred_by, is_email_verified
+         FROM users WHERE id = $1 FOR UPDATE`,
         [row.user_id],
       );
       const userRow = userRes.rows[0];
 
-      // Idempotency guard — do nothing if already verified
+      if (userRow?.is_banned) {
+        await client.query('ROLLBACK');
+        throw new AuthenticationError('This account has been suspended');
+      }
+
+      // Idempotency guard — do nothing if already verified, but still issue
+      // a session so the user can land in /dashboard from the email link.
       if (userRow?.is_email_verified) {
         await client.query('ROLLBACK');
-        res.json({ success: true, message: 'Email already verified' });
+        issueTokenCookies(res, {
+          id:       userRow.id,
+          username: userRow.username,
+          is_admin: userRow.is_admin,
+        });
+        res.json({ success: true, message: 'Email already verified', auto_login: true });
         return;
       }
 
       await client.query('UPDATE users SET is_email_verified = TRUE WHERE id = $1', [row.user_id]);
       await client.query('DELETE FROM email_verification_tokens WHERE id = $1', [row.id]);
+
+      // Record the session details so we can issue cookies once the TX
+      // commits successfully.
+      if (userRow) {
+        sessionUser = {
+          id:       userRow.id,
+          username: userRow.username,
+          is_admin: userRow.is_admin,
+        };
+      }
 
       // ── Credit referral bonus now that we know the email is real ─────────
       // This is the path that attributes manually-signed-up users to their
@@ -204,7 +305,18 @@ export async function verifyEmail(
       client.release();
     }
 
-    res.json({ success: true, message: 'Email verified successfully' });
+    // Auto-login the user now that their email is verified — they no
+    // longer need to go back to /login. OAuth sign-ups already get cookies
+    // at their callback; this completes the manual flow symmetrically.
+    if (sessionUser) {
+      issueTokenCookies(res, sessionUser);
+    }
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully',
+      auto_login: Boolean(sessionUser),
+    });
   } catch (err) { next(err); }
 }
 
