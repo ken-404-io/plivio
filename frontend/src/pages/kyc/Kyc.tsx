@@ -108,7 +108,9 @@ export default function Kyc() {
 
     setSubmitting(true);
     try {
-      await api.post('/kyc', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      // Don't set Content-Type manually — the axios interceptor strips it
+      // for FormData so the browser can compute the multipart boundary.
+      await api.post('/kyc', formData);
       toast.success("KYC submitted! We'll review it within 1–3 business days.");
       setKycData({ status: 'pending', id_type: idType, submitted_at: new Date().toISOString(), reviewed_at: null, rejection_reason: null });
       setIdFront(null);

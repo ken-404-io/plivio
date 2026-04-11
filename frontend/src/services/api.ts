@@ -25,6 +25,20 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const token = readCsrfToken();
     if (token) config.headers['X-CSRF-Token'] = token;
   }
+
+  // FormData uploads: strip the default application/json Content-Type so
+  // axios / the browser can set it to multipart/form-data with a proper
+  // boundary. If we leave the JSON default in place (or set the header to
+  // the literal string 'multipart/form-data' without a boundary), the
+  // multipart body is misparsed on the server and no file ever reaches
+  // multer — this is why avatar / KYC uploads were silently failing.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    if (config.headers) {
+      delete config.headers['Content-Type'];
+      delete (config.headers as Record<string, unknown>)['content-type'];
+    }
+  }
+
   return config;
 });
 
