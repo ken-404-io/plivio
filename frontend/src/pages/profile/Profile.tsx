@@ -412,9 +412,11 @@ function AvatarUpload({ avatarUrl, username, onUploaded }: {
 
     setBusy(true);
     try {
-      const { data } = await api.post<{ avatar_url: string }>('/users/me/avatar', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      // Do NOT set Content-Type manually — the axios request interceptor
+      // detects FormData and lets the browser compute the multipart
+      // boundary automatically. Forcing 'multipart/form-data' here (no
+      // boundary) was breaking the upload on the server.
+      const { data } = await api.post<{ avatar_url: string }>('/users/me/avatar', formData);
       // Swap in the new URL immediately; the <img key> below forces React
       // to drop the old <img> element so the browser can't re-use a cached
       // decode of the previous avatar.

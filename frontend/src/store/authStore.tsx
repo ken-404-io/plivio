@@ -128,14 +128,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch { /* ignore */ }
 
-    dispatch({ type: 'SET_TRANSITION', payload: 'logging-in' });
-
+    // NOTE: the "Logging in…" transition overlay is only dispatched AFTER
+    // the server confirms the credentials are valid. Triggering it at the
+    // start of the request made the overlay flash into view on every
+    // validation / invalid-credential error, which looked like the user
+    // was being logged in when they actually weren't.
     try {
       const { data } = await api.post<{ requires_2fa?: boolean }>('/auth/login', { email, password });
       if (data.requires_2fa) {
-        dispatch({ type: 'SET_TRANSITION', payload: null });
+        // Don't animate — user still needs to enter their 2FA code
         return { requires_2fa: true, is_admin: false };
       }
+
+      dispatch({ type: 'SET_TRANSITION', payload: 'logging-in' });
+
       const user = await fetchMe();
 
       // Broadcast to other tabs
@@ -150,15 +156,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_TRANSITION', payload: null });
       return { requires_2fa: false, is_admin: user?.is_admin ?? false };
     } catch (err) {
+      // Make sure the overlay never lingers if something throws after the
+      // transition was dispatched (e.g. fetchMe failing post-login).
       dispatch({ type: 'SET_TRANSITION', payload: null });
       throw err;
     }
   }, [fetchMe]);
 
   const verify2FA = useCallback(async (token: string) => {
-    dispatch({ type: 'SET_TRANSITION', payload: 'logging-in' });
+    // Same pattern as login: only animate the overlay once the server has
+    // accepted the code — avoids a misleading flash when the 2FA check
+    // rejects the entered value.
     try {
       await api.post('/auth/2fa/verify-login', { token });
+
+      dispatch({ type: 'SET_TRANSITION', payload: 'logging-in' });
+
       const user = await fetchMe();
 
       if (user?.id) {
