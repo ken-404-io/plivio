@@ -1,4 +1,4 @@
-import { useState, useRef, type FormEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
@@ -379,10 +379,20 @@ function AvatarUpload({ avatarUrl, username, onUploaded }: {
   const inputRef  = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
-  // Cloudinary URLs are absolute; legacy local paths are relative
-  const src = avatarUrl
-    ? (avatarUrl.startsWith('http') ? avatarUrl : avatarUrl)
-    : null;
+  // Keep a local copy of the URL so we can update the preview immediately
+  // after a successful upload — waiting for fetchMe() to round-trip would
+  // leave the old image on screen for several hundred milliseconds, and
+  // some browsers aggressively cache the <img> even when the src string
+  // (but not the underlying resource) changes.
+  const [localUrl, setLocalUrl] = useState<string | null>(avatarUrl);
+
+  // Re-sync with the prop whenever the authoritative value changes
+  // (e.g. after fetchMe() completes, or the user is loaded for the first time).
+  useEffect(() => {
+    setLocalUrl(avatarUrl);
+  }, [avatarUrl]);
+
+  const src = localUrl;
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -402,9 +412,13 @@ function AvatarUpload({ avatarUrl, username, onUploaded }: {
 
     setBusy(true);
     try {
-      await api.post('/users/me/avatar', formData, {
+      const { data } = await api.post<{ avatar_url: string }>('/users/me/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      // Swap in the new URL immediately; the <img key> below forces React
+      // to drop the old <img> element so the browser can't re-use a cached
+      // decode of the previous avatar.
+      setLocalUrl(data.avatar_url);
       toast.success('Avatar updated.');
       onUploaded();
     } catch (err: unknown) {
@@ -427,7 +441,7 @@ function AvatarUpload({ avatarUrl, username, onUploaded }: {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
       >
         {src ? (
-          <img src={src} alt="Your avatar" className="avatar-img" />
+          <img key={src} src={src} alt="Your avatar" className="avatar-img" />
         ) : (
           <div className="avatar-placeholder">
             {username.charAt(0).toUpperCase()}
@@ -442,7 +456,7 @@ function AvatarUpload({ avatarUrl, username, onUploaded }: {
           )}
         </div>
       </div>
-      <p className="avatar-hint">Tap to change photo · JPEG, PNG, WEBP · 2 MB max</p>
+      <p className="avatar-hint">JPEG, PNG, WEBP · 2 MB max</p>
       <input
         ref={inputRef}
         type="file"
@@ -558,7 +572,6 @@ export default function Profile() {
         <div>
           <BackButton />
           <h1 className="page-title">Profile</h1>
-          <p className="page-subtitle">Manage your account details and security settings</p>
         </div>
       </header>
 
@@ -570,7 +583,6 @@ export default function Profile() {
         />
         <div className="profile-hero-info">
           <p className="profile-username">{user?.username}</p>
-          <p className="profile-email">{user?.email}</p>
           <div className="profile-hero-meta">
             <span className={`plan-badge plan-badge--${user?.plan ?? 'free'}`}>
               {user?.plan?.toUpperCase() ?? 'FREE'}
@@ -619,16 +631,6 @@ export default function Profile() {
               <div className="detail-row">
                 <dt className="detail-label">Username</dt>
                 <dd className="detail-value">{user?.username}</dd>
-              </div>
-              <div className="detail-row">
-                <dt className="detail-label">Email</dt>
-                <dd className="detail-value">
-                  {user?.email}
-                  {user?.is_email_verified
-                    ? <span className="badge badge--success ml-2">Verified</span>
-                    : <span className="badge ml-2">Unverified</span>
-                  }
-                </dd>
               </div>
               <div className="detail-row">
                 <dt className="detail-label">KYC status</dt>

@@ -28,6 +28,7 @@ import {
   sendVerificationEmail,
   sendPasswordResetEmail,
 } from '../services/email.ts';
+import { logger } from '../utils/logger.ts';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -152,6 +153,10 @@ export async function verifyEmail(
       await client.query('DELETE FROM email_verification_tokens WHERE id = $1', [row.id]);
 
       // ── Credit referral bonus now that we know the email is real ─────────
+      // This is the path that attributes manually-signed-up users to their
+      // referrer. OAuth accounts are credited at upsert time because the
+      // provider has already verified their email; manual accounts rely on
+      // this block running successfully after the user clicks the link.
       if (userRow?.referred_by) {
         try {
           const refTaskRes = await client.query<{ id: string; reward_amount: string }>(
@@ -172,9 +177,22 @@ export async function verifyEmail(
                VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
               [userRow.referred_by, refTask.id, refTask.reward_amount],
             );
+            logger.info(
+              { referrerId: userRow.referred_by, referredUserId: row.user_id, amount: refTask.reward_amount },
+              '✅ Referral bonus credited on manual email verification',
+            );
+          } else {
+            logger.warn(
+              { referrerId: userRow.referred_by, referredUserId: row.user_id },
+              '⚠️ No active referral task found — referral bonus NOT credited',
+            );
           }
-        } catch {
-          // Non-fatal — verification still succeeds even if bonus insert fails
+        } catch (bonusErr) {
+          // Log but don't fail verification — the account is still verified
+          logger.error(
+            { err: (bonusErr as Error).message, referrerId: userRow.referred_by, referredUserId: row.user_id },
+            '❌ Failed to credit referral bonus on email verification',
+          );
         }
       }
 

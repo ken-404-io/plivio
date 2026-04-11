@@ -3,17 +3,29 @@ import pool from '../config/db.ts';
 
 const REWARD_PER_CORRECT = 0.50;
 
-const PLAN_QUESTION_LIMITS: Record<string, number> = {
-  free:    50,
-  premium: 150,
-  elite:   500,
+// Lifetime question cap — Free plan users have a hard ceiling of 100 total
+// questions. Premium and Elite users have NO lifetime cap; their counters
+// are daily (reset at 00:00 Philippine Standard Time).
+const FREE_LIFETIME_QUESTIONS = 100;
+
+// Daily question cap (resets 00:00 PST / Asia/Manila). null = unlimited.
+const DAILY_QUESTION_LIMITS: Record<string, number | null> = {
+  free:    null,     // Free uses the lifetime cap above
+  premium: 100,
+  elite:   null,     // Unlimited daily
 };
 
+// Daily earning cap from the quiz bot (₱). null = unlimited.
 const DAILY_EARN_LIMITS: Record<string, number | null> = {
   free:    20,
   premium: 100,
   elite:   null,
 };
+
+// ─── SQL snippet: "today" in Philippine Standard Time (UTC+8) ──────────────
+// `answered_at` is TIMESTAMPTZ, so we compare against 00:00 Asia/Manila
+// converted back to an absolute instant.
+const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila')`;
 
 // ─── GET /quiz/status ──────────────────────────────────────────────────────
 export async function getQuizStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -30,11 +42,11 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
       [userId],
     );
     const effectivePlan = (planRes.rows[0]?.effective_plan ?? 'free') as string;
-    const questionLimit = PLAN_QUESTION_LIMITS[effectivePlan] ?? 50;
-    const dailyLimit    = DAILY_EARN_LIMITS[effectivePlan];
+    const dailyQuestionLimit = DAILY_QUESTION_LIMITS[effectivePlan] ?? null;
+    const dailyEarnLimit     = DAILY_EARN_LIMITS[effectivePlan] ?? null;
 
-    // Total questions answered (all time)
-    const totalRes = await pool.query(
+    // Lifetime answered (used for Free plan cap)
+    const lifetimeRes = await pool.query(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct,
               COALESCE(SUM(reward_earned), 0) AS total_earned
@@ -42,57 +54,63 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
       [userId],
     );
 
-    // Today's earnings and answer count from quiz
+    // Today's quiz activity (PH day boundary)
     const todayRes = await pool.query(
       `SELECT COALESCE(SUM(reward_earned), 0) AS today_earned,
               COUNT(*) AS today_answered
        FROM user_question_answers
-       WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
+       WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
       [userId],
     );
 
-    // Total earnings today from ALL sources (tasks + quiz)
-    const allTodayRes = await pool.query(
-      `SELECT
-        COALESCE((
-          SELECT SUM(reward_earned) FROM task_completions
-          WHERE user_id = $1 AND status = 'approved'
-            AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
-        ), 0) +
-        COALESCE((
-          SELECT SUM(reward_earned) FROM user_question_answers
-          WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
-        ), 0) AS all_today_earned`,
-      [userId],
-    );
+    const lifetimeAnswered = parseInt(lifetimeRes.rows[0]?.total ?? '0');
+    const lifetimeCorrect  = parseInt(lifetimeRes.rows[0]?.correct ?? '0');
+    const totalEarned      = parseFloat(lifetimeRes.rows[0]?.total_earned ?? '0');
+    const todayEarned      = parseFloat(todayRes.rows[0]?.today_earned ?? '0');
+    const todayAnswered    = parseInt(todayRes.rows[0]?.today_answered ?? '0');
 
-    const total         = parseInt(totalRes.rows[0]?.total ?? '0');
-    const correct       = parseInt(totalRes.rows[0]?.correct ?? '0');
-    const totalEarned   = parseFloat(totalRes.rows[0]?.total_earned ?? '0');
-    const todayEarned   = parseFloat(todayRes.rows[0]?.today_earned ?? '0');
-    const todayAnswered = parseInt(todayRes.rows[0]?.today_answered ?? '0');
-    const allTodayEarned = parseFloat(allTodayRes.rows[0]?.all_today_earned ?? '0');
+    // Determine the question cap that applies to this user.
+    //  - Free:    lifetime cap (100 total)
+    //  - Premium: daily cap (100/day, resets at PH midnight)
+    //  - Elite:   no cap at all
+    let questionLimit:  number | null;
+    let questionsLeft:  number | null;
+    if (effectivePlan === 'free') {
+      questionLimit = FREE_LIFETIME_QUESTIONS;
+      questionsLeft = Math.max(0, FREE_LIFETIME_QUESTIONS - lifetimeAnswered);
+    } else if (dailyQuestionLimit !== null) {
+      questionLimit = dailyQuestionLimit;
+      questionsLeft = Math.max(0, dailyQuestionLimit - todayAnswered);
+    } else {
+      // Elite: unlimited
+      questionLimit = null;
+      questionsLeft = null;
+    }
 
-    const questionsLeft  = Math.max(0, questionLimit - total);
-    const dailyRemaining = dailyLimit !== null
-      ? Math.max(0, dailyLimit - allTodayEarned)
+    const dailyRemaining = dailyEarnLimit !== null
+      ? Math.max(0, dailyEarnLimit - todayEarned)
       : null;
 
-    const canEarnMore = questionsLeft > 0 && (dailyRemaining === null || dailyRemaining > 0);
+    const hasQuestionsLeft = questionsLeft === null || questionsLeft > 0;
+    const hasEarningsLeft  = dailyRemaining === null || dailyRemaining > 0;
+    const canEarnMore      = hasQuestionsLeft && hasEarningsLeft;
 
     res.json({
-      success: true,
-      plan: effectivePlan,
-      question_limit:  questionLimit,
-      total_answered:  total,
-      total_correct:   correct,
-      questions_left:  questionsLeft,
-      total_earned:    totalEarned,
-      today_earned:    todayEarned,
-      today_answered:  todayAnswered,
-      daily_limit:     dailyLimit,
-      daily_remaining: dailyRemaining,
-      can_earn_more:   canEarnMore,
+      success:          true,
+      plan:             effectivePlan,
+      question_limit:   questionLimit,       // null for elite
+      total_answered:   lifetimeAnswered,     // lifetime total (used by UI progress)
+      total_correct:    lifetimeCorrect,
+      questions_left:   questionsLeft,       // null for elite
+      total_earned:     totalEarned,
+      today_earned:     todayEarned,
+      today_answered:   todayAnswered,
+      daily_limit:      dailyEarnLimit,
+      daily_remaining:  dailyRemaining,
+      can_earn_more:    canEarnMore,
+      // Reason flags the frontend uses to decide which UI to render
+      free_lifetime_exhausted: effectivePlan === 'free' && lifetimeAnswered >= FREE_LIFETIME_QUESTIONS,
+      earnings_capped:         dailyRemaining !== null && dailyRemaining <= 0,
     });
   } catch (err) {
     next(err);
@@ -113,52 +131,65 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
       [userId],
     );
     const effectivePlan  = (planRes.rows[0]?.effective_plan ?? 'free') as string;
-    const questionLimit  = PLAN_QUESTION_LIMITS[effectivePlan] ?? 50;
-    const dailyLimit     = DAILY_EARN_LIMITS[effectivePlan];
+    const dailyQuestionLimit = DAILY_QUESTION_LIMITS[effectivePlan] ?? null;
+    const dailyEarnLimit     = DAILY_EARN_LIMITS[effectivePlan] ?? null;
 
-    // Count total answered
-    const countRes = await pool.query(
-      `SELECT COUNT(*) AS total FROM user_question_answers WHERE user_id = $1`,
-      [userId],
-    );
-    const totalAnswered = parseInt(countRes.rows[0]?.total ?? '0');
-
-    if (totalAnswered >= questionLimit) {
-      res.json({
-        success: false,
-        reason:  'limit_reached',
-        message: `You have reached your ${effectivePlan} plan limit of ${questionLimit} questions. Upgrade to answer more!`,
-      });
-      return;
-    }
-
-    // Check daily earning limit
-    if (dailyLimit !== null) {
-      const allTodayRes = await pool.query(
-        `SELECT
-          COALESCE((
-            SELECT SUM(reward_earned) FROM task_completions
-            WHERE user_id = $1 AND status = 'approved'
-              AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
-          ), 0) +
-          COALESCE((
-            SELECT SUM(reward_earned) FROM user_question_answers
-            WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
-          ), 0) AS all_today_earned`,
+    // Free plan: enforce lifetime cap
+    if (effectivePlan === 'free') {
+      const countRes = await pool.query(
+        `SELECT COUNT(*) AS total FROM user_question_answers WHERE user_id = $1`,
         [userId],
       );
-      const allTodayEarned = parseFloat(allTodayRes.rows[0]?.all_today_earned ?? '0');
-      if (allTodayEarned >= dailyLimit) {
+      const lifetime = parseInt(countRes.rows[0]?.total ?? '0');
+      if (lifetime >= FREE_LIFETIME_QUESTIONS) {
+        res.json({
+          success: false,
+          reason:  'free_lifetime_exhausted',
+          message: `You've used all ${FREE_LIFETIME_QUESTIONS} questions on the free plan. Upgrade to Premium or Elite to keep earning from the quiz bot.`,
+        });
+        return;
+      }
+    } else if (dailyQuestionLimit !== null) {
+      // Premium: enforce daily cap (reset at PH midnight)
+      const dayRes = await pool.query(
+        `SELECT COUNT(*) AS today FROM user_question_answers
+         WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
+        [userId],
+      );
+      const todayCount = parseInt(dayRes.rows[0]?.today ?? '0');
+      if (todayCount >= dailyQuestionLimit) {
         res.json({
           success: false,
           reason:  'daily_limit_reached',
-          message: `You have reached your daily earning limit of ₱${dailyLimit}. Come back tomorrow!`,
+          message: `You've used your ${dailyQuestionLimit} questions for today. Your quota resets at 12:00 AM PST.`,
         });
         return;
       }
     }
 
-    // Get next unanswered question (with its correct answer for generating choices)
+    // Check quiz-bot earning cap (based on today's PH-day quiz earnings only)
+    if (dailyEarnLimit !== null) {
+      const earnRes = await pool.query(
+        `SELECT COALESCE(SUM(reward_earned), 0) AS today_earned
+         FROM user_question_answers
+         WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
+        [userId],
+      );
+      const todayEarned = parseFloat(earnRes.rows[0]?.today_earned ?? '0');
+      if (todayEarned >= dailyEarnLimit) {
+        res.json({
+          success: false,
+          reason:  'earnings_capped',
+          message: effectivePlan === 'free'
+            ? `Come back tomorrow — you've reached your ₱${dailyEarnLimit} daily limit.`
+            : `Come back tomorrow — you've reached your ₱${dailyEarnLimit} daily quiz limit.`,
+        });
+        return;
+      }
+    }
+
+    // Get next unanswered question (with its correct answer for generating choices).
+    // The UNIQUE(user_id, question_id) constraint guarantees no repetition.
     const questionRes = await pool.query(
       `SELECT q.id, q.question, q.answer, q.category
        FROM chat_questions q
@@ -237,7 +268,8 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    // Check not already answered
+    // Check not already answered (the UNIQUE constraint also guarantees this
+    // at the DB level — this early check just gives a cleaner error message)
     const alreadyRes = await pool.query(
       `SELECT id FROM user_question_answers WHERE user_id = $1 AND question_id = $2`,
       [userId, question_id],
@@ -256,17 +288,31 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
       [userId],
     );
     const effectivePlan = (planRes.rows[0]?.effective_plan ?? 'free') as string;
-    const questionLimit = PLAN_QUESTION_LIMITS[effectivePlan] ?? 50;
-    const dailyLimit    = DAILY_EARN_LIMITS[effectivePlan];
+    const dailyQuestionLimit = DAILY_QUESTION_LIMITS[effectivePlan] ?? null;
+    const dailyEarnLimit     = DAILY_EARN_LIMITS[effectivePlan] ?? null;
 
-    const countRes = await pool.query(
-      `SELECT COUNT(*) AS total FROM user_question_answers WHERE user_id = $1`,
-      [userId],
-    );
-    const totalAnswered = parseInt(countRes.rows[0]?.total ?? '0');
-    if (totalAnswered >= questionLimit) {
-      res.status(403).json({ success: false, error: 'Question limit reached for your plan.' });
-      return;
+    // Enforce the right cap based on plan
+    if (effectivePlan === 'free') {
+      const countRes = await pool.query(
+        `SELECT COUNT(*) AS total FROM user_question_answers WHERE user_id = $1`,
+        [userId],
+      );
+      const lifetime = parseInt(countRes.rows[0]?.total ?? '0');
+      if (lifetime >= FREE_LIFETIME_QUESTIONS) {
+        res.status(403).json({ success: false, error: 'Free plan lifetime question limit reached.' });
+        return;
+      }
+    } else if (dailyQuestionLimit !== null) {
+      const dayRes = await pool.query(
+        `SELECT COUNT(*) AS today FROM user_question_answers
+         WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
+        [userId],
+      );
+      const todayCount = parseInt(dayRes.rows[0]?.today ?? '0');
+      if (todayCount >= dailyQuestionLimit) {
+        res.status(403).json({ success: false, error: 'Daily question limit reached.' });
+        return;
+      }
     }
 
     // Check correctness (case-insensitive, trimmed)
@@ -277,24 +323,17 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
     let rewardEarned = 0;
 
     if (isCorrect) {
-      // Check daily limit before awarding
-      if (dailyLimit !== null) {
-        const allTodayRes = await pool.query(
-          `SELECT
-            COALESCE((
-              SELECT SUM(reward_earned) FROM task_completions
-              WHERE user_id = $1 AND status = 'approved'
-                AND completed_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
-            ), 0) +
-            COALESCE((
-              SELECT SUM(reward_earned) FROM user_question_answers
-              WHERE user_id = $1 AND answered_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
-            ), 0) AS all_today_earned`,
+      // Check daily earning limit before awarding (PH day boundary, quiz earnings only)
+      if (dailyEarnLimit !== null) {
+        const earnRes = await pool.query(
+          `SELECT COALESCE(SUM(reward_earned), 0) AS today_earned
+           FROM user_question_answers
+           WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
           [userId],
         );
-        const allTodayEarned = parseFloat(allTodayRes.rows[0]?.all_today_earned ?? '0');
-        if (allTodayEarned < dailyLimit) {
-          rewardEarned = Math.min(REWARD_PER_CORRECT, dailyLimit - allTodayEarned);
+        const todayEarned = parseFloat(earnRes.rows[0]?.today_earned ?? '0');
+        if (todayEarned < dailyEarnLimit) {
+          rewardEarned = Math.min(REWARD_PER_CORRECT, dailyEarnLimit - todayEarned);
         }
       } else {
         rewardEarned = REWARD_PER_CORRECT;
