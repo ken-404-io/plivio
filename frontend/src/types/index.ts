@@ -279,7 +279,7 @@ export interface AuthContextValue {
   sessionConflict: boolean;
   login: (email: string, password: string) => Promise<{ requires_2fa: boolean; is_admin: boolean }>;
   verify2FA: (token: string) => Promise<{ is_admin: boolean }>;
-  register: (payload: RegisterPayload) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<{ requires_email_verification: boolean; email: string }>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<User | null>;
   dismissSessionConflict: () => void;

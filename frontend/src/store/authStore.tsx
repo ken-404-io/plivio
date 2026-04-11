@@ -176,17 +176,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchMe]);
 
   const register = useCallback(async (payload: RegisterPayload) => {
-    dispatch({ type: 'SET_TRANSITION', payload: 'logging-in' });
-    try {
-      await api.post('/auth/register', payload);
-      await fetchMe();
-      await new Promise((r) => setTimeout(r, 800));
-      dispatch({ type: 'SET_TRANSITION', payload: null });
-    } catch (err) {
-      dispatch({ type: 'SET_TRANSITION', payload: null });
-      throw err;
-    }
-  }, [fetchMe]);
+    // Manual sign-ups do NOT auto-login. The backend creates the account
+    // and sends a verification email; the caller is expected to show a
+    // "check your email" screen and the user only gets a session after
+    // clicking the verification link.
+    const { data } = await api.post<{
+      success: boolean;
+      requires_email_verification?: boolean;
+      email?: string;
+      message?: string;
+    }>('/auth/register', payload);
+    return {
+      requires_email_verification: Boolean(data.requires_email_verification),
+      email: data.email ?? payload.email,
+    };
+  }, []);
 
   const logout = useCallback(async () => {
     dispatch({ type: 'SET_TRANSITION', payload: 'logging-out' });

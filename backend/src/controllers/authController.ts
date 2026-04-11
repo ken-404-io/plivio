@@ -135,6 +135,11 @@ export async function register(req: Request, res: Response, next: NextFunction):
     //  in emailAuthController.verifyEmail once the address is confirmed)
 
     // ── Send email verification ───────────────────────────────────────────
+    // For manual sign-ups the account is NOT usable until the email is
+    // verified — we do not issue session cookies here. The user will only
+    // receive cookies after they click the verification link (which calls
+    // /api/auth/verify-email and itself issues cookies). OAuth sign-ups
+    // still auto-login because the provider has already verified the email.
     try {
       const rawToken  = crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -146,11 +151,16 @@ export async function register(req: Request, res: Response, next: NextFunction):
       // Fire and forget — email must never delay the registration response
       sendVerificationEmail(user.email as string, user.username as string, rawToken).catch(() => {});
     } catch {
-      // Non-fatal — account is created; user can resend from dashboard
+      // Non-fatal — account is created; user can request a resend from
+      // the "check your email" screen shown by the frontend.
     }
 
-    issueTokenCookies(res, { id: user.id as string, username: user.username as string, is_admin: user.is_admin as boolean });
-    res.status(201).json({ success: true, user });
+    res.status(201).json({
+      success: true,
+      requires_email_verification: true,
+      message: 'Account created. Please check your email to verify your address before logging in.',
+      email: user.email as string,
+    });
   } catch (err) { next(err); }
 }
 
@@ -162,7 +172,8 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
     const { rows } = await pool.query(
       `SELECT id, username, email, password_hash, totp_secret, plan,
-              balance, referral_code, is_admin, is_banned, is_verified
+              balance, referral_code, is_admin, is_banned, is_verified,
+              is_email_verified
        FROM users WHERE email = $1 LIMIT 1`,
       [email.toLowerCase()]
     );
@@ -174,6 +185,21 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash as string);
     if (!passwordMatch) throw new AuthenticationError('Invalid credentials');
+
+    // Manual sign-ups must verify their email address before they can log in.
+    // OAuth accounts never hit this endpoint (their provider has already
+    // verified the address), so this check is manual-login-only by
+    // construction. We return a structured error so the frontend can
+    // render a friendly screen with a "Resend verification email" button.
+    if (!user.is_email_verified) {
+      res.status(403).json({
+        success: false,
+        error:   'Please verify your email address before logging in. Check your inbox for the verification link.',
+        code:    'email_not_verified',
+        email:   user.email as string,
+      });
+      return;
+    }
 
     if (user.totp_secret) {
       const preToken = generateAccessToken({ id: user.id as string, pending_2fa: true });

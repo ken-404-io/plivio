@@ -40,6 +40,7 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction):
   // attacker can't forge a request without knowing the token.
   if (
     req.path === '/api/auth/verify-email' ||
+    req.path === '/api/auth/verify-email/resend' ||
     req.path === '/api/auth/reset-password' ||
     req.path === '/api/users/me/confirm-email-change'
   ) { next(); return; }
