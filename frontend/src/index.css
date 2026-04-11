@@ -265,6 +265,50 @@ a, button, [role="button"], [tabindex] {
     font-family: inherit;
   }
 
+  /* ── Quizly FAB in the bottom nav ───────────────────────────────────────
+     The Quizly nav slot is styled as a larger, raised "action" button that
+     visually dominates its neighbours (Earnings, Tasks, etc). The icon sits
+     inside a circular gradient puck that floats above the bar. */
+  .bottom-nav--with-quizly {
+    align-items: flex-end;
+  }
+  .bottom-nav-item--quizly {
+    flex: 1.25;
+    padding-top: 0;
+    padding-bottom: 10px;
+    color: var(--text);
+  }
+  .bottom-nav-item--quizly:hover { color: var(--text); }
+  .bottom-nav-item--quizly.bottom-nav-item--active { color: var(--text); }
+  .bottom-nav-item--quizly.bottom-nav-item--active::before { display: none; }
+  .bottom-nav-quizly-fab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    margin-top: -20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: #fff;
+    box-shadow:
+      0 10px 24px rgba(99, 102, 241, 0.42),
+      0 0 0 4px var(--bg-surface);
+    transition: transform 0.12s, box-shadow 0.15s;
+    z-index: 2;
+  }
+  .bottom-nav-item--quizly:active .bottom-nav-quizly-fab { transform: scale(0.94); }
+  .bottom-nav-label--quizly {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 6px;
+  }
+  .bottom-nav-item--quizly.bottom-nav-item--active .bottom-nav-label--quizly {
+    color: var(--accent);
+  }
+
   /* ── Full-screen Menu overlay ── */
   .menu-screen {
     position: fixed;
@@ -511,6 +555,25 @@ a, button, [role="button"], [tabindex] {
 }
 .nav-item:hover { background: var(--bg-elevated); color: var(--text-heading); text-decoration: none; }
 .nav-item--active { background: var(--accent-light); color: var(--accent); }
+
+/* Quizly sidebar entry — deliberately rendered larger / bolder than the
+   surrounding nav items (including Earnings) so it reads as the primary
+   earning activity in the app. */
+.nav-item--quizly {
+  padding: 13px 14px;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.25);
+  margin: 4px 0 6px;
+}
+.nav-item--quizly:hover { color: #fff; background: linear-gradient(135deg, #7376f4 0%, #9c6cf9 100%); }
+.nav-item--quizly.nav-item--active {
+  background: linear-gradient(135deg, #7376f4 0%, #9c6cf9 100%);
+  color: #fff;
+}
+.nav-item--quizly .nav-icon { color: #fff; width: 24px; }
 
 .nav-icon { font-size: 16px; width: 20px; text-align: center; }
 
@@ -1675,6 +1738,48 @@ a, button, [role="button"], [tabindex] {
   font-size: 12px;
   color: var(--error);
   margin-top: 4px;
+}
+
+/* Inline validation error rendered directly beneath an input or form row. */
+.form-field-error {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--error, #ef4444);
+  margin: 6px 0 0;
+  line-height: 1.3;
+}
+
+/* ─── 6-digit OTP input row (Register verify screen) ──────────────────────── */
+.otp-input-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+.otp-input {
+  width: 44px;
+  height: 54px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-appearance: none;
+}
+.otp-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(170, 59, 255, 0.18);
+}
+.otp-input--error {
+  border-color: var(--error, #ef4444) !important;
+}
+@media (max-width: 380px) {
+  .otp-input { width: 40px; height: 50px; font-size: 20px; }
+  .otp-input-row { gap: 6px; }
 }
 
 /* ─── 2FA setup flow ──────────────────────────────────────────────────────────── */
@@ -3572,50 +3677,109 @@ a, button, [role="button"], [tabindex] {
   transition: width 0.4s ease;
 }
 
-/* ─── Tasks CTA ──────────────────────────────────────────────────────────────── */
-.dash-tasks-cta {
+/* ─── Quizly CTA (Dashboard hero button) ────────────────────────────────── */
+.dash-quizly-cta {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background: var(--accent-light);
-  border: 1px solid var(--accent-border);
+  gap: 14px;
+  width: 100%;
+  padding: 18px 18px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
   border-radius: var(--radius-lg);
-  text-decoration: none;
-  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.28);
+  transition: transform 0.12s, box-shadow 0.15s, opacity 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
-.dash-tasks-cta:hover  { background: var(--accent-border); }
-.dash-tasks-cta:active { transform: scale(0.98); }
-.dash-tasks-cta-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: var(--accent);
+.dash-quizly-cta:hover  { box-shadow: 0 16px 36px rgba(99, 102, 241, 0.36); }
+.dash-quizly-cta:active { transform: scale(0.985); }
+.dash-quizly-cta:disabled { opacity: 0.6; cursor: not-allowed; }
+.dash-quizly-cta-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.16);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.dash-tasks-cta-body {
+.dash-quizly-cta-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
-.dash-tasks-cta-count {
-  font-size: 14px;
+.dash-quizly-cta-title {
+  font-size: 16px;
   font-weight: 700;
-  color: var(--accent);
+  color: #fff;
   line-height: 1.2;
 }
-.dash-tasks-cta-sub {
+.dash-quizly-cta-title strong { font-weight: 800; }
+.dash-quizly-cta-sub {
   font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.35;
+}
+.dash-quizly-cta-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  flex-shrink: 0;
+}
+.dash-quizly-cta-reward-amt {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+.dash-quizly-cta-reward-lbl {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.72);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 3px;
+}
+.dash-quizly-cta-arrow { color: rgba(255, 255, 255, 0.75); flex-shrink: 0; }
+
+/* ─── Dashboard Quizly progress subrow (under the daily goal card) ─── */
+.dash-goal-subrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.dash-goal-substat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.dash-goal-substat-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.dash-goal-substat-lbl {
+  font-size: 11px;
   color: var(--text-muted);
 }
-.dash-tasks-cta-arrow { color: var(--accent); flex-shrink: 0; }
+.dash-goal-substat-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+}
 
 /* ─── Dashboard goal hint ────────────────────────────────────────────────────── */
 .dash-goal-hint {

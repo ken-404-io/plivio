@@ -18,10 +18,10 @@ export default function EmailVerificationBanner({ email }: Props) {
     try {
       await api.post('/auth/verify-email/send');
       setSent(true);
-      toast.success('Verification email sent! Check your inbox.');
+      toast.success('Verification code sent! Check your inbox.');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Could not send email. Please try again later.');
+      toast.error(msg ?? 'Could not send code. Please try again later.');
     } finally {
       setSending(false);
     }
@@ -31,15 +31,14 @@ export default function EmailVerificationBanner({ email }: Props) {
     <div className="email-verify-banner" role="alert">
       <span className="email-verify-icon" aria-hidden="true"><Mail size={18} /></span>
       <span className="email-verify-text">
-        Please verify your email address{' '}
-        <strong>{email}</strong> to unlock all features.
+        Please verify <strong>{email}</strong> with the 6-digit code we emailed you.
       </span>
       <button
         className="btn btn-sm email-verify-btn"
         onClick={() => { void resend(); }}
         disabled={sending || sent}
       >
-        {sent ? <><Check size={14} /> Email sent</> : sending ? 'Sending…' : 'Resend email'}
+        {sent ? <><Check size={14} /> Code sent</> : sending ? 'Sending…' : 'Resend code'}
       </button>
     </div>
   );

@@ -4,6 +4,7 @@ import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import type { TaskListResponse, Earning } from '../../types/index.ts';
 import EmailVerificationBanner from '../../components/common/EmailVerificationBanner.tsx';
+import ChatTask from '../tasks/ChatTask.tsx';
 import {
   ShieldCheck,
   Play,
@@ -13,13 +14,31 @@ import {
   Zap,
   BadgeCheck,
   Flame,
-  CheckSquare,
+  MessageCircle,
   ArrowUpCircle,
   ChevronRight,
   Trophy,
   Coins,
   TrendingUp,
 } from 'lucide-react';
+
+// ─── Quizly (daily quiz) status shape ────────────────────────────────────────
+interface QuizlyStatus {
+  success: boolean;
+  plan: string;
+  question_limit: number | null;
+  total_answered: number;
+  total_correct: number;
+  questions_left: number | null;
+  total_earned: number;
+  today_earned: number;
+  today_answered: number;
+  daily_limit: number | null;
+  daily_remaining: number | null;
+  can_earn_more: boolean;
+  free_lifetime_exhausted?: boolean;
+  earnings_capped?: boolean;
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -37,23 +56,29 @@ function EarningTypeIcon({ type }: { type: string }) {
 
 // ─── Dashboard page ───────────────────────────────────────────────────────────
 
-const STREAK_TASK_GOAL = 5;
+// Matches STREAK_QUIZ_GOAL in ChatTask — answering this many quiz questions
+// in a single PH day checks the user in for their daily streak.
+const STREAK_QUIZ_GOAL = 15;
 
 export default function Dashboard() {
   const { user, fetchMe } = useAuth();
 
   const [taskData, setTaskData] = useState<TaskListResponse | null>(null);
   const [earnings, setEarnings] = useState<Earning[]>([]);
+  const [quizly,   setQuizly]   = useState<QuizlyStatus | null>(null);
   const [loading,  setLoading]  = useState(true);
+  const [showQuizly, setShowQuizly] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [taskRes, earningRes] = await Promise.all([
+      const [taskRes, earningRes, quizRes] = await Promise.all([
         api.get<TaskListResponse>('/tasks'),
         api.get<{ data: Earning[] }>('/users/me/earnings', { params: { limit: 5 } }),
+        api.get<QuizlyStatus>('/quiz/status').catch(() => null),
       ]);
       setTaskData(taskRes.data);
       setEarnings(earningRes.data.data ?? []);
+      if (quizRes) setQuizly(quizRes.data);
     } catch {
       // silent — fallback UI handles empty state
     } finally {
@@ -64,6 +89,14 @@ export default function Dashboard() {
   useEffect(() => {
     void load();
     fetchMe();
+  }, [load, fetchMe]);
+
+  // Reload after closing the Quizly modal so the daily progress card
+  // reflects the latest answered/earned counts.
+  const handleQuizlyClose = useCallback(() => {
+    setShowQuizly(false);
+    void load();
+    void fetchMe();
   }, [load, fetchMe]);
 
   // ── Skeleton ──────────────────────────────────────────────────────────────
@@ -132,17 +165,34 @@ export default function Dashboard() {
   const todayEarned    = Number(taskData?.today_earnings ?? 0);
   const dailyLimit     = taskData?.daily_limit ?? null;
   const earningsPct    = dailyLimit ? Math.min(100, Math.round((todayEarned / dailyLimit) * 100)) : 100;
-  const availableCount = taskData?.tasks?.filter(t => !t.completed_today && !t.in_progress_today).length ?? 0;
-  const completedCount = taskData?.tasks?.filter(t => t.completed_today).length ?? 0;
-  const streakPct      = Math.min(100, Math.round((completedCount / STREAK_TASK_GOAL) * 100));
-  const streakDone     = completedCount >= STREAK_TASK_GOAL;
   const streak         = user?.streak_count ?? 0;
   const coins          = Number(user?.coins ?? 0);
   const balance        = Number(user?.balance ?? 0);
   const isFreePlan     = !user?.plan || user.plan === 'free';
   const nextBonusIn    = streak > 0 ? 7 - (streak % 7) : 7;
 
+  // Quizly-specific derived values (drive both the CTA and the daily card)
+  const quizPlan          = quizly?.plan ?? user?.plan ?? 'free';
+  const quizTodayAnswered = quizly?.today_answered ?? 0;
+  const quizTodayEarned   = quizly?.today_earned   ?? 0;
+  const quizTotalAnswered = quizly?.total_answered ?? 0;
+  const quizLimit         = quizly?.question_limit ?? null;
+  const quizLeft          = quizly?.questions_left ?? null;
+  const quizDailyLimit    = quizly?.daily_limit ?? null;
+  const quizDailyDone     = quizTodayAnswered >= STREAK_QUIZ_GOAL;
+  const quizStreakPct     = Math.min(100, Math.round((quizTodayAnswered / STREAK_QUIZ_GOAL) * 100));
+  const quizLocked        = quizly ? !quizly.can_earn_more : false;
+  // CTA sub-line describes the plan's quota in human terms
+  const quizSubline = (() => {
+    if (!quizly) return 'Loading your quiz…';
+    if (quizPlan === 'elite')   return 'Unlimited questions · answer anytime';
+    if (quizPlan === 'premium') return `${quizLeft ?? 0} of 100 questions left today`;
+    // Free plan — lifetime cap
+    return `${quizLeft ?? 0} of ${quizLimit ?? 100} questions remaining`;
+  })();
+
   return (
+    <>
     <div className="page">
 
       {/* Email verification banner */}
@@ -203,19 +253,34 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ── Tasks CTA — the one primary action ── */}
-      {availableCount > 0 && (
-        <Link to="/tasks" className="dash-tasks-cta">
-          <span className="dash-tasks-cta-icon">
-            <CheckSquare size={18} />
+      {/* ── Quizly CTA — the one primary action ── */}
+      <button
+        type="button"
+        className="dash-quizly-cta"
+        onClick={() => setShowQuizly(true)}
+        disabled={quizLocked}
+      >
+        <span className="dash-quizly-cta-icon">
+          <MessageCircle size={22} />
+        </span>
+        <div className="dash-quizly-cta-body">
+          <span className="dash-quizly-cta-title">
+            Open <strong>Quizly</strong>
           </span>
-          <div className="dash-tasks-cta-body">
-            <span className="dash-tasks-cta-count">{availableCount} tasks available</span>
-            <span className="dash-tasks-cta-sub">Start earning now</span>
-          </div>
-          <ChevronRight size={18} className="dash-tasks-cta-arrow" />
-        </Link>
-      )}
+          <span className="dash-quizly-cta-sub">
+            {quizLocked
+              ? (quizly?.free_lifetime_exhausted
+                  ? 'Free questions used — upgrade to keep earning'
+                  : "Daily limit reached — come back tomorrow")
+              : quizSubline}
+          </span>
+        </div>
+        <div className="dash-quizly-cta-reward">
+          <span className="dash-quizly-cta-reward-amt">₱0.50</span>
+          <span className="dash-quizly-cta-reward-lbl">per answer</span>
+        </div>
+        <ChevronRight size={18} className="dash-quizly-cta-arrow" />
+      </button>
 
       {/* ── KYC banner ── */}
       {user?.kyc_status === 'none' && (
@@ -229,46 +294,74 @@ export default function Dashboard() {
         </Link>
       )}
 
-      {/* ── Today's Goal ── */}
+      {/* ── Quizly daily progress (replaces the old Today's Goal card) ── */}
       <div className="dash-goal-card">
         <div className="dash-goal-header">
           <div className="dash-goal-title-row">
             <Flame size={16} className={streak > 0 ? 'dash-goal-flame--active' : 'dash-goal-flame'} />
-            <span className="dash-goal-title">Today's Goal</span>
-            {streakDone && (
-              <span className="dash-goal-done-badge"><Trophy size={10} /> Done!</span>
+            <span className="dash-goal-title">Quizly Today</span>
+            {quizDailyDone && (
+              <span className="dash-goal-done-badge"><Trophy size={10} /> Streak!</span>
             )}
           </div>
-          <span className="dash-goal-progress-count">{completedCount}/{STREAK_TASK_GOAL}</span>
+          <span className="dash-goal-progress-count">
+            {quizTodayAnswered}/{STREAK_QUIZ_GOAL}
+          </span>
         </div>
 
         <div className="dash-goal-bar">
           <div
-            className={`dash-goal-fill${streakDone ? ' dash-goal-fill--done' : ''}`}
-            style={{ width: `${streakPct}%` }}
+            className={`dash-goal-fill${quizDailyDone ? ' dash-goal-fill--done' : ''}`}
+            style={{ width: `${quizStreakPct}%` }}
           />
         </div>
 
         <p className="dash-goal-hint">
-          {streakDone
+          {quizDailyDone
             ? 'Streak earned — come back tomorrow 🎉'
-            : `${STREAK_TASK_GOAL - completedCount} more task${STREAK_TASK_GOAL - completedCount !== 1 ? 's' : ''} for your streak`}
+            : `Answer ${STREAK_QUIZ_GOAL - quizTodayAnswered} more question${STREAK_QUIZ_GOAL - quizTodayAnswered !== 1 ? 's' : ''} in Quizly for your streak`}
         </p>
 
         <div className="dash-goal-stats">
           <div className="dash-goal-stat">
-            <span className="dash-goal-stat-value">{streak}</span>
-            <span className="dash-goal-stat-label">Day streak</span>
+            <span className="dash-goal-stat-value">{quizTodayAnswered}</span>
+            <span className="dash-goal-stat-label">Answered</span>
           </div>
           <div className="dash-goal-stat-divider" />
           <div className="dash-goal-stat">
-            <span className="dash-goal-stat-value">{nextBonusIn}</span>
-            <span className="dash-goal-stat-label">Days to bonus</span>
+            <span className="dash-goal-stat-value">₱{quizTodayEarned.toFixed(2)}</span>
+            <span className="dash-goal-stat-label">
+              {quizDailyLimit ? `of ₱${quizDailyLimit}` : 'Earned today'}
+            </span>
           </div>
           <div className="dash-goal-stat-divider" />
           <div className="dash-goal-stat">
-            <span className="dash-goal-stat-value">{completedCount}</span>
-            <span className="dash-goal-stat-label">Done today</span>
+            <span className="dash-goal-stat-value">
+              {quizPlan === 'elite' ? '∞' : (quizLeft ?? 0)}
+            </span>
+            <span className="dash-goal-stat-label">
+              {quizPlan === 'free' ? 'Left total' : 'Left today'}
+            </span>
+          </div>
+        </div>
+
+        {/* Secondary row: daily streak data (moved out of the goal card body) */}
+        <div className="dash-goal-subrow">
+          <div className="dash-goal-substat">
+            <Flame size={12} className={streak > 0 ? 'dash-goal-flame--active' : 'dash-goal-flame'} />
+            <span className="dash-goal-substat-val">{streak}</span>
+            <span className="dash-goal-substat-lbl">day streak</span>
+          </div>
+          <span className="dash-goal-substat-divider" />
+          <div className="dash-goal-substat">
+            <Trophy size={12} />
+            <span className="dash-goal-substat-val">{nextBonusIn}</span>
+            <span className="dash-goal-substat-lbl">days to bonus</span>
+          </div>
+          <span className="dash-goal-substat-divider" />
+          <div className="dash-goal-substat">
+            <span className="dash-goal-substat-val">{quizTotalAnswered}</span>
+            <span className="dash-goal-substat-lbl">lifetime</span>
           </div>
         </div>
       </div>
@@ -284,7 +377,7 @@ export default function Dashboard() {
 
         {earnings.length === 0 ? (
           <div className="empty-state">
-            <p>No earnings yet. <Link to="/tasks" className="link">Complete tasks</Link> to start.</p>
+            <p>No earnings yet. <button type="button" className="link" onClick={() => setShowQuizly(true)}>Open Quizly</button> to start.</p>
           </div>
         ) : (
           <div className="earnings-list">
@@ -307,5 +400,8 @@ export default function Dashboard() {
       </section>
 
     </div>
+
+    {showQuizly && <ChatTask onClose={handleQuizlyClose} />}
+    </>
   );
 }

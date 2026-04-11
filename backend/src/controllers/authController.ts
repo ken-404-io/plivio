@@ -19,7 +19,7 @@ import {
   NotFoundError,
 } from '../utils/errors.ts';
 import type { JwtPayload } from '../types/express.js';
-import { sendVerificationEmail } from '../services/email.ts';
+import { issueVerificationOtp } from './emailAuthController.ts';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -134,26 +134,22 @@ export async function register(req: Request, res: Response, next: NextFunction):
     // (crediting immediately allowed fake-email abuse; bonus now granted
     //  in emailAuthController.verifyEmail once the address is confirmed)
 
-    // ── Send email verification ───────────────────────────────────────────
+    // ── Send a 6-digit verification OTP ───────────────────────────────────
     // For manual sign-ups the account is NOT usable until the email is
     // verified — we do not issue session cookies here. The user will only
-    // receive cookies after they click the verification link (which calls
-    // /api/auth/verify-email and itself issues cookies). OAuth sign-ups
+    // receive cookies after they submit the correct OTP to
+    // /api/auth/verify-email (which itself issues cookies). OAuth sign-ups
     // still auto-login because the provider has already verified the email.
-    try {
-      const rawToken  = crypto.randomBytes(32).toString('hex');
-      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-      await pool.query(
-        `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
-         VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
-        [user.id as string, tokenHash],
-      );
-      // Fire and forget — email must never delay the registration response
-      sendVerificationEmail(user.email as string, user.username as string, rawToken).catch(() => {});
-    } catch {
-      // Non-fatal — account is created; user can request a resend from
-      // the "check your email" screen shown by the frontend.
-    }
+    // Fire-and-forget — email sending must never delay the register response.
+    issueVerificationOtp(
+      user.id as string,
+      user.email as string,
+      user.username as string,
+    ).catch((err: unknown) => {
+      // Non-fatal — account is created; user can tap "Resend code".
+      // eslint-disable-next-line no-console
+      console.error('[register] issueVerificationOtp failed', err);
+    });
 
     res.status(201).json({
       success: true,

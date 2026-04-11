@@ -18,6 +18,7 @@ import TermsOfService from './pages/TermsOfService.tsx';
 import PrivacyPolicy  from './pages/PrivacyPolicy.tsx';
 import Contact        from './pages/Contact.tsx';
 import Dashboard      from './pages/dashboard/Dashboard.tsx';
+import Quizly         from './pages/quizly/Quizly.tsx';
 import Tasks          from './pages/tasks/Tasks.tsx';
 import Earnings       from './pages/earnings/Earnings.tsx';
 import Withdraw       from './pages/withdraw/Withdraw.tsx';
@@ -54,6 +55,7 @@ export default function App() {
               <Route element={<ProtectedRoute />}>
                 <Route element={<Layout />}>
                   <Route path="/dashboard"  element={<Dashboard />} />
+                  <Route path="/quizly"     element={<Quizly />} />
                   <Route path="/tasks"      element={<Tasks />} />
                   <Route path="/earnings"   element={<Earnings />} />
                   <Route path="/withdraw"   element={<Withdraw />} />

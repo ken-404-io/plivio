@@ -15,6 +15,7 @@ import {
   ChevronRight,
   LogOut,
   SlidersHorizontal,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 
@@ -27,19 +28,24 @@ interface NavItem {
   desc?: string;
 }
 
-// Primary bottom-bar items (always visible)
-const NAV_PRIMARY: NavItem[] = [
-  { to: '/dashboard', label: 'Home',  Icon: LayoutDashboard },
-  { to: '/tasks',     label: 'Tasks', Icon: CheckSquare     },
-  { to: '/coins',     label: 'Coins', Icon: Coins           },
-  { to: '/plans',     label: 'Plans', Icon: Star            },
+// Primary bottom-bar items (always visible). Quizly is the centre "featured"
+// action and is rendered at a larger size than Earnings and the other
+// surrounding items to emphasise it as the primary earning activity.
+const NAV_PRIMARY_LEFT: NavItem[] = [
+  { to: '/dashboard', label: 'Home',     Icon: LayoutDashboard },
+  { to: '/earnings',  label: 'Earnings', Icon: DollarSign      },
 ];
+const NAV_PRIMARY_RIGHT: NavItem[] = [
+  { to: '/tasks',     label: 'Tasks',    Icon: CheckSquare     },
+  { to: '/plans',     label: 'Plans',    Icon: Star            },
+];
+const QUIZLY_NAV: NavItem = { to: '/quizly', label: 'Quizly', Icon: MessageCircle };
 
 // Grouped menu items for the full-screen "Menu" page
 const MENU_GROUPS: { title?: string; items: NavItem[] }[] = [
   {
     items: [
-      { to: '/earnings',  label: 'Earnings',   Icon: DollarSign,    desc: 'View your earnings history'  },
+      { to: '/coins',     label: 'Coins',      Icon: Coins,         desc: 'Daily streak & coin balance' },
       { to: '/kyc',       label: 'Verify ID',  Icon: BadgeCheck,    desc: 'Complete identity check'     },
       { to: '/withdraw',  label: 'Withdraw',   Icon: ArrowUpCircle, desc: 'Cash out your balance'       },
     ],
@@ -87,8 +93,8 @@ export default function BottomNav({ isAdmin = false }: BottomNavProps) {
 
   return (
     <>
-      <nav className="bottom-nav" aria-label="Mobile navigation">
-        {NAV_PRIMARY.map(({ to, label, Icon }) => (
+      <nav className="bottom-nav bottom-nav--with-quizly" aria-label="Mobile navigation">
+        {NAV_PRIMARY_LEFT.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -96,7 +102,34 @@ export default function BottomNav({ isAdmin = false }: BottomNavProps) {
               `bottom-nav-item${isActive ? ' bottom-nav-item--active' : ''}`
             }
           >
-            <span className="bottom-nav-icon"><Icon size={22} /></span>
+            <span className="bottom-nav-icon"><Icon size={20} /></span>
+            <span className="bottom-nav-label">{label}</span>
+          </NavLink>
+        ))}
+
+        {/* Centre Quizly FAB — larger than surrounding nav items */}
+        <NavLink
+          to={QUIZLY_NAV.to}
+          className={({ isActive }) =>
+            `bottom-nav-item bottom-nav-item--quizly${isActive ? ' bottom-nav-item--active' : ''}`
+          }
+          aria-label="Quizly"
+        >
+          <span className="bottom-nav-quizly-fab">
+            <QUIZLY_NAV.Icon size={26} />
+          </span>
+          <span className="bottom-nav-label bottom-nav-label--quizly">Quizly</span>
+        </NavLink>
+
+        {NAV_PRIMARY_RIGHT.map(({ to, label, Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              `bottom-nav-item${isActive ? ' bottom-nav-item--active' : ''}`
+            }
+          >
+            <span className="bottom-nav-icon"><Icon size={20} /></span>
             <span className="bottom-nav-label">{label}</span>
           </NavLink>
         ))}
@@ -107,7 +140,7 @@ export default function BottomNav({ isAdmin = false }: BottomNavProps) {
           aria-label="Open menu"
           aria-expanded={showMenu}
         >
-          <span className="bottom-nav-icon"><Menu size={22} /></span>
+          <span className="bottom-nav-icon"><Menu size={20} /></span>
           <span className="bottom-nav-label">Menu</span>
         </button>
       </nav>

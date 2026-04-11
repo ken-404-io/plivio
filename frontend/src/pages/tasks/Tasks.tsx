@@ -189,7 +189,7 @@ export default function Tasks() {
           )}
         </div>
 
-        {/* ── Quiz Bot card ── */}
+        {/* ── Quizly card ── */}
         <section className="tasks-section">
           <div className="tasks-section-header">
             <h2 className="tasks-section-title">Featured</h2>
@@ -199,12 +199,12 @@ export default function Tasks() {
               <MessageCircle size={24} />
             </div>
             <div className="quiz-task-card-body">
-              <div className="quiz-task-card-title">Quiz Bot</div>
+              <div className="quiz-task-card-title">Quizly</div>
               <div className="quiz-task-card-sub">
                 Pick A or B — answer correctly to earn ₱0.50 each
               </div>
               <div className="quiz-task-card-limits">
-                Free: 50q · Premium: 150q · Elite: 500q
+                Free: 100 total · Premium: 100/day · Elite: unlimited
               </div>
             </div>
             <div className="quiz-task-card-right">
