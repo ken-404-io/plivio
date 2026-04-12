@@ -7,7 +7,6 @@ import {
   Settings,
   Coins,
   Menu,
-  DollarSign,
   Star,
   UserPlus,
   BadgeCheck,
@@ -32,12 +31,11 @@ interface NavItem {
 // action and is rendered at a larger size than Earnings and the other
 // surrounding items to emphasise it as the primary earning activity.
 const NAV_PRIMARY_LEFT: NavItem[] = [
-  { to: '/dashboard', label: 'Home',     Icon: LayoutDashboard },
-  { to: '/earnings',  label: 'Earnings', Icon: DollarSign      },
+  { to: '/dashboard', label: 'Home',  Icon: LayoutDashboard },
+  { to: '/tasks',     label: 'Tasks', Icon: CheckSquare     },
 ];
 const NAV_PRIMARY_RIGHT: NavItem[] = [
-  { to: '/tasks',     label: 'Tasks',    Icon: CheckSquare     },
-  { to: '/plans',     label: 'Plans',    Icon: Star            },
+  { to: '/plans',     label: 'Plans', Icon: Star            },
 ];
 const QUIZLY_NAV: NavItem = { to: '/quizly', label: 'Quizly', Icon: MessageCircle };
 
