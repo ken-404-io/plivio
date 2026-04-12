@@ -174,13 +174,13 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       [email.toLowerCase()]
     );
 
-    if (rows.length === 0) throw new AuthenticationError('Invalid credentials');
+    if (rows.length === 0) throw new AuthenticationError('Invalid credentials. Please check your email and password and try again.');
 
     const user = rows[0] as Record<string, unknown>;
     if (user.is_banned) throw new AuthenticationError('This account has been suspended');
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash as string);
-    if (!passwordMatch) throw new AuthenticationError('Invalid credentials');
+    if (!passwordMatch) throw new AuthenticationError('Invalid credentials. Please check your email and password and try again.');
 
     // Manual sign-ups must verify their email address before they can log in.
     // OAuth accounts never hit this endpoint (their provider has already

@@ -119,7 +119,7 @@ export default function Login() {
       } else {
         // Inline error shown under the password field — matches the
         // "Invalid credentials." pattern requested by design.
-        setFieldError({ password: data?.error || 'Invalid credentials.' });
+        setFieldError({ password: data?.error || 'Invalid credentials. Please check your email and password and try again.' });
       }
     } finally {
       setLoading(false);

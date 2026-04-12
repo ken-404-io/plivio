@@ -4,9 +4,9 @@ import api from '../../services/api.ts';
 import { useAuth } from '../../store/authStore.tsx';
 import { useAchievement } from '../../components/common/Achievement.tsx';
 import {
-  Bot, X, CheckCircle2, XCircle,
+  MessageCircle, X, CheckCircle2, XCircle,
   ChevronRight, Trophy, Zap, BookOpen, Flame,
-  Sparkles, Crown,
+  Star, Crown,
 } from 'lucide-react';
 
 const STREAK_QUIZ_GOAL = 15;
@@ -282,7 +282,7 @@ export default function ChatTask({ onClose }: Props) {
         {/* ── Header ── */}
         <div className="cq-header">
           <div className="cq-header-left">
-            <div className="cq-bot-avatar"><Bot size={20} /></div>
+            <div className="cq-bot-avatar"><MessageCircle size={20} /></div>
             <div>
               <div className="cq-title">Quizly</div>
               <div className="cq-subtitle">
@@ -407,7 +407,7 @@ export default function ChatTask({ onClose }: Props) {
           {phase === 'done' && doneMode === 'upgrade' && (
             <div className="cq-done cq-done--upgrade">
               <div className="cq-upgrade-badge">
-                <Sparkles size={28} />
+                <Star size={28} />
               </div>
               <div className="cq-done-title">You've unlocked everything free!</div>
               <p className="cq-done-msg">{limitMsg}</p>
@@ -418,7 +418,7 @@ export default function ChatTask({ onClose }: Props) {
                   <span><strong>Premium:</strong> 100 questions / day &middot; ₱100 daily cap</span>
                 </div>
                 <div className="cq-upgrade-benefit">
-                  <Sparkles size={16} />
+                  <Star size={16} />
                   <span><strong>Elite:</strong> Unlimited questions, no daily cap</span>
                 </div>
               </div>

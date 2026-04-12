@@ -200,12 +200,6 @@ export default function Tasks() {
             </div>
             <div className="quiz-task-card-body">
               <div className="quiz-task-card-title">Quizly</div>
-              <div className="quiz-task-card-sub">
-                Pick A or B — answer correctly to earn ₱0.50 each
-              </div>
-              <div className="quiz-task-card-limits">
-                Free: 100 total · Premium: 100/day · Elite: unlimited
-              </div>
             </div>
             <div className="quiz-task-card-right">
               <span className="quiz-task-card-reward">₱0.50</span>
