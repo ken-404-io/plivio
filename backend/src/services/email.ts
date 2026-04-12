@@ -182,6 +182,40 @@ export async function sendWithdrawalStatusEmail(
   await send(to, subject, wrap('Withdrawal Update', body));
 }
 
+export async function sendKycStatusEmail(
+  to: string,
+  username: string,
+  status: 'approved' | 'rejected',
+  rejectionReason?: string,
+): Promise<void> {
+  const isApproved = status === 'approved';
+  const subject = isApproved
+    ? `Your ${APP_NAME} identity verification is approved`
+    : `Your ${APP_NAME} identity verification was rejected`;
+
+  const body = isApproved
+    ? `
+      <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+        KYC Approved
+      </p>
+      <p>Hi <strong>${username}</strong>,</p>
+      <p>Your identity has been <strong style="color:#22c55e;">verified</strong>.
+         You can now request withdrawals and access all features on ${APP_NAME}.</p>
+      ${button(`${APP_URL}/withdraw`, 'Go to Withdrawals')}`
+    : `
+      <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+        KYC Rejected
+      </p>
+      <p>Hi <strong>${username}</strong>,</p>
+      <p>Unfortunately your identity verification was
+         <strong style="color:#ef4444;">rejected</strong>.</p>
+      ${rejectionReason ? `<p><strong>Reason:</strong> ${rejectionReason}</p>` : ''}
+      <p>Please resubmit your documents with clearer photos and try again.</p>
+      ${button(`${APP_URL}/kyc`, 'Resubmit Documents')}`;
+
+  await send(to, subject, wrap('KYC Verification', body));
+}
+
 export async function sendSubscriptionConfirmEmail(
   to: string,
   username: string,
