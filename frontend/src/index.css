@@ -172,6 +172,31 @@ a, button, [role="button"], [tabindex] {
   .topbar-brand { display: none !important; }
 }
 
+/* ─── Pull-to-refresh indicator ─────────────────────────────────────────────── */
+.ptr-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 50;
+  pointer-events: none;
+  transition: transform 0.15s ease;
+}
+.ptr-spinner {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+  transition: transform 0.1s linear;
+}
+.ptr-spinner--active {
+  animation: ptr-spin 0.7s linear infinite;
+}
+@keyframes ptr-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ─── Bottom navigation (mobile only) ───────────────────────────────────────── */
 .bottom-nav {
   display: none; /* shown via media query below */

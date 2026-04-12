@@ -3,6 +3,7 @@ import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { Flame, AlertTriangle } from 'lucide-react';
 import Sidebar           from './Sidebar.tsx';
 import BottomNav         from './BottomNav.tsx';
+import PullToRefresh     from '../common/PullToRefresh.tsx';
 import NotificationBell  from '../common/NotificationBell.tsx';
 import OnboardingModal, { hasCompletedOnboarding } from '../common/OnboardingModal.tsx';
 import { AchievementProvider } from '../common/Achievement.tsx';
@@ -42,8 +43,8 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
       {/* Desktop: left sidebar */}
       <Sidebar isAdmin={isAdmin} />
 
-      {/* Page content */}
-      <main className="main-content">
+      {/* Page content — PullToRefresh provides the .main-content wrapper */}
+      <PullToRefresh>
         <div className="topbar">
           {/* Mobile-only: avatar + plan badge (left) */}
           <div className="topbar-mobile-left">
@@ -79,7 +80,7 @@ export default function Layout({ isAdmin = false }: LayoutProps) {
         </div>
 
         <Outlet />
-      </main>
+      </PullToRefresh>
 
       {/* Mobile: bottom tab bar */}
       <BottomNav isAdmin={isAdmin} />
