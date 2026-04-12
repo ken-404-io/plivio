@@ -1,4 +1,3 @@
-import bcrypt from 'bcrypt';
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { ForbiddenError, NotFoundError, ConflictError, ValidationError } from '../utils/errors.ts';
@@ -101,31 +100,6 @@ async function todayEarnings(userId: string): Promise<number> {
     );
     return Number((rows[0] as { total: string }).total);
   }
-}
-
-/** Generate a simple math captcha challenge. Returns the question and a bcrypt hash of the answer. */
-async function generateCaptcha(): Promise<{ question: string; answerHash: string }> {
-  const ops = ['+', '-', 'x'] as const;
-  const op  = ops[Math.floor(Math.random() * ops.length)];
-
-  let a: number, b: number, answer: number;
-
-  if (op === '+') {
-    a = Math.floor(Math.random() * 20) + 1;
-    b = Math.floor(Math.random() * 20) + 1;
-    answer = a + b;
-  } else if (op === '-') {
-    a = Math.floor(Math.random() * 20) + 10;
-    b = Math.floor(Math.random() * 10) + 1;
-    answer = a - b;
-  } else {
-    a = Math.floor(Math.random() * 9) + 2;
-    b = Math.floor(Math.random() * 9) + 2;
-    answer = a * b;
-  }
-
-  const answerHash = await bcrypt.hash(String(answer), 12);
-  return { question: `What is ${a} ${op} ${b}?`, answerHash };
 }
 
 // ─── List tasks ────────────────────────────────────────────────────────────
@@ -264,16 +238,9 @@ export async function startTask(req: Request, res: Response, next: NextFunction)
       throw new ValidationError('Referral rewards are issued automatically when a friend registers using your code.');
     }
 
-    // Generate captcha challenge or select ad network
+    // Select ad network for video/ad tasks
     let serverData: Record<string, unknown> = {};
-    let challenge: Record<string, string>   = {};
     let embedCode: string | undefined;
-
-    if (task.type === 'captcha') {
-      const captcha           = await generateCaptcha();
-      serverData.captcha_hash = captcha.answerHash;
-      challenge.question      = captcha.question;
-    }
 
     if (task.type === 'video' || task.type === 'ad_click') {
       const networks = (config.networks ?? []).filter((n) => n.embed_code?.trim());
@@ -300,8 +267,7 @@ export async function startTask(req: Request, res: Response, next: NextFunction)
       success:             true,
       completion_id:       completionId,
       verification_config: config,
-      ...(Object.keys(challenge).length > 0 && { challenge }),
-      ...(embedCode                           && { embed_code: embedCode }),
+      ...(embedCode && { embed_code: embedCode }),
     });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -366,26 +332,6 @@ export async function submitTask(req: Request, res: Response, next: NextFunction
         throw new ValidationError(
           `You must complete the full ${required}s view. Wait ${remaining} more second${remaining !== 1 ? 's' : ''}.`
         );
-      }
-    }
-
-    if (comp.type === 'captcha') {
-      const submittedAnswer = String(proof.answer ?? '').trim();
-      if (!submittedAnswer) throw new ValidationError('Captcha answer is required.');
-
-      const storedHash = comp.server_data.captcha_hash as string | undefined;
-      if (!storedHash) throw new ValidationError('Captcha session expired. Please start again.');
-
-      const correct = await bcrypt.compare(submittedAnswer, storedHash);
-      if (!correct) {
-        // Mark as rejected so the user must start fresh
-        await client.query(
-          `UPDATE task_completions SET status = 'rejected', completed_at = NOW() WHERE id = $1`,
-          [comp.id]
-        );
-        await client.query('COMMIT');
-        res.status(400).json({ success: false, error: 'Incorrect captcha answer. Please try again.' });
-        return;
       }
     }
 

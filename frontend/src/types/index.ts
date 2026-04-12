@@ -118,7 +118,6 @@ export interface StartTaskResponse {
   success: boolean;
   completion_id: string;
   verification_config: VerificationConfig;
-  challenge?: { question: string };
   embed_code?: string;
 }
 

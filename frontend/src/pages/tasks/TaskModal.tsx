@@ -107,40 +107,6 @@ function VideoAdPanel({
   );
 }
 
-// ─── Captcha panel ──────────────────────────────────────────────────────────
-
-function CaptchaPanel({
-  question,
-  answer,
-  onChange,
-}: {
-  question: string;
-  answer: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="task-modal-content">
-      <div className="task-modal-captcha-box">
-        <p className="task-modal-captcha-label">Solve this to prove you&apos;re human:</p>
-        <p className="task-modal-captcha-question">{question}</p>
-      </div>
-
-      <label className="form-label" htmlFor="captcha-answer">Your answer</label>
-      <input
-        id="captcha-answer"
-        className="form-input"
-        type="number"
-        value={answer}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Enter the number"
-        autoFocus
-      />
-
-      <p className="task-modal-hint">Enter the correct answer to earn your reward.</p>
-    </div>
-  );
-}
-
 // ─── Survey panel ───────────────────────────────────────────────────────────
 
 function SurveyPanel({
@@ -188,10 +154,6 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
   const [embedCode,      setEmbedCode]      = useState<string | undefined>();
   const [errorMsg,       setErrorMsg]       = useState('');
 
-  // Captcha state
-  const [captchaQuestion, setCaptchaQuestion] = useState('');
-  const [captchaAnswer,   setCaptchaAnswer]   = useState('');
-
   // Survey state
   const [surveyAnswers, setSurveyAnswers] = useState<Record<string, string>>({});
 
@@ -214,9 +176,6 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
         setCompletionId(data.completion_id);
         completionIdRef.current = data.completion_id;
 
-        if (task.type === 'captcha' && data.challenge) {
-          setCaptchaQuestion(data.challenge.question);
-        }
         if (data.embed_code) {
           setEmbedCode(data.embed_code);
         }
@@ -257,7 +216,6 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
     setPhase('submitting');
 
     let proof: Record<string, unknown> = {};
-    if (task.type === 'captcha') proof = { answer: captchaAnswer.trim() };
     if (task.type === 'survey')  proof = { answers: surveyAnswers };
 
     void submitProof(proof);
@@ -273,7 +231,6 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
 
   // ── Can the user manually submit? ────────────────────────────────────────
   function isSubmittable(): boolean {
-    if (task.type === 'captcha') return captchaAnswer.trim().length > 0;
     if (task.type === 'survey') {
       const questions = config.questions ?? [];
       return questions.every((q) => (surveyAnswers[q.id] ?? '').trim().length >= q.min_length);
@@ -321,13 +278,6 @@ export default function TaskModal({ task, onClose, onComplete }: Props) {
                 duration={duration}
                 embedCode={embedCode}
                 onTimerDone={handleTimerDone}
-              />
-            )}
-            {task.type === 'captcha' && (
-              <CaptchaPanel
-                question={captchaQuestion}
-                answer={captchaAnswer}
-                onChange={setCaptchaAnswer}
               />
             )}
             {task.type === 'survey' && (

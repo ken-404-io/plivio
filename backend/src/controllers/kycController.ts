@@ -20,6 +20,7 @@ import {
   deleteFromCloudinary,
   extractPublicId,
 } from '../config/cloudinary.ts';
+import { sendKycStatusEmail } from '../services/email.ts';
 
 const VALID_ID_TYPES = new Set([
   'passport', 'national_id', 'drivers_license',
@@ -242,17 +243,26 @@ export async function reviewKyc(
     // Sync kyc_status on users table
     await pool.query(`UPDATE users SET kyc_status = $1 WHERE id = $2`, [newStatus, user_id]);
 
-    // In-app notification
+    // Fetch user email/username for email notification
+    const userResult = await pool.query(
+      `SELECT email, username FROM users WHERE id = $1`,
+      [user_id],
+    );
+    const { email: userEmail, username } = userResult.rows[0] as { email: string; username: string };
+
+    // In-app + push + email notification
     if (action === 'approve') {
       const title = 'KYC Approved';
       const body  = 'Your identity has been verified. You can now request withdrawals.';
       await createNotification(user_id, 'kyc_approved', title, body, '/withdraw');
       void sendPushToUser(user_id, title, body, '/withdraw');
+      void sendKycStatusEmail(userEmail, username, 'approved');
     } else {
       const title = 'KYC Rejected';
       const body  = `Your KYC was rejected: ${rejection_reason ?? ''}. Please resubmit with clearer documents.`;
       await createNotification(user_id, 'kyc_rejected', title, body, '/kyc');
       void sendPushToUser(user_id, title, body, '/kyc');
+      void sendKycStatusEmail(userEmail, username, 'rejected', rejection_reason ?? undefined);
     }
 
     res.json({ success: true, status: newStatus });
