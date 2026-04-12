@@ -4735,138 +4735,469 @@ a, button, [role="button"], [tabindex] {
   .tasks-stats-row { padding: 10px 0; }
 }
 
-/* ─── Withdraw page ───────────────────────────────────────────────────────────── */
-.withdraw-balance-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, var(--accent-dark), var(--accent));
-  border-radius: var(--radius);
-  padding: 20px 24px;
-  color: #fff;
-}
-.withdraw-balance-left  { display: flex; flex-direction: column; gap: 4px; }
-.withdraw-balance-label { font-size: 12px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.05em; }
-.withdraw-balance-value { font-size: 32px; font-weight: 700; line-height: 1; }
-.withdraw-balance-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; opacity: 0.85; }
-.withdraw-min-note      { font-size: 12px; opacity: 0.75; }
+/* ─── Withdraw page (redesigned) ─────────────────────────────────────────────── */
 
-.withdraw-form { display: flex; flex-direction: column; gap: 16px; }
-
-.withdraw-method-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.withdraw-method-option {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 14px 12px;
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  background: var(--bg-elevated);
-}
-.withdraw-method-option:hover  { border-color: var(--accent-border); }
-.withdraw-method-option--active { border-color: var(--accent); background: var(--accent-light); }
-.withdraw-method-icon  { color: var(--accent); }
-.withdraw-method-label { font-size: 12px; font-weight: 700; color: var(--text-heading); letter-spacing: 0.05em; }
-
-.form-label-hint { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 4px; }
-.form-hint       { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block; }
-
-.withdraw-amount-wrap { position: relative; }
-.withdraw-amount-prefix {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-.withdraw-amount-input { padding-left: 28px !important; font-size: 18px; font-weight: 600; }
-
-/* ─── Withdraw — history list ─────────────────────────────────────────────────── */
-.withdraw-history-list { display: flex; flex-direction: column; gap: 10px; }
-
-.withdraw-history-card {
+/* Hero balance card */
+.wd-hero {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.wd-hero-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.wd-hero-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent-dark), var(--accent));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.wd-hero-text { display: flex; flex-direction: column; gap: 2px; }
+.wd-hero-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.wd-hero-amount {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-heading);
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+.wd-hero-limits {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-top: 2px;
+  border-top: 1px solid var(--border);
+}
+.wd-hero-limits-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+/* Withdrawal form */
+.wd-form {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-
-.withdraw-history-top {
+.wd-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
 }
-
-.withdraw-history-method {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.wd-fieldset-legend {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-heading);
-}
-
-.withdraw-history-amount {
-  font-size: 16px;
   font-weight: 700;
   color: var(--text-heading);
+  padding: 0;
+  margin-bottom: 2px;
 }
 
-.withdraw-history-details {
+/* Method chips */
+.wd-method-row { display: flex; gap: 8px; }
+.wd-method-chip {
+  flex: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 8px;
-  flex-wrap: wrap;
-}
-
-.withdraw-history-account {
-  font-size: 12px;
+  padding: 14px 12px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-muted);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.wd-method-chip:hover { border-color: var(--accent-border); }
+.wd-method-chip--active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
-.withdraw-history-status {
+/* Input fields */
+.wd-input-group {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  gap: 5px;
+}
+.wd-input-label {
   font-size: 12px;
   font-weight: 600;
+  color: var(--text-muted);
 }
-
-.withdraw-history-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.wd-input {
+  width: 100%;
+  height: var(--input-h);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-
-.withdraw-history-date {
+.wd-input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.wd-input::placeholder { color: var(--text-muted); opacity: 0.6; }
+.wd-input-hint {
   font-size: 11px;
   color: var(--text-muted);
 }
 
-.withdraw-rejection-reason {
+/* Quick amount chips */
+.wd-quick-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.wd-quick-chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.wd-quick-chip:hover { border-color: var(--accent-border); }
+.wd-quick-chip--active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+/* Amount input */
+.wd-amount-wrap { position: relative; }
+.wd-amount-prefix {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.wd-amount-input {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px 0 32px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-heading);
+  font-size: 22px;
+  font-weight: 700;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.wd-amount-input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.wd-amount-input::placeholder { color: var(--text-muted); opacity: 0.4; }
+
+/* Live fee preview */
+.wd-fee-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border-radius: 10px;
+}
+.wd-fee-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.wd-fee-row--net {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--success);
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+
+/* Submit button */
+.wd-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+/* ── History ─────────────────────────────────────────────────────────────────── */
+.wd-history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px 0;
+  font-family: inherit;
+}
+.wd-history-toggle .section-title { pointer-events: none; }
+.wd-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--warning);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.wd-history-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+
+.wd-history-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-left: 3px solid var(--border);
+}
+.wd-history-card--pending    { border-left-color: var(--warning); }
+.wd-history-card--processing { border-left-color: var(--accent);  }
+.wd-history-card--paid       { border-left-color: var(--success); }
+.wd-history-card--rejected   { border-left-color: var(--error);   }
+.wd-history-card--cancelled  { border-left-color: var(--text-muted); }
+
+.wd-history-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wd-history-method-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+.wd-history-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.wd-history-amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.wd-history-net {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-heading);
+  line-height: 1;
+}
+.wd-history-gross {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.wd-history-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wd-history-account {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.wd-history-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.wd-history-cancel {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--error);
+  border-radius: 8px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--error);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.wd-history-cancel:hover:not(:disabled) { background: rgba(239,68,68,0.08); }
+.wd-history-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.wd-history-rejection {
   display: flex;
   align-items: flex-start;
   gap: 6px;
   padding: 8px 10px;
-  background: rgba(239, 68, 68, 0.08);
+  background: rgba(239,68,68,0.08);
   border-radius: var(--radius-sm);
   font-size: 12px;
   color: var(--error);
+  line-height: 1.4;
 }
+
+/* ── Confirmation bottom-sheet ───────────────────────────────────────────────── */
+.wd-confirm { max-width: 400px !important; gap: 18px !important; }
+.wd-confirm-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px 16px;
+  background: var(--accent-light);
+  border-radius: 12px;
+  text-align: center;
+}
+.wd-confirm-hero-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.wd-confirm-hero-amount {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -1px;
+  line-height: 1.1;
+}
+.wd-confirm-hero-fee {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.wd-confirm-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.wd-confirm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.wd-confirm-row:last-child { border-bottom: none; }
+.wd-confirm-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.wd-confirm-value {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  text-align: right;
+  max-width: 60%;
+  word-break: break-all;
+}
+.wd-confirm-value--mono {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.04em;
+}
+.wd-confirm-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  text-align: center;
+  margin: 0;
+}
+
+.wd-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+.wd-confirm-back { flex: 0 0 auto; min-width: 72px; }
+.wd-confirm-submit {
+  flex: 1;
+  height: 46px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+/* Keep old form-hint / form-label-hint classes used elsewhere */
+.form-label-hint { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 4px; }
+.form-hint       { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block; }
 
 /* ─── Generic modal (used by Withdraw confirm and similar) ───────────────────── */
 .modal-overlay {
@@ -4939,98 +5270,6 @@ a, button, [role="button"], [tabindex] {
     padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
   }
 }
-
-/* ─── Withdraw — confirmation modal ──────────────────────────────────────────── */
-.withdraw-confirm-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.withdraw-confirm-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  font-size: 14px;
-  border-bottom: 1px solid var(--border);
-}
-.withdraw-confirm-row:last-child { border-bottom: none; }
-
-.withdraw-confirm-label {
-  color: var(--text-muted);
-  font-size: 13px;
-}
-.withdraw-confirm-value {
-  font-weight: 600;
-  color: var(--text-heading);
-  text-align: right;
-  max-width: 60%;
-  word-break: break-all;
-}
-
-.withdraw-confirm-note {
-  font-size: 12px;
-  color: var(--text-muted);
-  padding: 8px 4px 0;
-  line-height: 1.5;
-}
-
-/* ─── Admin — withdrawal payment info ────────────────────────────────────────── */
-/* ─── Withdrawal invoice modal ───────────────────────────────────────────────── */
-.wd-invoice-modal { max-width: 380px !important; }
-.wd-invoice {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.wd-invoice-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.wd-invoice-row--fee .wd-invoice-label { color: var(--text-muted); font-size: 12px; }
-.wd-invoice-row--total { padding-top: 2px; }
-.wd-invoice-row--total .wd-invoice-label { font-weight: 600; font-size: 13px; }
-.wd-invoice-label { font-size: 13px; color: var(--text); }
-.wd-invoice-value { font-size: 13px; font-weight: 600; color: var(--text-heading); }
-.wd-invoice-value--fee { color: var(--error); font-weight: 500; }
-.wd-invoice-divider { height: 1px; background: var(--border); margin: 2px 0; }
-.wd-invoice-net {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 4px;
-  padding: 10px 14px;
-  background: var(--accent-light);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius);
-}
-.wd-invoice-net-label { font-size: 13px; font-weight: 600; color: var(--accent); }
-.wd-invoice-net-value { font-size: 20px; font-weight: 800; color: var(--accent); }
-.wd-invoice-dest {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.wd-invoice-dest-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.wd-invoice-dest-label { font-size: 12px; color: var(--text-muted); }
-.wd-invoice-dest-value { font-size: 12px; font-weight: 600; color: var(--text-heading); text-align: right; }
-.wd-invoice-note { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
-.withdraw-history-gross { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
 
 /* Admin withdrawal amounts */
 .adm-wd-amounts { text-align: right; flex-shrink: 0; }
