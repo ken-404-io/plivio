@@ -4,14 +4,28 @@ import api from '../../services/api.ts';
 import type { AxiosError } from 'axios';
 
 export default function ForgotPassword() {
-  const [email,   setEmail]   = useState('');
-  const [sent,    setSent]    = useState(false);
-  const [error,   setError]   = useState('');
-  const [loading, setLoading] = useState(false);
+  const [email,      setEmail]      = useState('');
+  const [sent,       setSent]       = useState(false);
+  const [fieldError, setFieldError] = useState<Record<string, string>>({});
+  const [loading,    setLoading]    = useState(false);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setEmail(e.target.value);
+    if (fieldError.email || fieldError.form) {
+      setFieldError({});
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    const errs: Record<string, string> = {};
+    if (!email.trim()) errs.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errs.email = 'Enter a valid email address';
+    }
+    if (Object.keys(errs).length > 0) { setFieldError(errs); return; }
+
+    setFieldError({});
     setLoading(true);
 
     try {
@@ -19,8 +33,7 @@ export default function ForgotPassword() {
       setSent(true);
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;
-      // Show generic error — don't expose whether email exists
-      setError(axErr.response?.data?.error ?? 'Something went wrong. Please try again.');
+      setFieldError({ form: axErr.response?.data?.error ?? 'Something went wrong. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -46,35 +59,33 @@ export default function ForgotPassword() {
             </p>
           </div>
         ) : (
-          <>
-            {error && <div className="alert alert--error" role="alert">{error}</div>}
-
-            <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
+          <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
               <div className="form-group">
                 <label className="form-label" htmlFor="email">Email address</label>
                 <input
                   id="email"
                   name="email"
                   type="email"
-                  className="form-input"
+                  className={`form-input${fieldError.email ? ' form-input--error' : ''}`}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={handleChange}
                   required
                   autoComplete="email"
                   placeholder="you@example.com"
                   autoFocus
                 />
+                {fieldError.email && <p className="form-field-error" role="alert">{fieldError.email}</p>}
+                {fieldError.form && <p className="form-field-error" role="alert">{fieldError.form}</p>}
               </div>
 
               <button
                 type="submit"
                 className="btn btn-primary btn-full"
-                disabled={loading || !email.trim()}
+                disabled={loading}
               >
                 {loading ? 'Sending…' : 'Send reset link'}
               </button>
             </form>
-          </>
         )}
 
         <p className="auth-footer">

@@ -1330,7 +1330,7 @@ a, button, [role="button"], [tabindex] {
 }
 
 /* ─── Form elements ──────────────────────────────────────────────────────────── */
-.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .form-label { font-size: 13px; font-weight: 500; color: var(--text-heading); }
 .form-optional { font-weight: 400; color: var(--text-muted); }
 
@@ -1345,7 +1345,7 @@ a, button, [role="button"], [tabindex] {
   outline: none;
   transition: border-color 0.15s;
 }
-.form-input:focus { border-color: var(--accent-border); }
+.form-input:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-light); }
 .form-input::placeholder { color: var(--text-muted); }
 
 .form-input--otp {
@@ -1733,6 +1733,10 @@ a, button, [role="button"], [tabindex] {
 }
 .form-input--error {
   border-color: var(--error) !important;
+  background: rgba(239, 68, 68, 0.04);
+}
+.form-input--error:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 .form-error-hint {
   font-size: 12px;
@@ -1746,7 +1750,16 @@ a, button, [role="button"], [tabindex] {
   font-weight: 500;
   color: var(--error, #ef4444);
   margin: 6px 0 0;
-  line-height: 1.3;
+  line-height: 1.4;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  animation: field-error-in 0.2s ease;
+}
+
+@keyframes field-error-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ─── 6-digit OTP input row (Register verify screen) ──────────────────────── */
@@ -1835,36 +1848,38 @@ a, button, [role="button"], [tabindex] {
   flex-wrap: wrap;
 }
 
-/* ─── Toast notifications ─────────────────────────────────────────────────────── */
+/* ─── Notification section (inline alerts) ───────────────────────────────────── */
 .toast-stack {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-width: 380px;
-  width: calc(100% - 40px);
+  gap: 6px;
+  max-width: 520px;
+  width: 100%;
+  padding: 8px 12px;
   pointer-events: none;
 }
 
 .toast {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
-  padding: 13px 14px;
-  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  border-radius: var(--radius);
   border: 1px solid transparent;
   background: var(--bg-surface);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   pointer-events: all;
-  animation: toast-in 0.2s ease;
+  animation: toast-in 0.25s ease;
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateX(12px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateY(-100%); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .toast--success { border-color: rgba(34,197,94,0.35);  background: rgba(34,197,94,0.08); }
@@ -1876,14 +1891,13 @@ a, button, [role="button"], [tabindex] {
   font-size: 14px;
   font-weight: 700;
   flex-shrink: 0;
-  margin-top: 1px;
 }
 .toast--success .toast-icon { color: var(--success); }
 .toast--error   .toast-icon { color: var(--error);   }
 .toast--warning .toast-icon { color: var(--warning); }
 .toast--info    .toast-icon { color: var(--info);    }
 
-.toast-message { flex: 1; font-size: 14px; line-height: 1.4; color: var(--text-heading); }
+.toast-message { flex: 1; font-size: 13px; line-height: 1.4; color: var(--text-heading); }
 
 .toast-close {
   background: none;
@@ -1893,7 +1907,7 @@ a, button, [role="button"], [tabindex] {
   padding: 0;
   flex-shrink: 0;
   line-height: 1;
-  margin-top: 1px;
+  cursor: pointer;
 }
 .toast-close:hover { color: var(--text-heading); }
 
@@ -4608,7 +4622,7 @@ a, button, [role="button"], [tabindex] {
   .auth-screen { padding: 16px; align-items: flex-start; padding-top: 40px; }
 
   /* Profile — old overrides removed; layout is now mobile-first in component styles */
-  .toast-stack { top: 12px; right: 12px; width: calc(100% - 24px); max-width: 100%; }
+  .toast-stack { padding: 6px 8px; max-width: 100%; }
   .referral-share-grid { grid-template-columns: 1fr; }
 
   .password-form { max-width: 100%; }
@@ -5953,9 +5967,9 @@ a, button, [role="button"], [tabindex] {
   width: 68px; height: 68px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, var(--accent-dark) 0%, var(--accent) 100%);
   color: #fff;
-  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 10px 24px rgba(24, 119, 242, 0.35);
 }
 .cq-upgrade-benefits {
   display: flex; flex-direction: column; gap: 8px;
@@ -5971,7 +5985,7 @@ a, button, [role="button"], [tabindex] {
   font-size: 13px; color: var(--text);
   text-align: left;
 }
-.cq-upgrade-benefit svg { flex-shrink: 0; color: #8b5cf6; }
+.cq-upgrade-benefit svg { flex-shrink: 0; color: var(--accent); }
 
 
 /* ─── Referral section ───────────────────────────────────────────────────────── */

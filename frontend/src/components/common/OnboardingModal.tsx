@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   Coins,
   CheckSquare,
-  ArrowUpCircle,
+  Wallet,
   Flame,
-  BadgeCheck,
+  Mail,
   ChevronRight,
   X,
-  Zap,
+  Gift,
 } from 'lucide-react';
 import api from '../../services/api.ts';
 
@@ -46,7 +46,7 @@ function HowItWorksStep() {
   const items = [
     { Icon: CheckSquare, title: 'Complete Tasks',    desc: 'Finish captchas, videos, surveys and more to earn pesos.' },
     { Icon: Flame,       title: 'Build a Streak',   desc: 'Complete 5 tasks a day to earn your daily streak + bonus coins.' },
-    { Icon: ArrowUpCircle, title: 'Cash Out',        desc: 'Withdraw your earnings to GCash once your ID is verified.' },
+    { Icon: Wallet,      title: 'Cash Out',          desc: 'Withdraw your earnings to GCash once your ID is verified.' },
   ];
 
   return (
@@ -108,7 +108,7 @@ export default function OnboardingModal({
       body: (
         <div className="onboard-welcome">
           <div className="onboard-welcome-icon">
-            <Zap size={40} />
+            <Gift size={40} />
           </div>
           <p className="onboard-welcome-desc">
             Plivio pays you real money for completing simple online tasks.
@@ -135,7 +135,7 @@ export default function OnboardingModal({
       title: 'Verify Your Email',
       body: (
         <div className="onboard-email">
-          <BadgeCheck size={36} className="onboard-email-icon" />
+          <Mail size={36} className="onboard-email-icon" />
           <p className="onboard-email-desc">
             We sent a verification link to <strong>{email}</strong>.
             Check your inbox (and spam folder) to activate your account.

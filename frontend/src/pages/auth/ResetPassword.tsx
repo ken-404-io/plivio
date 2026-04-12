@@ -8,12 +8,12 @@ export default function ResetPassword() {
   const [searchParams]        = useSearchParams();
   const token                 = searchParams.get('token') ?? '';
 
-  const [password,  setPassword]  = useState('');
-  const [confirm,   setConfirm]   = useState('');
-  const [error,     setError]     = useState('');
-  const [success,   setSuccess]   = useState(false);
-  const [loading,   setLoading]   = useState(false);
-  const [tokenBad,  setTokenBad]  = useState(false);
+  const [password,   setPassword]   = useState('');
+  const [confirm,    setConfirm]    = useState('');
+  const [fieldError, setFieldError] = useState<Record<string, string>>({});
+  const [success,    setSuccess]    = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [tokenBad,   setTokenBad]   = useState(false);
 
   useEffect(() => {
     if (!token || token.length !== 64 || !/^[a-f0-9]+$/.test(token)) {
@@ -21,19 +21,29 @@ export default function ResetPassword() {
     }
   }, [token]);
 
+  function clearFieldError(name: string) {
+    setFieldError((prev) => {
+      if (!prev[name] && !prev.form) return prev;
+      const next = { ...prev };
+      delete next[name];
+      delete next.form;
+      return next;
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    const errs: Record<string, string> = {};
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
+      errs.password = 'Password must be at least 8 characters.';
     }
     if (password !== confirm) {
-      setError('Passwords do not match.');
-      return;
+      errs.confirm = 'Passwords do not match.';
     }
+    if (Object.keys(errs).length > 0) { setFieldError(errs); return; }
 
+    setFieldError({});
     setLoading(true);
     try {
       await api.post('/auth/reset-password', { token, password });
@@ -41,7 +51,7 @@ export default function ResetPassword() {
       setTimeout(() => { navigate('/login'); }, 3000);
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;
-      setError(axErr.response?.data?.error ?? 'Reset failed. The link may have expired.');
+      setFieldError({ form: axErr.response?.data?.error ?? 'Reset failed. The link may have expired.' });
     } finally {
       setLoading(false);
     }
@@ -81,25 +91,23 @@ export default function ResetPassword() {
             </p>
           </div>
         ) : (
-          <>
-            {error && <div className="alert alert--error" role="alert">{error}</div>}
-
-            <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
+          <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
               <div className="form-group">
                 <label className="form-label" htmlFor="password">New password</label>
                 <input
                   id="password"
                   name="password"
                   type="password"
-                  className="form-input"
+                  className={`form-input${fieldError.password ? ' form-input--error' : ''}`}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); clearFieldError('password'); }}
                   required
                   minLength={8}
                   autoComplete="new-password"
                   placeholder="At least 8 characters"
                   autoFocus
                 />
+                {fieldError.password && <p className="form-field-error" role="alert">{fieldError.password}</p>}
               </div>
 
               <div className="form-group">
@@ -108,14 +116,16 @@ export default function ResetPassword() {
                   id="confirm"
                   name="confirm"
                   type="password"
-                  className="form-input"
+                  className={`form-input${fieldError.confirm ? ' form-input--error' : ''}`}
                   value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
+                  onChange={(e) => { setConfirm(e.target.value); clearFieldError('confirm'); }}
                   required
                   minLength={8}
                   autoComplete="new-password"
                   placeholder="Repeat password"
                 />
+                {fieldError.confirm && <p className="form-field-error" role="alert">{fieldError.confirm}</p>}
+                {fieldError.form && <p className="form-field-error" role="alert">{fieldError.form}</p>}
               </div>
 
               <button
@@ -126,7 +136,6 @@ export default function ResetPassword() {
                 {loading ? 'Saving…' : 'Set new password'}
               </button>
             </form>
-          </>
         )}
 
         <p className="auth-footer">

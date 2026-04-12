@@ -36,19 +36,36 @@ export const PLANS: Record<string, PlanInfo> = {
     name:        'Free',
     price_php:   0,
     daily_limit: 20,
-    features:    ['20 Questions', 'PHP 20 daily limit', 'GCash & PayPal withdrawals'],
+    features:    [
+      'Up to 20 quiz questions',
+      '₱20 daily earning cap',
+      'GCash & PayPal withdrawals',
+      'Standard support',
+    ],
   },
   premium: {
     name:        'Premium',
     price_php:   249,
     daily_limit: 100,
-    features:    [ 'PHP 100 daily limit', '200 Questions', 'Priority support'],
+    features:    [
+      '200 quiz questions per day',
+      '₱100 daily earning cap',
+      'Ad-free experience',
+      'All task types unlocked',
+      'Priority support',
+    ],
   },
   elite: {
     name:        'Elite',
     price_php:   499,
     daily_limit: null,
-    features:    ['Unlimited daily earnings', 'Unlimited Questions', 'Early access', 'VIP support'],
+    features:    [
+      'Unlimited quiz questions',
+      'No daily earning cap',
+      'Ad-free experience',
+      'Early access to new features',
+      'VIP dedicated support',
+    ],
   },
 };
 
