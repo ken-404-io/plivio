@@ -4,6 +4,7 @@ import {
   UserPlus, LayoutDashboard, Bell, Send,
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
   XCircle, Eye, EyeOff, Coins, MessageSquare, Clock,
+  Banknote, Square, CheckSquare,
 } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
@@ -195,19 +196,27 @@ export default function AdminDashboard() {
   const [rejectTarget,  setRejectTarget]  = useState<string | null>(null);
   const [wdRejectTarget,setWdRejectTarget]= useState<string | null>(null);
 
+  // Withdrawal tab state
+  const [wdFilter,      setWdFilter]      = useState<'pending' | 'processing'>('pending');
+  const [wdProcessing,  setWdProcessing]  = useState<AdminWithdrawal[]>([]);
+  const [wdSelected,    setWdSelected]    = useState<Set<string>>(new Set());
+  const [batchBusy,     setBatchBusy]     = useState(false);
+
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load non-user data once
   useEffect(() => {
     async function load() {
       try {
-        const [statsRes, wdRes, kycRes] = await Promise.all([
+        const [statsRes, wdRes, wdProcRes, kycRes] = await Promise.all([
           api.get<{ stats: AdminStats }>('/admin/stats'),
           api.get<{ withdrawals: AdminWithdrawal[] }>('/admin/withdrawals'),
+          api.get<{ withdrawals: AdminWithdrawal[] }>('/admin/withdrawals?status=processing'),
           api.get<{ submissions: AdminKycSubmission[] }>('/admin/kyc'),
         ]);
         setStats(statsRes.data.stats);
         setWithdrawals(wdRes.data.withdrawals);
+        setWdProcessing(wdProcRes.data.withdrawals);
         setKycList(kycRes.data.submissions);
       } catch {
         toast.error('Failed to load admin data.');
@@ -301,13 +310,78 @@ export default function AdminDashboard() {
     }
   }
 
-  async function processWithdrawal(id: string, action: 'approve' | 'reject', rejection_reason?: string) {
+  async function processWithdrawal(id: string, action: 'approve' | 'reject' | 'mark_paid', rejection_reason?: string) {
     try {
-      await api.put(`/admin/withdrawals/${id}`, { action, rejection_reason });
-      setWithdrawals((prev) => prev.filter((w) => w.id !== id));
-      toast.success(`Withdrawal ${action === 'approve' ? 'approved' : 'rejected'}.`);
+      const { data } = await api.put<{ status: string }>(`/admin/withdrawals/${id}`, { action, rejection_reason });
+      if (action === 'approve') {
+        // Move from pending list to processing list
+        const item = withdrawals.find((w) => w.id === id);
+        setWithdrawals((prev) => prev.filter((w) => w.id !== id));
+        if (item) setWdProcessing((prev) => [{ ...item, status: data.status as AdminWithdrawal['status'] }, ...prev]);
+        toast.success('Approved — now in Processing. Send the money, then Mark as Paid.');
+      } else if (action === 'mark_paid') {
+        setWdProcessing((prev) => prev.filter((w) => w.id !== id));
+        toast.success('Marked as paid. User has been notified.');
+      } else {
+        setWithdrawals((prev) => prev.filter((w) => w.id !== id));
+        setWdProcessing((prev) => prev.filter((w) => w.id !== id));
+        toast.success('Withdrawal rejected. Balance refunded.');
+      }
+      setWdSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
+    }
+  }
+
+  function toggleWdSelect(id: string) {
+    setWdSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  function toggleWdSelectAll() {
+    const currentList = wdFilter === 'pending' ? withdrawals : wdProcessing;
+    const allIds = currentList.map((w) => w.id);
+    const allSelected = allIds.length > 0 && allIds.every((id) => wdSelected.has(id));
+    if (allSelected) {
+      setWdSelected(new Set());
+    } else {
+      setWdSelected(new Set(allIds));
+    }
+  }
+
+  async function batchAction(action: 'approve' | 'reject' | 'mark_paid', rejection_reason?: string) {
+    if (wdSelected.size === 0) return;
+    setBatchBusy(true);
+    try {
+      const { data } = await api.put<{ results: { id: string; status: string; error?: string }[] }>(
+        '/admin/withdrawals-batch',
+        { ids: [...wdSelected], action, rejection_reason },
+      );
+      const succeeded = new Set(data.results.filter((r) => !r.error || r.status === 'skipped').map((r) => r.id));
+      const errors = data.results.filter((r) => r.error && r.status === 'error');
+
+      if (action === 'approve') {
+        const moved = withdrawals.filter((w) => succeeded.has(w.id));
+        setWithdrawals((prev) => prev.filter((w) => !succeeded.has(w.id)));
+        setWdProcessing((prev) => [...moved.map((w) => ({ ...w, status: 'processing' as const })), ...prev]);
+      } else if (action === 'mark_paid') {
+        setWdProcessing((prev) => prev.filter((w) => !succeeded.has(w.id)));
+      } else {
+        setWithdrawals((prev) => prev.filter((w) => !succeeded.has(w.id)));
+        setWdProcessing((prev) => prev.filter((w) => !succeeded.has(w.id)));
+      }
+      setWdSelected(new Set());
+
+      const ok = data.results.length - errors.length;
+      toast.success(`${ok} withdrawal(s) processed.`);
+      if (errors.length > 0) toast.error(`${errors.length} failed.`);
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Batch action failed.');
+    } finally {
+      setBatchBusy(false);
     }
   }
 
@@ -354,7 +428,14 @@ export default function AdminDashboard() {
       )}
       {wdRejectTarget && (
         <RejectModal
-          onConfirm={(reason) => { void processWithdrawal(wdRejectTarget, 'reject', reason); setWdRejectTarget(null); }}
+          onConfirm={(reason) => {
+            if (wdRejectTarget === '__batch__') {
+              void batchAction('reject', reason);
+            } else {
+              void processWithdrawal(wdRejectTarget, 'reject', reason);
+            }
+            setWdRejectTarget(null);
+          }}
           onCancel={() => setWdRejectTarget(null)}
         />
       )}
@@ -587,52 +668,138 @@ export default function AdminDashboard() {
       )}
 
       {/* ── Withdrawals ── */}
-      {tab === 'withdrawals' && (
-        <div className="adm-list">
-          {withdrawals.length === 0 ? (
-            <div className="empty-state"><p>No pending withdrawals.</p></div>
-          ) : withdrawals.map((w) => (
-            <div key={w.id} className="adm-wd-card">
-              <div className="adm-wd-top">
-                <div className="adm-wd-user">
-                  <span className="adm-wd-username">{w.username}</span>
-                  <span className="adm-wd-email">{w.email}</span>
+      {tab === 'withdrawals' && (() => {
+        const currentList = wdFilter === 'pending' ? withdrawals : wdProcessing;
+        const allIds = currentList.map((w) => w.id);
+        const allSelected = allIds.length > 0 && allIds.every((id) => wdSelected.has(id));
+
+        return (
+          <>
+            {/* Status filter tabs */}
+            <div className="adm-wd-filters">
+              <button
+                className={`adm-wd-filter${wdFilter === 'pending' ? ' adm-wd-filter--active' : ''}`}
+                onClick={() => { setWdFilter('pending'); setWdSelected(new Set()); }}
+              >
+                <Clock size={13} />
+                Pending
+                {withdrawals.length > 0 && <span className="adm-tab-badge">{withdrawals.length}</span>}
+              </button>
+              <button
+                className={`adm-wd-filter${wdFilter === 'processing' ? ' adm-wd-filter--active' : ''}`}
+                onClick={() => { setWdFilter('processing'); setWdSelected(new Set()); }}
+              >
+                <Banknote size={13} />
+                Processing
+                {wdProcessing.length > 0 && <span className="adm-tab-badge">{wdProcessing.length}</span>}
+              </button>
+            </div>
+
+            {/* Batch action bar */}
+            {currentList.length > 0 && (
+              <div className="adm-wd-batch-bar">
+                <button className="adm-wd-select-all" onClick={toggleWdSelectAll} type="button">
+                  {allSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                  <span>{allSelected ? 'Deselect all' : 'Select all'}</span>
+                </button>
+
+                {wdSelected.size > 0 && (
+                  <div className="adm-wd-batch-actions">
+                    <span className="adm-wd-batch-count">{wdSelected.size} selected</span>
+                    {wdFilter === 'pending' && (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={batchBusy}
+                        onClick={() => { void batchAction('approve'); }}
+                      >
+                        {batchBusy ? 'Working…' : 'Approve All'}
+                      </button>
+                    )}
+                    {wdFilter === 'processing' && (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={batchBusy}
+                        onClick={() => { void batchAction('mark_paid'); }}
+                      >
+                        <Banknote size={13} />
+                        {batchBusy ? 'Working…' : 'Mark All Paid'}
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-danger btn-sm"
+                      disabled={batchBusy}
+                      onClick={() => setWdRejectTarget('__batch__')}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Withdrawal list */}
+            <div className="adm-list">
+              {currentList.length === 0 ? (
+                <div className="empty-state">
+                  <p>No {wdFilter} withdrawals.</p>
                 </div>
-                <div className="adm-wd-amounts">
-                  <div className="adm-wd-amount">₱{Number(w.net_amount || w.amount).toFixed(2)}</div>
-                  <div className="adm-wd-amount-sub">
-                    Requested ₱{Number(w.amount).toFixed(2)} · Fee ₱{Number(w.fee_amount || 0).toFixed(2)}
+              ) : currentList.map((w) => (
+                <div key={w.id} className={`adm-wd-card${wdSelected.has(w.id) ? ' adm-wd-card--selected' : ''}`}>
+                  <div className="adm-wd-top">
+                    <button className="adm-wd-checkbox" onClick={() => toggleWdSelect(w.id)} type="button">
+                      {wdSelected.has(w.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                    </button>
+                    <div className="adm-wd-user">
+                      <span className="adm-wd-username">{w.username}</span>
+                      <span className="adm-wd-email">{w.email}</span>
+                    </div>
+                    <div className="adm-wd-amounts">
+                      <div className="adm-wd-amount">₱{Number(w.net_amount || w.amount).toFixed(2)}</div>
+                      <div className="adm-wd-amount-sub">
+                        Req ₱{Number(w.amount).toFixed(2)} · Fee ₱{Number(w.fee_amount || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="adm-wd-payment">
+                    <span className="adm-wd-method">{w.method.toUpperCase()}</span>
+                    <div className="adm-wd-account">
+                      <span className="adm-wd-account-name">{w.account_name}</span>
+                      <span className="adm-wd-account-num">{w.account_number}</span>
+                    </div>
+                    <span className="adm-wd-date">
+                      {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                  <div className="adm-wd-actions">
+                    {wdFilter === 'pending' && (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => { void processWithdrawal(w.id, 'approve'); }}
+                      >
+                        <CheckCircle2 size={13} /> Approve
+                      </button>
+                    )}
+                    {wdFilter === 'processing' && (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => { void processWithdrawal(w.id, 'mark_paid'); }}
+                      >
+                        <Banknote size={13} /> Mark Paid
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => setWdRejectTarget(w.id)}
+                    >
+                      <XCircle size={13} /> Reject
+                    </button>
                   </div>
                 </div>
-              </div>
-              <div className="adm-wd-payment">
-                <span className="adm-wd-method">{w.method.toUpperCase()}</span>
-                <div className="adm-wd-account">
-                  <span className="adm-wd-account-name">{w.account_name}</span>
-                  <span className="adm-wd-account-num">{w.account_number}</span>
-                </div>
-                <span className="adm-wd-date">
-                  {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-              </div>
-              <div className="adm-wd-actions">
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => { void processWithdrawal(w.id, 'approve'); }}
-                >
-                  <CheckCircle2 size={13} /> Approve
-                </button>
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => setWdRejectTarget(w.id)}
-                >
-                  <XCircle size={13} /> Reject
-                </button>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          </>
+        );
+      })()}
 
       {/* ── KYC ── */}
       {tab === 'kyc' && (

@@ -2542,6 +2542,65 @@ a, button, [role="button"], [tabindex] {
 }
 .adm-pagination-info { font-size: 12px; color: var(--text-muted); }
 
+/* Withdrawal status filter & batch bar */
+.adm-wd-filters {
+  display: flex;
+  gap: 6px;
+}
+.adm-wd-filter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.adm-wd-filter:hover { border-color: var(--accent-border); }
+.adm-wd-filter--active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.adm-wd-batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.adm-wd-select-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 4px 0;
+}
+.adm-wd-select-all:hover { color: var(--accent); }
+.adm-wd-batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.adm-wd-batch-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 /* Withdrawal cards */
 .adm-wd-card {
   background: var(--bg-surface);
@@ -2551,7 +2610,23 @@ a, button, [role="button"], [tabindex] {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: border-color 0.12s;
 }
+.adm-wd-card--selected {
+  border-color: var(--accent-border);
+  background: var(--accent-light);
+}
+.adm-wd-checkbox {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.adm-wd-card--selected .adm-wd-checkbox { color: var(--accent); }
 .adm-wd-top {
   display: flex;
   align-items: flex-start;
