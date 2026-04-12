@@ -222,7 +222,7 @@ export async function listPendingWithdrawals(req: Request, res: Response, next: 
     const { rows } = await pool.query(
       `SELECT w.id, w.amount, w.fee_amount, w.net_amount, w.method, w.status,
               w.account_name, w.account_number,
-              w.requested_at, w.processed_at,
+              w.requested_at, w.processed_at, w.processed_by,
               u.username, u.email
        FROM withdrawals w JOIN users u ON u.id = w.user_id
        WHERE w.status = $1 ORDER BY w.requested_at ASC`,
@@ -232,13 +232,38 @@ export async function listPendingWithdrawals(req: Request, res: Response, next: 
   } catch (err) { next(err); }
 }
 
+// ─── Audit log helper ──────────────────────────────────────────────────────
+
+async function logAudit(
+  adminId: string, action: string, targetType: string, targetId: string,
+  details?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [adminId, action, targetType, targetId, details ? JSON.stringify(details) : null],
+    );
+  } catch {
+    // Non-fatal — don't let audit failures break the main flow
+  }
+}
+
+// ─── Process a single withdrawal (approve → processing → paid, or reject) ──
+
 export async function processWithdrawal(req: Request, res: Response, next: NextFunction): Promise<void> {
   const client = await pool.connect();
   try {
-    const { id }     = req.params as Record<string, string>;
-    const { action, rejection_reason } = req.body as { action: 'approve' | 'reject'; rejection_reason?: string };
+    const adminId = req.user!.id;
+    const { id }  = req.params as Record<string, string>;
+    const { action, rejection_reason } = req.body as {
+      action: 'approve' | 'reject' | 'mark_paid';
+      rejection_reason?: string;
+    };
 
-    if (!['approve', 'reject'].includes(action)) throw new ValidationError('action must be approve or reject');
+    if (!['approve', 'reject', 'mark_paid'].includes(action)) {
+      throw new ValidationError('action must be approve, reject, or mark_paid');
+    }
     if (action === 'reject' && !rejection_reason?.trim()) {
       throw new ValidationError('rejection_reason is required when rejecting');
     }
@@ -249,20 +274,32 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
     if (wRows.length === 0) throw new NotFoundError('Withdrawal not found');
 
     const withdrawal = wRows[0] as Record<string, unknown>;
-    if (withdrawal.status !== 'pending') throw new ValidationError('Withdrawal is not in pending state');
 
-    const newStatus = action === 'approve' ? 'paid' : 'rejected';
+    // Determine valid state transitions
+    let newStatus: string;
+    if (action === 'approve') {
+      if (withdrawal.status !== 'pending') throw new ValidationError('Only pending withdrawals can be approved');
+      newStatus = 'processing';
+    } else if (action === 'mark_paid') {
+      if (withdrawal.status !== 'processing') throw new ValidationError('Only processing withdrawals can be marked as paid');
+      newStatus = 'paid';
+    } else {
+      // reject
+      if (withdrawal.status !== 'pending' && withdrawal.status !== 'processing') {
+        throw new ValidationError('Only pending or processing withdrawals can be rejected');
+      }
+      newStatus = 'rejected';
+    }
+
     await client.query(
-      `UPDATE withdrawals SET status = $1, rejection_reason = $2, processed_at = NOW() WHERE id = $3`,
-      [newStatus, action === 'reject' ? (rejection_reason ?? null) : null, id],
+      `UPDATE withdrawals SET status = $1, rejection_reason = $2, processed_at = NOW(), processed_by = $3 WHERE id = $4`,
+      [newStatus, action === 'reject' ? (rejection_reason ?? null) : null, adminId, id],
     );
 
     if (action === 'reject') {
-      // Refund the full requested amount (fee waived on rejection)
       await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [withdrawal.amount, withdrawal.user_id]);
     }
 
-    // Fetch user email for notification (before commit so we have all data)
     const { rows: userRows } = await client.query(
       'SELECT email, username FROM users WHERE id = $1',
       [withdrawal.user_id],
@@ -272,8 +309,16 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
 
     const netAmount = Number(withdrawal.net_amount ?? withdrawal.amount);
 
-    // Send email + in-app notification (outside transaction — non-fatal)
-    if (userRows.length > 0) {
+    // Audit log
+    void logAudit(adminId, `withdrawal_${action}`, 'withdrawal', id, {
+      amount: Number(withdrawal.amount),
+      net_amount: netAmount,
+      method: withdrawal.method,
+      username: (userRows[0] as { username: string } | undefined)?.username,
+    });
+
+    // Notifications — only on terminal states (paid or rejected)
+    if ((newStatus === 'paid' || newStatus === 'rejected') && userRows.length > 0) {
       const u = userRows[0] as { email: string; username: string };
       void sendWithdrawalStatusEmail(u.email, u.username, netAmount, newStatus as 'paid' | 'rejected');
 
@@ -286,9 +331,7 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
       void createNotification(
         withdrawal.user_id as string,
         isPaid ? 'withdrawal_paid' : 'withdrawal_rejected',
-        wdTitle,
-        wdBody,
-        '/withdraw',
+        wdTitle, wdBody, '/withdraw',
       );
       void sendPushToUser(withdrawal.user_id as string, wdTitle, wdBody, '/withdraw');
     }
@@ -300,6 +343,118 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
   } finally {
     client.release();
   }
+}
+
+// ─── Batch process multiple withdrawals ─────────────────────────────────────
+
+export async function batchProcessWithdrawals(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const adminId = req.user!.id;
+    const { ids, action, rejection_reason } = req.body as {
+      ids: string[];
+      action: 'approve' | 'reject' | 'mark_paid';
+      rejection_reason?: string;
+    };
+
+    if (!Array.isArray(ids) || ids.length === 0) throw new ValidationError('ids must be a non-empty array');
+    if (ids.length > 50) throw new ValidationError('Maximum 50 withdrawals per batch');
+    if (!['approve', 'reject', 'mark_paid'].includes(action)) {
+      throw new ValidationError('action must be approve, reject, or mark_paid');
+    }
+    if (action === 'reject' && !rejection_reason?.trim()) {
+      throw new ValidationError('rejection_reason is required when rejecting');
+    }
+
+    const results: { id: string; status: string; error?: string }[] = [];
+
+    for (const id of ids) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        const { rows: wRows } = await client.query('SELECT * FROM withdrawals WHERE id = $1 FOR UPDATE', [id]);
+        if (wRows.length === 0) { results.push({ id, status: 'error', error: 'Not found' }); await client.query('ROLLBACK'); continue; }
+
+        const w = wRows[0] as Record<string, unknown>;
+
+        // Validate state transition
+        let newStatus: string;
+        if (action === 'approve' && w.status === 'pending') { newStatus = 'processing'; }
+        else if (action === 'mark_paid' && w.status === 'processing') { newStatus = 'paid'; }
+        else if (action === 'reject' && (w.status === 'pending' || w.status === 'processing')) { newStatus = 'rejected'; }
+        else { results.push({ id, status: 'skipped', error: `Cannot ${action} a ${w.status as string} withdrawal` }); await client.query('ROLLBACK'); continue; }
+
+        await client.query(
+          `UPDATE withdrawals SET status = $1, rejection_reason = $2, processed_at = NOW(), processed_by = $3 WHERE id = $4`,
+          [newStatus, action === 'reject' ? (rejection_reason ?? null) : null, adminId, id],
+        );
+
+        if (action === 'reject') {
+          await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [w.amount, w.user_id]);
+        }
+
+        const { rows: userRows } = await client.query('SELECT email, username FROM users WHERE id = $1', [w.user_id]);
+        await client.query('COMMIT');
+
+        const netAmount = Number(w.net_amount ?? w.amount);
+        void logAudit(adminId, `withdrawal_batch_${action}`, 'withdrawal', id, {
+          amount: Number(w.amount), net_amount: netAmount, method: w.method,
+          username: (userRows[0] as { username: string } | undefined)?.username,
+        });
+
+        // Notifications on terminal states
+        if ((newStatus === 'paid' || newStatus === 'rejected') && userRows.length > 0) {
+          const u = userRows[0] as { email: string; username: string };
+          void sendWithdrawalStatusEmail(u.email, u.username, netAmount, newStatus as 'paid' | 'rejected');
+          const isPaid = newStatus === 'paid';
+          void createNotification(
+            w.user_id as string,
+            isPaid ? 'withdrawal_paid' : 'withdrawal_rejected',
+            isPaid ? 'Withdrawal Approved' : 'Withdrawal Rejected',
+            isPaid
+              ? `Your withdrawal of ₱${netAmount.toFixed(2)} has been approved and is being sent to your account.`
+              : `Your withdrawal was rejected. ₱${Number(w.amount).toFixed(2)} has been refunded to your balance.`,
+            '/withdraw',
+          );
+          void sendPushToUser(
+            w.user_id as string,
+            isPaid ? 'Withdrawal Approved' : 'Withdrawal Rejected',
+            isPaid
+              ? `Your withdrawal of ₱${netAmount.toFixed(2)} has been approved.`
+              : `Your withdrawal was rejected. Balance refunded.`,
+            '/withdraw',
+          );
+        }
+
+        results.push({ id, status: newStatus });
+      } catch {
+        await client.query('ROLLBACK');
+        results.push({ id, status: 'error', error: 'Processing failed' });
+      } finally {
+        client.release();
+      }
+    }
+
+    res.json({ success: true, results });
+  } catch (err) { next(err); }
+}
+
+// ─── List audit log ─────────────────────────────────────────────────────────
+
+export async function listAuditLog(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const limit  = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const { rows } = await pool.query(
+      `SELECT a.*, u.username AS admin_username
+       FROM admin_audit_log a
+       JOIN users u ON u.id = a.admin_id
+       ORDER BY a.created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset],
+    );
+    res.json({ success: true, log: rows });
+  } catch (err) { next(err); }
 }
 
 // ─── Update ad networks for a video/ad task ───────────────────────────────

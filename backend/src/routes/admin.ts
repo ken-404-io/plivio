@@ -15,6 +15,8 @@ import {
   updateAdNetworks,
   listPendingWithdrawals,
   processWithdrawal,
+  batchProcessWithdrawals,
+  listAuditLog,
 } from '../controllers/adminController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
@@ -78,9 +80,15 @@ router.delete('/tasks/:id',          validateParam('id'), deleteTask);
 router.get('/withdrawals', listPendingWithdrawals);
 router.put('/withdrawals/:id',
   validateIntParam('id'),
-  validateBody({ action: { required: true, enum: ['approve', 'reject'] } }),
+  validateBody({ action: { required: true, enum: ['approve', 'reject', 'mark_paid'] } }),
   processWithdrawal,
 );
+router.put('/withdrawals-batch',
+  validateBody({ action: { required: true, enum: ['approve', 'reject', 'mark_paid'] } }),
+  batchProcessWithdrawals,
+);
+
+router.get('/audit-log', listAuditLog);
 
 router.get('/kyc', listKycSubmissions);
 router.put('/kyc/:id',

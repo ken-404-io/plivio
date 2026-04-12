@@ -233,6 +233,8 @@ export interface AdminWithdrawal {
   account_name: string;
   account_number: string;
   requested_at: string;
+  processed_at?: string;
+  processed_by?: string;
   username: string;
   email: string;
 }
