@@ -80,7 +80,7 @@ function getDeviceId(): string {
     `${screen.width}x${screen.height}x${screen.colorDepth}`,
     String(new Date().getTimezoneOffset()),
     String(navigator.hardwareConcurrency || 0),
-    String((navigator as Record<string, unknown>).deviceMemory || 0),
+    String((navigator as unknown as Record<string, unknown>).deviceMemory || 0),
     navigator.platform || '',
   ];
 
