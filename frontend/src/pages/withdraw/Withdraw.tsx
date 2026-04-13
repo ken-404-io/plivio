@@ -56,8 +56,9 @@ function FreePlanUpgradeModal({ onClose }: { onClose: () => void }) {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const MIN_AMOUNT        = 50;
-const MAX_AMOUNT        = 5000;
+const MIN_AMOUNT            = 50;
+const MAX_AMOUNT            = 5000;
+const FREE_PLAN_MAX_AMOUNT  = 100;
 const DOC_FEE_RATE      = 0.01;
 const HANDLING_FEE_RATE  = 0.04;
 const TOTAL_FEE_RATE    = DOC_FEE_RATE + HANDLING_FEE_RATE;
@@ -215,11 +216,15 @@ export default function Withdraw() {
   const liveFee    = Math.round(liveAmount * TOTAL_FEE_RATE * 100) / 100;
   const liveNet    = Math.round((liveAmount - liveFee) * 100) / 100;
 
+  // ── Plan checks ───────────────────────────────────────────────────────────
+  const isFreePlan = user?.plan === 'free';
+
   // ── Quick amounts filtered by balance ─────────────────────────────────────
   const balance = Number(user?.balance ?? 0);
+  const effectiveMax = isFreePlan ? FREE_PLAN_MAX_AMOUNT : MAX_AMOUNT;
   const quickAmounts = useMemo(
-    () => QUICK_AMOUNTS.filter((a) => a <= balance && a <= MAX_AMOUNT),
-    [balance],
+    () => QUICK_AMOUNTS.filter((a) => a <= balance && a <= effectiveMax),
+    [balance, effectiveMax],
   );
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -227,6 +232,7 @@ export default function Withdraw() {
     if (!form.amount || isNaN(liveAmount))                    return 'Enter a valid amount.';
     if (liveAmount < MIN_AMOUNT)                              return `Minimum withdrawal is ₱${MIN_AMOUNT}.`;
     if (liveAmount > MAX_AMOUNT)                              return `Maximum withdrawal is ₱${MAX_AMOUNT.toLocaleString()}.`;
+    if (isFreePlan && liveAmount > FREE_PLAN_MAX_AMOUNT)      return `Free plan withdrawals are limited to ₱${FREE_PLAN_MAX_AMOUNT}. Upgrade to withdraw more.`;
     if (liveAmount > balance)                                 return 'Insufficient balance.';
     if (!form.account_name.trim())                            return 'Account name is required.';
     if (form.account_name.trim().length < 2)                  return 'Account name is too short.';
@@ -238,7 +244,6 @@ export default function Withdraw() {
   }
 
   // Check proactively if free-plan user has already used their one withdrawal
-  const isFreePlan = user?.plan === 'free';
   const hasUsedFreeWithdrawal = isFreePlan && history.some(
     (w) => !['cancelled'].includes(w.status),
   );
@@ -396,7 +401,7 @@ export default function Withdraw() {
         <div className="wd-hero-limits">
           <span>Min ₱{MIN_AMOUNT}</span>
           <span className="wd-hero-limits-dot" />
-          <span>Max ₱{MAX_AMOUNT.toLocaleString()}</span>
+          <span>Max ₱{(isFreePlan ? FREE_PLAN_MAX_AMOUNT : MAX_AMOUNT).toLocaleString()}</span>
           <span className="wd-hero-limits-dot" />
           <span>5% fee</span>
         </div>
