@@ -4,13 +4,13 @@ import {
   UserPlus, LayoutDashboard, Bell, Send,
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
   XCircle, Eye, EyeOff, Coins, MessageSquare, Clock,
-  CreditCard, UserCheck, Info, History, Smartphone, RotateCcw, Filter,
+  CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
 } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type {
   AdminUser, AdminWithdrawal, AdminWithdrawalHistory, AdminStats,
-  AdminKycSubmission, AdminUserDetails, PlanType,
+  AdminKycSubmission, AdminUserDetails,
 } from '../../types/index.ts';
 
 const TABS = ['overview', 'users', 'withdrawals', 'kyc'] as const;
