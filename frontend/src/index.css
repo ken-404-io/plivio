@@ -5328,6 +5328,20 @@ a, button, [role="button"], [tabindex] {
   font-weight: 700;
 }
 
+/* ─── Withdrawal cooldown banner ───────────────────────────────────────────── */
+.wd-cooldown-banner {
+  animation: wd-cooldown-pulse 2s ease-in-out infinite;
+}
+.wd-cooldown-time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+@keyframes wd-cooldown-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.85; }
+}
+
 /* Keep old form-hint / form-label-hint classes used elsewhere */
 .form-label-hint { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 4px; }
 .form-hint       { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block; }
