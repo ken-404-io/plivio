@@ -2,11 +2,12 @@ import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { ValidationError, ForbiddenError, NotFoundError } from '../utils/errors.ts';
 
-const FREE_PLAN_WITHDRAWAL_LIMIT = 1;
-const FREE_PLAN_MAX_AMOUNT       = 100;
-const FREE_PLAN_UPGRADE_CODE     = 'free_plan_limit_reached';
-const COOLDOWN_CODE              = 'withdrawal_cooldown';
-const COOLDOWN_HOURS             = 24;
+const FREE_PLAN_WITHDRAWAL_LIMIT    = 1;
+const FREE_PLAN_MAX_AMOUNT          = 100;
+const FREE_PLAN_UPGRADE_CODE        = 'free_plan_limit_reached';
+const PREMIUM_DAILY_WITHDRAWAL_MAX  = 149;  // ₱149 total per day for Premium
+// SQL snippet: start of "today" in Philippine Standard Time (UTC+8)
+const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila')`;
 
 const MIN_WITHDRAWAL  = 50;
 const MAX_WITHDRAWAL  = 5000;
@@ -95,26 +96,23 @@ export async function requestWithdrawal(
       }
     }
 
-    // Premium & Elite: 24-hour cooldown between withdrawals
-    if (user.plan === 'premium' || user.plan === 'elite') {
-      const { rows: lastWdRows } = await client.query(
-        `SELECT requested_at FROM withdrawals
-         WHERE user_id = $1 AND status NOT IN ('cancelled')
-         ORDER BY requested_at DESC LIMIT 1`,
+    // Premium: ₱149/day total withdrawal limit (Elite has no limit)
+    if (user.plan === 'premium') {
+      const { rows: todayRows } = await client.query(
+        `SELECT COALESCE(SUM(amount), 0) AS today_total
+         FROM withdrawals
+         WHERE user_id = $1
+           AND status NOT IN ('cancelled')
+           AND requested_at >= ${SQL_PH_DAY_START}`,
         [userId],
       );
-      if (lastWdRows.length > 0) {
-        const lastRequestedAt = new Date((lastWdRows[0] as { requested_at: string }).requested_at);
-        const cooldownEnd     = new Date(lastRequestedAt.getTime() + COOLDOWN_HOURS * 60 * 60 * 1000);
-        if (new Date() < cooldownEnd) {
-          const remaining = cooldownEnd.getTime() - Date.now();
-          const hours     = Math.floor(remaining / (60 * 60 * 1000));
-          const minutes   = Math.ceil((remaining % (60 * 60 * 1000)) / (60 * 1000));
-          throw new ForbiddenError(
-            `You have already made a withdrawal. You can withdraw again in ${hours}h ${minutes}m.`,
-            COOLDOWN_CODE,
-          );
-        }
+      const todayTotal = Number((todayRows[0] as { today_total: string }).today_total);
+      if (todayTotal + amount > PREMIUM_DAILY_WITHDRAWAL_MAX) {
+        const remaining = Math.max(0, PREMIUM_DAILY_WITHDRAWAL_MAX - todayTotal);
+        throw new ForbiddenError(
+          `Premium plan daily withdrawal limit is ₱${PREMIUM_DAILY_WITHDRAWAL_MAX}. ` +
+          `You have ₱${remaining.toFixed(2)} remaining today. Upgrade to Elite for no limit.`,
+        );
       }
     }
 
@@ -159,39 +157,30 @@ export async function getWithdrawalCooldown(
 
     const plan = (userRows[0] as { plan: string }).plan;
 
-    // Only premium/elite have cooldown
-    if (plan !== 'premium' && plan !== 'elite') {
-      res.json({ success: true, on_cooldown: false });
-      return;
-    }
-
-    const { rows: lastWdRows } = await pool.query(
-      `SELECT requested_at FROM withdrawals
-       WHERE user_id = $1 AND status NOT IN ('cancelled')
-       ORDER BY requested_at DESC LIMIT 1`,
-      [userId],
-    );
-
-    if (lastWdRows.length === 0) {
-      res.json({ success: true, on_cooldown: false });
-      return;
-    }
-
-    const lastRequestedAt = new Date((lastWdRows[0] as { requested_at: string }).requested_at);
-    const cooldownEnd     = new Date(lastRequestedAt.getTime() + COOLDOWN_HOURS * 60 * 60 * 1000);
-    const now             = new Date();
-
-    if (now < cooldownEnd) {
-      const remaining = cooldownEnd.getTime() - now.getTime();
+    // Premium: return today's used and remaining daily withdrawal allowance
+    if (plan === 'premium') {
+      const { rows: todayRows } = await pool.query(
+        `SELECT COALESCE(SUM(amount), 0) AS today_total
+         FROM withdrawals
+         WHERE user_id = $1
+           AND status NOT IN ('cancelled')
+           AND requested_at >= ${SQL_PH_DAY_START}`,
+        [userId],
+      );
+      const todayTotal = Number((todayRows[0] as { today_total: string }).today_total);
+      const remaining  = Math.max(0, PREMIUM_DAILY_WITHDRAWAL_MAX - todayTotal);
       res.json({
-        success:      true,
-        on_cooldown:  true,
-        cooldown_end: cooldownEnd.toISOString(),
-        remaining_ms: remaining,
+        success:          true,
+        on_cooldown:      false,
+        daily_limit:      PREMIUM_DAILY_WITHDRAWAL_MAX,
+        today_withdrawn:  todayTotal,
+        daily_remaining:  remaining,
       });
-    } else {
-      res.json({ success: true, on_cooldown: false });
+      return;
     }
+
+    // Elite and other plans: no restrictions
+    res.json({ success: true, on_cooldown: false });
   } catch (err) { next(err); }
 }
 
