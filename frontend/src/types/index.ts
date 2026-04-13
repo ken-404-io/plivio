@@ -241,10 +241,34 @@ export interface AdminUserWithdrawal {
   processed_at: string | null;
 }
 
+export interface AdminDeviceInfo {
+  fingerprint: string;
+  device_name: string | null;
+  registered_at: string | null;
+}
+
 export interface AdminUserDetails {
   subscription: AdminUserSubscription | null;
   invites: AdminUserInvite[];
   withdrawals: AdminUserWithdrawal[];
+  device: AdminDeviceInfo | null;
+}
+
+export interface AdminWithdrawalHistory {
+  id: string;
+  amount: string | number;
+  fee_amount: string | number;
+  net_amount: string | number;
+  method: WithdrawalMethod;
+  status: WithdrawalStatus;
+  account_name: string;
+  account_number: string;
+  rejection_reason: string | null;
+  requested_at: string;
+  processed_at: string | null;
+  username: string;
+  email: string;
+  user_plan: PlanType;
 }
 
 export interface AdminTask {

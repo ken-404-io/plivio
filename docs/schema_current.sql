@@ -33,6 +33,8 @@ CREATE TABLE users (
   referral_code        VARCHAR(12)  UNIQUE,
   referred_by          UUID         REFERENCES users(id),
   device_fingerprint   TEXT,
+  device_name          TEXT,
+  device_registered_at TIMESTAMPTZ,
   is_verified          BOOLEAN      DEFAULT FALSE,
   is_banned            BOOLEAN      DEFAULT FALSE,
   is_admin             BOOLEAN      DEFAULT FALSE,

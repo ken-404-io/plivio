@@ -116,6 +116,8 @@ export default function Login() {
       const data  = axErr.response?.data;
       if (data?.code === 'email_not_verified') {
         setUnverifiedEmail(data.email ?? form.email);
+      } else if (data?.code === 'device_mismatch') {
+        setFieldError({ form: data.error || 'Access denied. This account is already linked to another device.' });
       } else {
         // Inline error shown under the password field — matches the
         // "Invalid credentials." pattern requested by design.
