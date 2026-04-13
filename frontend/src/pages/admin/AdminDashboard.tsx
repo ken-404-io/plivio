@@ -5,22 +5,25 @@ import {
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
   XCircle, Eye, EyeOff, Coins, MessageSquare, Clock,
   CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
+  Download, X, Link2,
 } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type {
   AdminUser, AdminWithdrawal, AdminWithdrawalHistory, AdminStats,
-  AdminKycSubmission, AdminUserDetails,
+  AdminKycSubmission, AdminUserDetails, AdminReferral, AdminNotificationLog,
 } from '../../types/index.ts';
 
-const TABS = ['overview', 'users', 'withdrawals', 'kyc'] as const;
+const TABS = ['overview', 'users', 'withdrawals', 'referrals', 'notifications', 'kyc'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
-  overview:    { label: 'Overview',    Icon: LayoutDashboard },
-  users:       { label: 'Users',       Icon: Users           },
-  withdrawals: { label: 'Withdrawals', Icon: ArrowUpCircle   },
-  kyc:         { label: 'KYC',         Icon: ShieldCheck     },
+  overview:      { label: 'Overview',      Icon: LayoutDashboard },
+  users:         { label: 'Users',         Icon: Users           },
+  withdrawals:   { label: 'Withdrawals',   Icon: ArrowUpCircle   },
+  referrals:     { label: 'Referrals',     Icon: Link2           },
+  notifications: { label: 'Notifications', Icon: Bell            },
+  kyc:           { label: 'KYC',           Icon: ShieldCheck     },
 };
 
 // ─── Rejection modal ──────────────────────────────────────────────────────────
@@ -171,6 +174,50 @@ function StatCard({
   );
 }
 
+// ─── Filter chips ────────────────────────────────────────────────────────────
+function FilterChips({ filters, onRemove, onClear }: {
+  filters: Record<string, string>;
+  onRemove: (key: string) => void;
+  onClear: () => void;
+}) {
+  const active = Object.entries(filters).filter(([, v]) => v !== '');
+  if (active.length === 0) return null;
+  return (
+    <div className="adm-filter-chips">
+      {active.map(([key, val]) => (
+        <span key={key} className="adm-filter-chip">
+          {key}: {val}
+          <button className="adm-filter-chip-x" onClick={() => onRemove(key)}><X size={10} /></button>
+        </span>
+      ))}
+      <button className="adm-filter-chip adm-filter-chip--clear" onClick={onClear}>Clear all</button>
+    </div>
+  );
+}
+
+// ─── Export button ────────────────────────────────────────────────────────────
+function ExportButton({ section }: { section: string }) {
+  const [busy, setBusy] = useState(false);
+  async function handleExport() {
+    setBusy(true);
+    try {
+      const res = await api.get(`/admin/export/${section}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${section}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* silent */ }
+    finally { setBusy(false); }
+  }
+  return (
+    <button className="btn btn-ghost btn-sm adm-export-btn" onClick={() => { void handleExport(); }} disabled={busy}>
+      <Download size={13} /> {busy ? 'Exporting…' : 'Export CSV'}
+    </button>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const toast = useToast();
@@ -213,11 +260,36 @@ export default function AdminDashboard() {
     search: '' as string,
     date_from: '' as string,
     date_to:   '' as string,
+    amount_min: '' as string,
+    amount_max: '' as string,
   });
   const [wdExpanded,       setWdExpanded]       = useState<string | null>(null);
 
+  // Enhanced user filters
+  const [userStatusFilter, setUserStatusFilter] = useState('');
+  const [userDeviceFilter, setUserDeviceFilter] = useState('');
+  const [userDateFrom,     setUserDateFrom]     = useState('');
+  const [userDateTo,       setUserDateTo]       = useState('');
+
+  // Referrals state
+  const [refData,    setRefData]    = useState<AdminReferral[]>([]);
+  const [refMeta,    setRefMeta]    = useState({ page: 1, total: 0, limit: 25 });
+  const [refLoading, setRefLoading] = useState(false);
+  const [refPage,    setRefPage]    = useState(1);
+  const [refFilters, setRefFilters] = useState({ search: '', date_from: '', date_to: '' });
+
+  // Notifications state
+  const [notifData,    setNotifData]    = useState<AdminNotificationLog[]>([]);
+  const [notifMeta,    setNotifMeta]    = useState({ page: 1, total: 0, limit: 25 });
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifPage,    setNotifPage]    = useState(1);
+  const [notifFilters, setNotifFilters] = useState({ search: '', status: '', date_from: '', date_to: '' });
+  const [notifExpanded, setNotifExpanded] = useState<string | null>(null);
+
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wdSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notifSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load non-user data once
   useEffect(() => {
@@ -241,13 +313,20 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadUsers = useCallback(async (search: string, page: number, plan: 'all' | 'premium' | 'elite') => {
+  const loadUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
+      const params: Record<string, string | number> = { page: userPage, limit: 25 };
+      if (userSearch)       params.search    = userSearch;
+      if (userPlanFilter !== 'all') params.plan = userPlanFilter;
+      if (userStatusFilter) params.status    = userStatusFilter;
+      if (userDeviceFilter) params.device    = userDeviceFilter;
+      if (userDateFrom)     params.date_from = userDateFrom;
+      if (userDateTo)       params.date_to   = userDateTo;
       const { data } = await api.get<{
         data: AdminUser[];
         meta: { page: number; total: number; limit: number };
-      }>('/admin/users', { params: { search: search || undefined, page, limit: 25, plan: plan !== 'all' ? plan : undefined } });
+      }>('/admin/users', { params });
       setUsers(data.data);
       setUsersMeta(data.meta);
     } catch {
@@ -256,9 +335,9 @@ export default function AdminDashboard() {
       setUsersLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userPage, userPlanFilter, userStatusFilter, userDeviceFilter, userDateFrom, userDateTo]);
 
-  useEffect(() => { void loadUsers(userSearch, userPage, userPlanFilter); }, [loadUsers, userPage, userPlanFilter]);
+  useEffect(() => { void loadUsers(); }, [loadUsers]);
 
   const loadUserDetails = useCallback(async (userId: string) => {
     if (userDetails[userId] || userDetailsLoad[userId]) return;
@@ -283,8 +362,10 @@ export default function AdminDashboard() {
       if (filters.status)    params.status    = filters.status;
       if (filters.plan)      params.plan      = filters.plan;
       if (filters.search)    params.search    = filters.search;
-      if (filters.date_from) params.date_from = filters.date_from;
-      if (filters.date_to)   params.date_to   = filters.date_to;
+      if (filters.date_from)  params.date_from  = filters.date_from;
+      if (filters.date_to)    params.date_to    = filters.date_to;
+      if (filters.amount_min) params.amount_min = filters.amount_min;
+      if (filters.amount_max) params.amount_max = filters.amount_max;
 
       const { data } = await api.get<{
         data: AdminWithdrawalHistory[];
@@ -336,13 +417,73 @@ export default function AdminDashboard() {
     }
   }
 
+  // ── Referrals loader ────────────────────────────────────────────────────
+  const loadReferrals = useCallback(async (page: number, filters: typeof refFilters) => {
+    setRefLoading(true);
+    try {
+      const params: Record<string, string | number> = { page, limit: 25 };
+      if (filters.search)    params.search    = filters.search;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to)   params.date_to   = filters.date_to;
+      const { data } = await api.get<{ data: AdminReferral[]; meta: { page: number; total: number; limit: number } }>('/admin/referrals', { params });
+      setRefData(data.data);
+      setRefMeta(data.meta);
+    } catch { toast.error('Failed to load referrals.'); }
+    finally { setRefLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => { if (tab === 'referrals') void loadReferrals(refPage, refFilters); }, [tab, refPage, loadReferrals]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleRefFilterChange(key: string, value: string) {
+    const updated = { ...refFilters, [key]: value };
+    setRefFilters(updated);
+    if (key === 'search') {
+      if (refSearchDebounceRef.current) clearTimeout(refSearchDebounceRef.current);
+      refSearchDebounceRef.current = setTimeout(() => { setRefPage(1); void loadReferrals(1, updated); }, 400);
+    } else { setRefPage(1); void loadReferrals(1, updated); }
+  }
+
+  // ── Notifications loader ──────────────────────────────────────────────────
+  const loadNotifications = useCallback(async (page: number, filters: typeof notifFilters) => {
+    setNotifLoading(true);
+    try {
+      const params: Record<string, string | number> = { page, limit: 25 };
+      if (filters.search)    params.search    = filters.search;
+      if (filters.status)    params.status    = filters.status;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to)   params.date_to   = filters.date_to;
+      const { data } = await api.get<{ data: AdminNotificationLog[]; meta: { page: number; total: number; limit: number } }>('/admin/notifications', { params });
+      setNotifData(data.data);
+      setNotifMeta(data.meta);
+    } catch { toast.error('Failed to load notifications.'); }
+    finally { setNotifLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => { if (tab === 'notifications') void loadNotifications(notifPage, notifFilters); }, [tab, notifPage, loadNotifications]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleNotifFilterChange(key: string, value: string) {
+    const updated = { ...notifFilters, [key]: value };
+    setNotifFilters(updated);
+    if (key === 'search') {
+      if (notifSearchDebounceRef.current) clearTimeout(notifSearchDebounceRef.current);
+      notifSearchDebounceRef.current = setTimeout(() => { setNotifPage(1); void loadNotifications(1, updated); }, 400);
+    } else { setNotifPage(1); void loadNotifications(1, updated); }
+  }
+
   function handleUserSearch(value: string) {
     setUserSearch(value);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
       setUserPage(1);
-      void loadUsers(value, 1, userPlanFilter);
     }, 400);
+  }
+
+  function resetUserFilters() {
+    setUserSearch(''); setUserPlanFilter('all'); setUserStatusFilter('');
+    setUserDeviceFilter(''); setUserDateFrom(''); setUserDateTo('');
+    setUserPage(1);
   }
 
   function handlePlanFilter(plan: 'all' | 'premium' | 'elite') {
@@ -555,28 +696,47 @@ export default function AdminDashboard() {
       {/* ── Users ── */}
       {tab === 'users' && (
         <>
-          {/* Plan filter tabs */}
-          <div className="adm-plan-filter-tabs">
-            {(['all', 'premium', 'elite'] as const).map((p) => (
-              <button
-                key={p}
-                className={`adm-plan-filter-tab${userPlanFilter === p ? ' adm-plan-filter-tab--active' : ''} ${p !== 'all' ? `adm-plan-filter-tab--${p}` : ''}`}
-                onClick={() => handlePlanFilter(p)}
-              >
-                {p === 'all' ? 'All Users' : p.charAt(0).toUpperCase() + p.slice(1)}
-              </button>
-            ))}
+          {/* Filters */}
+          <div className="adm-wd-filters">
+            <div className="adm-filter-toolbar">
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Filters</span>
+              <ExportButton section="users" />
+            </div>
+            <div className="adm-wd-filter-row">
+              <div className="adm-search-wrap" style={{ flex: 1 }}>
+                <Search size={15} className="adm-search-icon" />
+                <input className="form-input adm-search-input" placeholder="Search username or email…" value={userSearch} onChange={(e) => handleUserSearch(e.target.value)} />
+              </div>
+              <select className="form-input adm-wd-filter-select" value={userPlanFilter} onChange={(e) => handlePlanFilter(e.target.value as 'all' | 'premium' | 'elite')}>
+                <option value="all">All Plans</option>
+                <option value="free">Free</option>
+                <option value="premium">Premium</option>
+                <option value="elite">Elite</option>
+              </select>
+              <select className="form-input adm-wd-filter-select" value={userStatusFilter} onChange={(e) => { setUserStatusFilter(e.target.value); setUserPage(1); }}>
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="banned">Banned</option>
+              </select>
+              <select className="form-input adm-wd-filter-select" value={userDeviceFilter} onChange={(e) => { setUserDeviceFilter(e.target.value); setUserPage(1); }}>
+                <option value="">All Devices</option>
+                <option value="registered">Registered</option>
+                <option value="unregistered">Unregistered</option>
+              </select>
+            </div>
+            <div className="adm-wd-filter-row">
+              <label className="adm-wd-filter-label">Joined from</label>
+              <input type="date" className="form-input adm-wd-filter-date" value={userDateFrom} onChange={(e) => { setUserDateFrom(e.target.value); setUserPage(1); }} />
+              <label className="adm-wd-filter-label">to</label>
+              <input type="date" className="form-input adm-wd-filter-date" value={userDateTo} onChange={(e) => { setUserDateTo(e.target.value); setUserPage(1); }} />
+              <button className="btn btn-ghost btn-sm" onClick={resetUserFilters}>Reset</button>
+            </div>
           </div>
-
-          <div className="adm-search-wrap">
-            <Search size={15} className="adm-search-icon" />
-            <input
-              className="form-input adm-search-input"
-              placeholder="Search username or email…"
-              value={userSearch}
-              onChange={(e) => handleUserSearch(e.target.value)}
-            />
-          </div>
+          <FilterChips
+            filters={{ plan: userPlanFilter !== 'all' ? userPlanFilter : '', status: userStatusFilter, device: userDeviceFilter, from: userDateFrom, to: userDateTo }}
+            onRemove={(k) => { if (k === 'plan') setUserPlanFilter('all'); else if (k === 'status') setUserStatusFilter(''); else if (k === 'device') setUserDeviceFilter(''); else if (k === 'from') setUserDateFrom(''); else if (k === 'to') setUserDateTo(''); setUserPage(1); }}
+            onClear={resetUserFilters}
+          />
 
           <div className="adm-list" style={{ opacity: usersLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
             {users.length === 0 && !usersLoading ? (
@@ -936,21 +1096,16 @@ export default function AdminDashboard() {
             <>
               {/* Filters row */}
               <div className="adm-wd-filters">
+                <div className="adm-filter-toolbar">
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Filters</span>
+                  <ExportButton section="withdrawals" />
+                </div>
                 <div className="adm-wd-filter-row">
                   <div className="adm-search-wrap" style={{ flex: 1 }}>
                     <Search size={15} className="adm-search-icon" />
-                    <input
-                      className="form-input adm-search-input"
-                      placeholder="Search user…"
-                      value={wdFilters.search}
-                      onChange={(e) => handleWdFilterChange('search', e.target.value)}
-                    />
+                    <input className="form-input adm-search-input" placeholder="Search user…" value={wdFilters.search} onChange={(e) => handleWdFilterChange('search', e.target.value)} />
                   </div>
-                  <select
-                    className="form-input adm-wd-filter-select"
-                    value={wdFilters.status}
-                    onChange={(e) => handleWdFilterChange('status', e.target.value)}
-                  >
+                  <select className="form-input adm-wd-filter-select" value={wdFilters.status} onChange={(e) => handleWdFilterChange('status', e.target.value)}>
                     <option value="">All Status</option>
                     <option value="pending">Pending</option>
                     <option value="processing">Processing</option>
@@ -958,11 +1113,7 @@ export default function AdminDashboard() {
                     <option value="rejected">Rejected</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
-                  <select
-                    className="form-input adm-wd-filter-select"
-                    value={wdFilters.plan}
-                    onChange={(e) => handleWdFilterChange('plan', e.target.value)}
-                  >
+                  <select className="form-input adm-wd-filter-select" value={wdFilters.plan} onChange={(e) => handleWdFilterChange('plan', e.target.value)}>
                     <option value="">All Plans</option>
                     <option value="free">Free</option>
                     <option value="premium">Premium</option>
@@ -971,21 +1122,21 @@ export default function AdminDashboard() {
                 </div>
                 <div className="adm-wd-filter-row">
                   <label className="adm-wd-filter-label">From</label>
-                  <input
-                    type="date"
-                    className="form-input adm-wd-filter-date"
-                    value={wdFilters.date_from}
-                    onChange={(e) => handleWdFilterChange('date_from', e.target.value)}
-                  />
+                  <input type="date" className="form-input adm-wd-filter-date" value={wdFilters.date_from} onChange={(e) => handleWdFilterChange('date_from', e.target.value)} />
                   <label className="adm-wd-filter-label">To</label>
-                  <input
-                    type="date"
-                    className="form-input adm-wd-filter-date"
-                    value={wdFilters.date_to}
-                    onChange={(e) => handleWdFilterChange('date_to', e.target.value)}
-                  />
+                  <input type="date" className="form-input adm-wd-filter-date" value={wdFilters.date_to} onChange={(e) => handleWdFilterChange('date_to', e.target.value)} />
+                  <label className="adm-wd-filter-label">Min ₱</label>
+                  <input type="number" className="form-input adm-amount-input" placeholder="0" value={wdFilters.amount_min} onChange={(e) => handleWdFilterChange('amount_min', e.target.value)} />
+                  <label className="adm-wd-filter-label">Max ₱</label>
+                  <input type="number" className="form-input adm-amount-input" placeholder="∞" value={wdFilters.amount_max} onChange={(e) => handleWdFilterChange('amount_max', e.target.value)} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setWdFilters({ status: '', plan: '', search: '', date_from: '', date_to: '', amount_min: '', amount_max: '' }); setWdHistoryPage(1); void loadWdHistory(1, { status: '', plan: '', search: '', date_from: '', date_to: '', amount_min: '', amount_max: '' }); }}>Reset</button>
                 </div>
               </div>
+              <FilterChips
+                filters={{ status: wdFilters.status, plan: wdFilters.plan, from: wdFilters.date_from, to: wdFilters.date_to, 'min ₱': wdFilters.amount_min, 'max ₱': wdFilters.amount_max }}
+                onRemove={(k) => { const key = k === 'min ₱' ? 'amount_min' : k === 'max ₱' ? 'amount_max' : k === 'from' ? 'date_from' : k === 'to' ? 'date_to' : k; handleWdFilterChange(key, ''); }}
+                onClear={() => { setWdFilters({ status: '', plan: '', search: '', date_from: '', date_to: '', amount_min: '', amount_max: '' }); setWdHistoryPage(1); void loadWdHistory(1, { status: '', plan: '', search: '', date_from: '', date_to: '', amount_min: '', amount_max: '' }); }}
+              />
 
               {/* Results */}
               <div className="adm-list" style={{ opacity: wdHistoryLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
@@ -1090,6 +1241,129 @@ export default function AdminDashboard() {
                 </div>
               )}
             </>
+          )}
+        </>
+      )}
+
+      {/* ── Referrals ── */}
+      {tab === 'referrals' && (
+        <>
+          <div className="adm-wd-filters">
+            <div className="adm-filter-toolbar">
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Referral Records</span>
+              <ExportButton section="referrals" />
+            </div>
+            <div className="adm-wd-filter-row">
+              <div className="adm-search-wrap" style={{ flex: 1 }}>
+                <Search size={15} className="adm-search-icon" />
+                <input className="form-input adm-search-input" placeholder="Search referrer or invited user…" value={refFilters.search} onChange={(e) => handleRefFilterChange('search', e.target.value)} />
+              </div>
+              <label className="adm-wd-filter-label">From</label>
+              <input type="date" className="form-input adm-wd-filter-date" value={refFilters.date_from} onChange={(e) => handleRefFilterChange('date_from', e.target.value)} />
+              <label className="adm-wd-filter-label">To</label>
+              <input type="date" className="form-input adm-wd-filter-date" value={refFilters.date_to} onChange={(e) => handleRefFilterChange('date_to', e.target.value)} />
+              <button className="btn btn-ghost btn-sm" onClick={() => { setRefFilters({ search: '', date_from: '', date_to: '' }); setRefPage(1); void loadReferrals(1, { search: '', date_from: '', date_to: '' }); }}>Reset</button>
+            </div>
+          </div>
+          <FilterChips
+            filters={{ from: refFilters.date_from, to: refFilters.date_to }}
+            onRemove={(k) => handleRefFilterChange(k === 'from' ? 'date_from' : 'date_to', '')}
+            onClear={() => { setRefFilters({ search: '', date_from: '', date_to: '' }); setRefPage(1); void loadReferrals(1, { search: '', date_from: '', date_to: '' }); }}
+          />
+          <div className="adm-list" style={{ opacity: refLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
+            {refData.length === 0 && !refLoading ? (
+              <div className="empty-state"><p>No referral records found.</p></div>
+            ) : refData.map((r, i) => (
+              <div key={`${r.referrer_id}-${r.invited_username}-${i}`} className="adm-ref-card">
+                <div className="adm-ref-user">
+                  <span className="adm-ref-username">{r.referrer_username}</span>
+                  <span className="adm-ref-email">Referrer · {r.referral_batches_credited} batches</span>
+                </div>
+                <span className="adm-ref-arrow">→</span>
+                <div className="adm-ref-user" style={{ flex: 1 }}>
+                  <span className="adm-ref-username">{r.invited_username}</span>
+                  <span className="adm-ref-email">{r.invited_email}</span>
+                </div>
+                <div className="adm-ref-meta">
+                  <span className={`plan-badge plan-badge--${r.invited_plan}`}>{r.invited_plan}</span>
+                  <span className="adm-ref-date">
+                    {new Date(r.invited_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {refMeta.total > refMeta.limit && (
+            <div className="adm-pagination">
+              <button className="btn btn-sm btn-ghost" disabled={refPage <= 1} onClick={() => setRefPage((p) => p - 1)}><ChevronLeft size={15} /> Prev</button>
+              <span className="adm-pagination-info">Page {refMeta.page} of {Math.ceil(refMeta.total / refMeta.limit)} · {refMeta.total} records</span>
+              <button className="btn btn-sm btn-ghost" disabled={refPage * refMeta.limit >= refMeta.total} onClick={() => setRefPage((p) => p + 1)}>Next <ChevronRight size={15} /></button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Notifications ── */}
+      {tab === 'notifications' && (
+        <>
+          <div className="adm-wd-filters">
+            <div className="adm-filter-toolbar">
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Notification Logs</span>
+              <ExportButton section="notifications" />
+            </div>
+            <div className="adm-wd-filter-row">
+              <div className="adm-search-wrap" style={{ flex: 1 }}>
+                <Search size={15} className="adm-search-icon" />
+                <input className="form-input adm-search-input" placeholder="Search user or title…" value={notifFilters.search} onChange={(e) => handleNotifFilterChange('search', e.target.value)} />
+              </div>
+              <select className="form-input adm-wd-filter-select" value={notifFilters.status} onChange={(e) => handleNotifFilterChange('status', e.target.value)}>
+                <option value="">All Status</option>
+                <option value="read">Read</option>
+                <option value="unread">Unread</option>
+              </select>
+              <label className="adm-wd-filter-label">From</label>
+              <input type="date" className="form-input adm-wd-filter-date" value={notifFilters.date_from} onChange={(e) => handleNotifFilterChange('date_from', e.target.value)} />
+              <label className="adm-wd-filter-label">To</label>
+              <input type="date" className="form-input adm-wd-filter-date" value={notifFilters.date_to} onChange={(e) => handleNotifFilterChange('date_to', e.target.value)} />
+              <button className="btn btn-ghost btn-sm" onClick={() => { setNotifFilters({ search: '', status: '', date_from: '', date_to: '' }); setNotifPage(1); void loadNotifications(1, { search: '', status: '', date_from: '', date_to: '' }); }}>Reset</button>
+            </div>
+          </div>
+          <FilterChips
+            filters={{ status: notifFilters.status, from: notifFilters.date_from, to: notifFilters.date_to }}
+            onRemove={(k) => handleNotifFilterChange(k === 'from' ? 'date_from' : k === 'to' ? 'date_to' : k, '')}
+            onClear={() => { setNotifFilters({ search: '', status: '', date_from: '', date_to: '' }); setNotifPage(1); void loadNotifications(1, { search: '', status: '', date_from: '', date_to: '' }); }}
+          />
+          <div className="adm-list" style={{ opacity: notifLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
+            {notifData.length === 0 && !notifLoading ? (
+              <div className="empty-state"><p>No notification records found.</p></div>
+            ) : notifData.map((n) => (
+              <div key={n.id} className="adm-notif-card" onClick={() => setNotifExpanded(notifExpanded === n.id ? null : n.id)}>
+                <div className="adm-notif-top">
+                  <span className="adm-notif-title">{n.title}</span>
+                  <div className="adm-notif-badges">
+                    <span className="adm-notif-type">{n.type}</span>
+                    <span className={`adm-notif-read ${n.is_read ? 'adm-notif-read--yes' : 'adm-notif-read--no'}`}>
+                      {n.is_read ? 'Read' : 'Unread'}
+                    </span>
+                  </div>
+                </div>
+                <div className="adm-notif-sub">
+                  <span>{n.username}</span>
+                  <span>·</span>
+                  <span>{new Date(n.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                {notifExpanded === n.id && (
+                  <div className="adm-notif-body">{n.message}</div>
+                )}
+              </div>
+            ))}
+          </div>
+          {notifMeta.total > notifMeta.limit && (
+            <div className="adm-pagination">
+              <button className="btn btn-sm btn-ghost" disabled={notifPage <= 1} onClick={() => setNotifPage((p) => p - 1)}><ChevronLeft size={15} /> Prev</button>
+              <span className="adm-pagination-info">Page {notifMeta.page} of {Math.ceil(notifMeta.total / notifMeta.limit)} · {notifMeta.total} records</span>
+              <button className="btn btn-sm btn-ghost" disabled={notifPage * notifMeta.limit >= notifMeta.total} onClick={() => setNotifPage((p) => p + 1)}>Next <ChevronRight size={15} /></button>
+            </div>
           )}
         </>
       )}
