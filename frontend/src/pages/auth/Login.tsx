@@ -75,6 +75,7 @@ export default function Login() {
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [resending,       setResending]       = useState(false);
   const [resent,          setResent]          = useState(false);
+  const [deviceBlocked,   setDeviceBlocked]   = useState(false);
 
   function clearFieldError(name: string) {
     setFieldError((prev) => {
@@ -104,6 +105,7 @@ export default function Login() {
 
     setFieldError({});
     setUnverifiedEmail(null);
+    setDeviceBlocked(false);
     setResent(false);
     setLoading(true);
     try {
@@ -117,7 +119,7 @@ export default function Login() {
       if (data?.code === 'email_not_verified') {
         setUnverifiedEmail(data.email ?? form.email);
       } else if (data?.code === 'device_mismatch') {
-        setFieldError({ form: data.error || 'Access denied. This account is already linked to another device.' });
+        setDeviceBlocked(true);
       } else {
         // Inline error shown under the password field — matches the
         // "Invalid credentials." pattern requested by design.
@@ -165,6 +167,18 @@ export default function Login() {
           <h1 className="brand-name">Plivio</h1>
           <p className="auth-subtitle">Sign in to start earning</p>
         </div>
+
+        {deviceBlocked && (
+          <div className="alert alert--error" role="alert" style={{ marginBottom: 16 }}>
+            <strong>Access Denied</strong>
+            <p style={{ margin: '6px 0 4px', fontSize: 13 }}>
+              This account is already linked to another device. You can only access your account from your registered device.
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+              If you lost access to your device or got a new one, please contact support to request a device change.
+            </p>
+          </div>
+        )}
 
         {unverifiedEmail && (
           <div className="alert alert--warning" role="alert" style={{ marginBottom: 16 }}>
