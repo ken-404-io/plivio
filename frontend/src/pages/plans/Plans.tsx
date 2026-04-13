@@ -21,12 +21,13 @@ interface CompareRow {
 }
 
 const COMPARE_ROWS: CompareRow[] = [
-  { label: 'Daily limit',      free: '₱20',        premium: '₱100',      elite: 'Unlimited' },
-  { label: 'Quiz questions',   free: '20 total',    premium: '200/day',   elite: 'Unlimited' },
-  { label: 'Task types',       free: 'Basic',       premium: 'All',       elite: 'All'       },
-  { label: 'Ad-free',          free: false,         premium: true,        elite: true        },
-  { label: 'Early access',     free: false,         premium: false,       elite: true        },
-  { label: 'Support',          free: 'Standard',    premium: 'Priority',  elite: 'VIP'       },
+  { label: 'Quiz daily limit',    free: '₱20',        premium: '₱50',       elite: 'Unlimited' },
+  { label: 'Quiz questions',      free: '20 total',    premium: '200/day',   elite: 'Unlimited' },
+  { label: 'Withdraw/day',        free: '₱100 (1x)',   premium: '₱149',      elite: 'Unlimited' },
+  { label: 'Task types',          free: 'Basic',       premium: 'All',       elite: 'All'       },
+  { label: 'Ad-free',             free: false,         premium: true,        elite: true        },
+  { label: 'Early access',        free: false,         premium: false,       elite: true        },
+  { label: 'Support',             free: 'Standard',    premium: 'Priority',  elite: 'VIP'       },
 ];
 
 function Cell({ value }: { value: CellVal }) {
