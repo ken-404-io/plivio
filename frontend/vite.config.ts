@@ -20,5 +20,7 @@ export default defineConfig({
     sourcemap: false,
     // Warn if a single chunk exceeds 600 kB
     chunkSizeWarningLimit: 600,
+    // Target Safari 14+ for broader iOS/macOS compatibility
+    target: ['es2020', 'safari14'],
   },
 });
