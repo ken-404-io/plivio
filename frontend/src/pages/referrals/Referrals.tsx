@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Check, CheckCircle, Copy, Share2, DollarSign, Trophy, Lock, Clock } from 'lucide-react';
+import { Users, Check, CheckCircle, Copy, Share2, DollarSign, Clock } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
@@ -26,36 +26,6 @@ interface ReferralsResponse {
 const INVITE_VALUE = 10;  // ₱10 per invite
 const BATCH_SIZE   = 10;  // invites per batch
 const BATCH_VALUE  = INVITE_VALUE * BATCH_SIZE; // ₱100 per batch
-
-// ─── Tier logic ────────────────────────────────────────────────────────────────
-
-interface Tier {
-  level:        number;
-  label:        string;
-  rewardPer10:  number;
-  unlockAt:     number;      // total invites required to enter this tier
-  nextUnlockAt: number | null; // invites to unlock the next tier (null = highest)
-}
-
-const TIERS: Tier[] = [
-  { level: 1, label: 'Tier 1', rewardPer10: 100, unlockAt: 0,    nextUnlockAt: 500  },
-  { level: 2, label: 'Tier 2', rewardPer10: 200, unlockAt: 500,  nextUnlockAt: 3000 },
-  { level: 3, label: 'Tier 3', rewardPer10: 500, unlockAt: 3000, nextUnlockAt: null },
-];
-
-function getCurrentTier(totalInvites: number): Tier {
-  for (let i = TIERS.length - 1; i >= 0; i--) {
-    if (totalInvites >= TIERS[i].unlockAt) return TIERS[i];
-  }
-  return TIERS[0];
-}
-
-function getTierProgress(totalInvites: number, tier: Tier): number {
-  if (tier.nextUnlockAt === null) return 100; // max tier
-  const range = tier.nextUnlockAt - tier.unlockAt;
-  const progress = totalInvites - tier.unlockAt;
-  return Math.min(100, Math.round((progress / range) * 100));
-}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -128,10 +98,6 @@ export default function Referrals() {
     isCredited: i < creditedCount,
   }));
 
-  // ─── Tier state (kept for tier-level overview card) ────────────────────────
-  const currentTier  = getCurrentTier(totalInvites);
-  const tierProgress = getTierProgress(totalInvites, currentTier);
-
   if (loading) return (
     <div className="page">
       <div className="sk-section">
@@ -146,12 +112,6 @@ export default function Referrals() {
             <span className="sk sk-line--sm skeleton" style={{ width: 70 }} />
           </div>
         ))}
-      </div>
-      {/* tier skeleton */}
-      <div className="sk-card" style={{ padding: 20 }}>
-        <span className="sk sk-line--sm skeleton" style={{ width: '30%' }} />
-        <span className="sk skeleton" style={{ width: '100%', height: 12, borderRadius: 6, marginTop: 12 }} />
-        <span className="sk sk-line--sm skeleton" style={{ width: '50%', marginTop: 8 }} />
       </div>
       {/* code card */}
       <div className="sk-card sk-row">
@@ -234,74 +194,6 @@ export default function Referrals() {
             : `${BATCH_SIZE - pendingInBatch} more invite${BATCH_SIZE - pendingInBatch !== 1 ? 's' : ''} needed to release ₱${BATCH_VALUE}.`
           }
         </p>
-      </div>
-
-      {/* ─── Tier Progress Card ────────────────────────────────────────────── */}
-      <div className="card tier-card">
-        <div className="tier-header">
-          <div className="tier-badge-wrap">
-            <div className={`tier-badge tier-badge--${currentTier.level}`}>
-              <Trophy size={16} />
-              <span>{currentTier.label}</span>
-            </div>
-            <span className="tier-reward-label">
-              ₱{currentTier.rewardPer10} per 10 invites
-            </span>
-          </div>
-          <div className="tier-earnings-pill">
-            <DollarSign size={14} />
-            <span>₱{releasedCredits.toLocaleString()}</span>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        {currentTier.nextUnlockAt !== null ? (
-          <div className="tier-progress-wrap">
-            <div className="tier-progress-bar">
-              <div
-                className="tier-progress-fill"
-                style={{ width: `${tierProgress}%` }}
-              />
-            </div>
-            <div className="tier-progress-labels">
-              <span>{totalInvites} invites</span>
-              <span>{currentTier.nextUnlockAt} to unlock {TIERS[currentTier.level]?.label}</span>
-            </div>
-          </div>
-        ) : (
-          <p className="tier-max-msg">
-            You've reached the highest tier — no cap on earnings!
-          </p>
-        )}
-
-        {/* Tier level overview */}
-        <div className="tier-levels">
-          {TIERS.map((t) => {
-            const isActive  = t.level === currentTier.level;
-            const isLocked  = t.level > currentTier.level;
-            return (
-              <div
-                key={t.level}
-                className={`tier-level${isActive ? ' tier-level--active' : ''}${isLocked ? ' tier-level--locked' : ''}`}
-              >
-                <div className="tier-level-header">
-                  <span className={`tier-level-dot tier-level-dot--${t.level}`} />
-                  <span className="tier-level-name">{t.label}</span>
-                  {isLocked && <Lock size={12} className="tier-level-lock" />}
-                  {isActive && <span className="tier-level-current-tag">Current</span>}
-                </div>
-                <div className="tier-level-details">
-                  <span className="tier-level-reward">₱{t.rewardPer10} / 10 invites</span>
-                  {t.nextUnlockAt !== null ? (
-                    <span className="tier-level-unlock">{t.unlockAt > 0 ? `Unlocks at ${t.unlockAt}` : 'Default tier'}</span>
-                  ) : (
-                    <span className="tier-level-unlock">Unlocks at {t.unlockAt}</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       {/* Share card */}
