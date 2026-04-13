@@ -21,7 +21,8 @@ interface CompareRow {
 }
 
 const COMPARE_ROWS: CompareRow[] = [
-  { label: 'Quiz daily limit',    free: '₱20',        premium: '₱50',       elite: 'Unlimited' },
+  { label: 'Price/month',         free: 'Free',        premium: '₱449',      elite: '₱1,599'    },
+  { label: 'Quiz daily limit',    free: '₱20',         premium: '₱50',       elite: 'Unlimited' },
   { label: 'Quiz questions',      free: '20 total',    premium: '200/day',   elite: 'Unlimited' },
   { label: 'Withdraw/day',        free: '₱100 (1x)',   premium: '₱149',      elite: 'Unlimited' },
   { label: 'Task types',          free: 'Basic',       premium: 'All',       elite: 'All'       },
