@@ -54,6 +54,31 @@ function FreePlanUpgradeModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Validation Error Modal ──────────────────────────────────────────────────
+
+function ValidationModal({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal wd-confirm" onClick={(e) => e.stopPropagation()}>
+        <div className="wd-confirm-hero" style={{ background: 'var(--bg-card)' }}>
+          <AlertCircle size={32} style={{ color: 'var(--error)', marginBottom: 8 }} />
+          <span className="wd-confirm-hero-label">Validation Error</span>
+        </div>
+        <div style={{ padding: '0 20px 4px' }}>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', margin: '12px 0 16px' }}>
+            {message}
+          </p>
+          <div className="wd-confirm-actions">
+            <button className="btn btn-primary wd-confirm-submit" onClick={onClose} style={{ flex: 1 }}>
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const MIN_AMOUNT            = 50;
@@ -159,6 +184,7 @@ export default function Withdraw() {
   const [loading,           setLoading]           = useState(true);
   const [showConfirm,       setShowConfirm]       = useState(false);
   const [showUpgradeModal,  setShowUpgradeModal]  = useState(false);
+  const [validationError,   setValidationError]   = useState<string | null>(null);
   const [submitting,        setSubmitting]        = useState(false);
   const [cancelling,        setCancelling]        = useState<string | null>(null);
   const [historyOpen,       setHistoryOpen]       = useState(false);
@@ -254,9 +280,9 @@ export default function Withdraw() {
   function handleReview(e: React.FormEvent) {
     e.preventDefault();
     if (hasUsedFreeWithdrawal) { setShowUpgradeModal(true); return; }
-    if (onCooldown) { toast.error('Please wait for the cooldown period to end before withdrawing again.'); return; }
+    if (onCooldown) { setValidationError('Please wait for the cooldown period to end before withdrawing again.'); return; }
     const err = validate();
-    if (err) { toast.error(err); return; }
+    if (err) { setValidationError(err); return; }
     setShowConfirm(true);
   }
 
@@ -283,10 +309,11 @@ export default function Withdraw() {
       if (errData?.code === 'withdrawal_cooldown') {
         setShowConfirm(false);
         void loadCooldown();
-        toast.error(errData.error ?? 'Withdrawal cooldown active. Please try again later.');
+        setValidationError(errData.error ?? 'Withdrawal cooldown active. Please try again later.');
         return;
       }
-      toast.error(errData?.error ?? 'Request failed. Please try again.');
+      setShowConfirm(false);
+      setValidationError(errData?.error ?? 'Request failed. Please try again.');
     } finally { setSubmitting(false); }
   }
 
@@ -343,6 +370,9 @@ export default function Withdraw() {
       )}
       {showUpgradeModal && (
         <FreePlanUpgradeModal onClose={() => setShowUpgradeModal(false)} />
+      )}
+      {validationError && (
+        <ValidationModal message={validationError} onClose={() => setValidationError(null)} />
       )}
 
       <header className="page-header">
