@@ -3,6 +3,7 @@ import pool from '../config/db.ts';
 import { ValidationError, ForbiddenError, NotFoundError } from '../utils/errors.ts';
 
 const FREE_PLAN_WITHDRAWAL_LIMIT = 1;
+const FREE_PLAN_MAX_AMOUNT       = 100;
 const FREE_PLAN_UPGRADE_CODE     = 'free_plan_limit_reached';
 const COOLDOWN_CODE              = 'withdrawal_cooldown';
 const COOLDOWN_HOURS             = 24;
@@ -75,8 +76,11 @@ export async function requestWithdrawal(
       throw new ValidationError(`Insufficient balance. Available: ₱${Number(user.balance).toFixed(2)}`);
     }
 
-    // Free plan users are limited to one (1) total withdrawal
+    // Free plan: max ₱100 per withdrawal and limited to 1 total
     if (user.plan === 'free') {
+      if (amount > FREE_PLAN_MAX_AMOUNT) {
+        throw new ValidationError(`Free plan withdrawals are limited to ₱${FREE_PLAN_MAX_AMOUNT}. Upgrade your plan to withdraw more.`);
+      }
       const { rows: wdCountRows } = await client.query(
         `SELECT COUNT(*) AS count FROM withdrawals
          WHERE user_id = $1 AND status NOT IN ('cancelled')`,
