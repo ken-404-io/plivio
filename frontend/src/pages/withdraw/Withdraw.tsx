@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowUpRight,
+  Timer,
 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
@@ -160,6 +161,8 @@ export default function Withdraw() {
   const [submitting,        setSubmitting]        = useState(false);
   const [cancelling,        setCancelling]        = useState<string | null>(null);
   const [historyOpen,       setHistoryOpen]       = useState(false);
+  const [cooldownEnd,       setCooldownEnd]       = useState<Date | null>(null);
+  const [cooldownRemaining, setCooldownRemaining] = useState('');
 
   async function loadHistory() {
     try {
@@ -169,7 +172,43 @@ export default function Withdraw() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { void loadHistory(); }, []);
+  async function loadCooldown() {
+    try {
+      const { data } = await api.get<{ on_cooldown: boolean; cooldown_end?: string }>('/withdrawals/cooldown');
+      if (data.on_cooldown && data.cooldown_end) {
+        setCooldownEnd(new Date(data.cooldown_end));
+      } else {
+        setCooldownEnd(null);
+      }
+    } catch { /* silent */ }
+  }
+
+  useEffect(() => { void loadHistory(); void loadCooldown(); }, []);
+
+  // Countdown timer for cooldown
+  useEffect(() => {
+    if (!cooldownEnd) { setCooldownRemaining(''); return; }
+
+    function tick() {
+      const now = Date.now();
+      const diff = cooldownEnd!.getTime() - now;
+      if (diff <= 0) {
+        setCooldownEnd(null);
+        setCooldownRemaining('');
+        return;
+      }
+      const h = Math.floor(diff / (60 * 60 * 1000));
+      const m = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+      const s = Math.floor((diff % (60 * 1000)) / 1000);
+      setCooldownRemaining(
+        h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`,
+      );
+    }
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [cooldownEnd]);
 
   // ── Live fee preview ──────────────────────────────────────────────────────
   const liveAmount = Number(form.amount) || 0;
@@ -204,9 +243,13 @@ export default function Withdraw() {
     (w) => !['cancelled'].includes(w.status),
   );
 
+  // Cooldown active for premium/elite users
+  const onCooldown = cooldownEnd !== null && cooldownEnd.getTime() > Date.now();
+
   function handleReview(e: React.FormEvent) {
     e.preventDefault();
     if (hasUsedFreeWithdrawal) { setShowUpgradeModal(true); return; }
+    if (onCooldown) { toast.error('Please wait for the cooldown period to end before withdrawing again.'); return; }
     const err = validate();
     if (err) { toast.error(err); return; }
     setShowConfirm(true);
@@ -224,12 +267,18 @@ export default function Withdraw() {
       setShowConfirm(false);
       setForm({ amount: '', method: 'gcash', account_name: '', account_number: '' });
       toast.success('Withdrawal submitted — we\'ll process it within 24 hours.');
-      await Promise.all([loadHistory(), fetchMe()]);
+      await Promise.all([loadHistory(), fetchMe(), loadCooldown()]);
     } catch (err: unknown) {
       const errData = (err as { response?: { data?: { error?: string; code?: string } } }).response?.data;
       if (errData?.code === 'free_plan_limit_reached') {
         setShowConfirm(false);
         setShowUpgradeModal(true);
+        return;
+      }
+      if (errData?.code === 'withdrawal_cooldown') {
+        setShowConfirm(false);
+        void loadCooldown();
+        toast.error(errData.error ?? 'Withdrawal cooldown active. Please try again later.');
         return;
       }
       toast.error(errData?.error ?? 'Request failed. Please try again.');
@@ -241,7 +290,7 @@ export default function Withdraw() {
     try {
       await api.delete(`/withdrawals/${id}`);
       toast.success('Withdrawal cancelled. Balance refunded.');
-      await Promise.all([loadHistory(), fetchMe()]);
+      await Promise.all([loadHistory(), fetchMe(), loadCooldown()]);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       toast.error(msg ?? 'Failed to cancel.');
@@ -318,6 +367,17 @@ export default function Withdraw() {
           <div>
             <strong>Withdrawal limit reached.</strong> Free plan users can only make 1 withdrawal.{' '}
             <Link to="/plans" className="link">Upgrade your plan →</Link>
+          </div>
+        </div>
+      )}
+
+      {/* Cooldown banner for premium/elite users */}
+      {!kycBlocked && onCooldown && (
+        <div className="alert alert--info wd-cooldown-banner">
+          <Timer size={18} />
+          <div>
+            <strong>Withdrawal cooldown active.</strong> You have already made a withdrawal.
+            You can withdraw again in <span className="wd-cooldown-time">{cooldownRemaining}</span>.
           </div>
         </div>
       )}
@@ -453,11 +513,20 @@ export default function Withdraw() {
         <button
           type="submit"
           className="btn btn-primary wd-submit"
-          disabled={kycBlocked || hasUsedFreeWithdrawal}
+          disabled={kycBlocked || hasUsedFreeWithdrawal || onCooldown}
           onClick={hasUsedFreeWithdrawal ? (e) => { e.preventDefault(); setShowUpgradeModal(true); } : undefined}
         >
-          Review Withdrawal
-          <ArrowRight size={16} />
+          {onCooldown ? (
+            <>
+              <Timer size={16} />
+              Cooldown: {cooldownRemaining}
+            </>
+          ) : (
+            <>
+              Review Withdrawal
+              <ArrowRight size={16} />
+            </>
+          )}
         </button>
       </form>
 

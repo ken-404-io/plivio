@@ -4,6 +4,8 @@ import { ValidationError, ForbiddenError, NotFoundError } from '../utils/errors.
 
 const FREE_PLAN_WITHDRAWAL_LIMIT = 1;
 const FREE_PLAN_UPGRADE_CODE     = 'free_plan_limit_reached';
+const COOLDOWN_CODE              = 'withdrawal_cooldown';
+const COOLDOWN_HOURS             = 24;
 
 const MIN_WITHDRAWAL  = 50;
 const MAX_WITHDRAWAL  = 5000;
@@ -89,6 +91,29 @@ export async function requestWithdrawal(
       }
     }
 
+    // Premium & Elite: 24-hour cooldown between withdrawals
+    if (user.plan === 'premium' || user.plan === 'elite') {
+      const { rows: lastWdRows } = await client.query(
+        `SELECT requested_at FROM withdrawals
+         WHERE user_id = $1 AND status NOT IN ('cancelled')
+         ORDER BY requested_at DESC LIMIT 1`,
+        [userId],
+      );
+      if (lastWdRows.length > 0) {
+        const lastRequestedAt = new Date((lastWdRows[0] as { requested_at: string }).requested_at);
+        const cooldownEnd     = new Date(lastRequestedAt.getTime() + COOLDOWN_HOURS * 60 * 60 * 1000);
+        if (new Date() < cooldownEnd) {
+          const remaining = cooldownEnd.getTime() - Date.now();
+          const hours     = Math.floor(remaining / (60 * 60 * 1000));
+          const minutes   = Math.ceil((remaining % (60 * 60 * 1000)) / (60 * 1000));
+          throw new ForbiddenError(
+            `You have already made a withdrawal. You can withdraw again in ${hours}h ${minutes}m.`,
+            COOLDOWN_CODE,
+          );
+        }
+      }
+    }
+
     // Deduct full requested amount from user balance
     await client.query(
       'UPDATE users SET balance = balance - $1 WHERE id = $2',
@@ -110,6 +135,60 @@ export async function requestWithdrawal(
   } finally {
     client.release();
   }
+}
+
+// ─── Withdrawal cooldown status ───────────────────────────────────────────────
+
+export async function getWithdrawalCooldown(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user!.id;
+
+    const { rows: userRows } = await pool.query(
+      'SELECT plan FROM users WHERE id = $1',
+      [userId],
+    );
+    if (!userRows.length) { res.json({ success: true, on_cooldown: false }); return; }
+
+    const plan = (userRows[0] as { plan: string }).plan;
+
+    // Only premium/elite have cooldown
+    if (plan !== 'premium' && plan !== 'elite') {
+      res.json({ success: true, on_cooldown: false });
+      return;
+    }
+
+    const { rows: lastWdRows } = await pool.query(
+      `SELECT requested_at FROM withdrawals
+       WHERE user_id = $1 AND status NOT IN ('cancelled')
+       ORDER BY requested_at DESC LIMIT 1`,
+      [userId],
+    );
+
+    if (lastWdRows.length === 0) {
+      res.json({ success: true, on_cooldown: false });
+      return;
+    }
+
+    const lastRequestedAt = new Date((lastWdRows[0] as { requested_at: string }).requested_at);
+    const cooldownEnd     = new Date(lastRequestedAt.getTime() + COOLDOWN_HOURS * 60 * 60 * 1000);
+    const now             = new Date();
+
+    if (now < cooldownEnd) {
+      const remaining = cooldownEnd.getTime() - now.getTime();
+      res.json({
+        success:      true,
+        on_cooldown:  true,
+        cooldown_end: cooldownEnd.toISOString(),
+        remaining_ms: remaining,
+      });
+    } else {
+      res.json({ success: true, on_cooldown: false });
+    }
+  } catch (err) { next(err); }
 }
 
 // ─── List user's own withdrawals ───────────────────────────────────────────────
