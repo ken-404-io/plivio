@@ -2,6 +2,9 @@ import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { ValidationError, ForbiddenError, NotFoundError } from '../utils/errors.ts';
 
+const FREE_PLAN_WITHDRAWAL_LIMIT = 1;
+const FREE_PLAN_UPGRADE_CODE     = 'free_plan_limit_reached';
+
 const MIN_WITHDRAWAL  = 50;
 const MAX_WITHDRAWAL  = 5000;
 const FEE_RATE        = 0.05;   // 5% total (1% document + 4% handling)
@@ -55,12 +58,12 @@ export async function requestWithdrawal(
 
     // Lock the user row to prevent race conditions on balance
     const { rows: userRows, rowCount } = await client.query(
-      'SELECT balance, is_banned, kyc_status FROM users WHERE id = $1 FOR UPDATE',
+      'SELECT balance, is_banned, kyc_status, plan FROM users WHERE id = $1 FOR UPDATE',
       [userId],
     );
     if (!rowCount) throw new NotFoundError('User not found');
 
-    const user = userRows[0] as { balance: string; is_banned: boolean; kyc_status: string };
+    const user = userRows[0] as { balance: string; is_banned: boolean; kyc_status: string; plan: string };
 
     if (user.is_banned) throw new ForbiddenError('Account suspended');
     if (user.kyc_status !== 'approved') {
@@ -68,6 +71,22 @@ export async function requestWithdrawal(
     }
     if (Number(user.balance) < amount) {
       throw new ValidationError(`Insufficient balance. Available: ₱${Number(user.balance).toFixed(2)}`);
+    }
+
+    // Free plan users are limited to one (1) total withdrawal
+    if (user.plan === 'free') {
+      const { rows: wdCountRows } = await client.query(
+        `SELECT COUNT(*) AS count FROM withdrawals
+         WHERE user_id = $1 AND status NOT IN ('cancelled')`,
+        [userId],
+      );
+      const existingCount = Number((wdCountRows[0] as { count: string }).count);
+      if (existingCount >= FREE_PLAN_WITHDRAWAL_LIMIT) {
+        throw new ForbiddenError(
+          'Free plan users can only make 1 withdrawal in total. Upgrade your plan to continue withdrawing.',
+          FREE_PLAN_UPGRADE_CODE,
+        );
+      }
     }
 
     // Deduct full requested amount from user balance

@@ -119,7 +119,11 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
     logger.error({ err: err.message, path: req.path, method: req.method }, 'Unhandled error');
   }
 
-  res.status(status).json({ success: false, error: message });
+  res.status(status).json({
+    success: false,
+    error:   message,
+    ...(appErr.code ? { code: appErr.code } : {}),
+  });
 });
 
 async function runDiagnostics(): Promise<void> {

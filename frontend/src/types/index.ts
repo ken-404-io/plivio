@@ -213,6 +213,40 @@ export interface AdminUser {
   created_at: string;
 }
 
+export interface AdminUserSubscription {
+  plan: PlanType;
+  starts_at: string;
+  expires_at: string;
+  is_active: boolean;
+}
+
+export interface AdminUserInvite {
+  username: string;
+  email: string;
+  plan: PlanType;
+  created_at: string;
+}
+
+export interface AdminUserWithdrawal {
+  id: string;
+  amount: string | number;
+  fee_amount: string | number;
+  net_amount: string | number;
+  method: WithdrawalMethod;
+  status: WithdrawalStatus;
+  account_name: string;
+  account_number: string;
+  rejection_reason: string | null;
+  requested_at: string;
+  processed_at: string | null;
+}
+
+export interface AdminUserDetails {
+  subscription: AdminUserSubscription | null;
+  invites: AdminUserInvite[];
+  withdrawals: AdminUserWithdrawal[];
+}
+
 export interface AdminTask {
   id: string;
   title: string;

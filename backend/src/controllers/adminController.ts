@@ -302,6 +302,51 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
   }
 }
 
+// ─── GET /admin/users/:id/details ────────────────────────────────────────────
+
+export async function getUserDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params as Record<string, string>;
+
+    const [subResult, invitesResult, withdrawalsResult] = await Promise.all([
+      // Current active subscription (if any)
+      pool.query(
+        `SELECT plan, starts_at, expires_at, is_active
+         FROM subscriptions
+         WHERE user_id = $1 AND is_active = TRUE AND expires_at > NOW()
+         ORDER BY expires_at DESC LIMIT 1`,
+        [id],
+      ),
+      // Users invited by this user (verified only)
+      pool.query(
+        `SELECT u.username, u.email, u.plan, u.created_at
+         FROM users u
+         WHERE u.referred_by = $1 AND u.is_email_verified = TRUE
+         ORDER BY u.created_at DESC`,
+        [id],
+      ),
+      // Withdrawal history (most recent 50)
+      pool.query(
+        `SELECT id, amount, fee_amount, net_amount, method, status,
+                account_name, account_number, rejection_reason,
+                requested_at, processed_at
+         FROM withdrawals
+         WHERE user_id = $1
+         ORDER BY requested_at DESC
+         LIMIT 50`,
+        [id],
+      ),
+    ]);
+
+    res.json({
+      success:      true,
+      subscription: subResult.rows[0] ?? null,
+      invites:      invitesResult.rows,
+      withdrawals:  withdrawalsResult.rows,
+    });
+  } catch (err) { next(err); }
+}
+
 // ─── Update ad networks for a video/ad task ───────────────────────────────
 
 export async function updateAdNetworks(req: Request, res: Response, next: NextFunction): Promise<void> {

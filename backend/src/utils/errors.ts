@@ -1,10 +1,12 @@
 export class AppError extends Error {
   statusCode: number;
+  code?: string;
 
-  constructor(message: string, statusCode = 500) {
+  constructor(message: string, statusCode = 500, code?: string) {
     super(message);
     this.name       = this.constructor.name;
     this.statusCode = statusCode;
+    this.code       = code;
     Error.captureStackTrace(this, this.constructor);
   }
 }
@@ -18,7 +20,7 @@ export class AuthenticationError extends AppError {
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = 'Access denied') { super(message, 403); }
+  constructor(message = 'Access denied', code?: string) { super(message, 403, code); }
 }
 
 export class NotFoundError extends AppError {

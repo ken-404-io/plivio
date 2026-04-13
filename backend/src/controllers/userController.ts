@@ -338,34 +338,44 @@ export async function getReferrals(
   try {
     const userId = req.user!.id;
 
-    // Referred users list + total referral earnings in parallel.
+    // Referred users list + batch tracking in parallel.
     // Only show referred users who have completed email verification —
     // unverified accounts should never appear in the "earned referrals"
     // list (we also only grant the referral bonus after verification).
-    const [listResult, earningsResult] = await Promise.all([
+    const [listResult, batchResult] = await Promise.all([
       pool.query(
         `SELECT u.username, u.plan, u.created_at
          FROM users u
          WHERE u.referred_by = $1
            AND u.is_email_verified = TRUE
-         ORDER BY u.created_at DESC`,
+         ORDER BY u.created_at ASC`,
         [userId],
       ),
       pool.query(
-        `SELECT COALESCE(SUM(tc.reward_earned), 0) AS total
-         FROM task_completions tc
-         JOIN tasks t ON t.id = tc.task_id
-         WHERE tc.user_id = $1 AND t.type = 'referral' AND tc.status = 'approved'`,
+        `SELECT referral_batches_credited FROM users WHERE id = $1`,
         [userId],
       ),
     ]);
 
-    const totalEarned = Number((earningsResult.rows[0] as { total: string }).total);
+    const batchesCredited = Number(
+      (batchResult.rows[0] as { referral_batches_credited: string } | undefined)
+        ?.referral_batches_credited ?? 0,
+    );
+
+    // Compute display totals from batch state
+    const totalInvites   = listResult.rows.length;
+    const creditedCount  = batchesCredited * 10;        // invites in completed batches
+    const pendingCount   = totalInvites - creditedCount; // invites pending the next batch
+    const releasedAmount = batchesCredited * 100;        // ₱100 per batch
+    const pendingAmount  = pendingCount * 10;            // ₱10 per pending invite
 
     res.json({
-      success:       true,
-      referrals:     listResult.rows,
-      total_earned:  totalEarned,
+      success:             true,
+      referrals:           listResult.rows,   // sorted oldest-first for status calc
+      total_earned:        releasedAmount,
+      referral_batches_credited: batchesCredited,
+      pending_credits:     pendingAmount,
+      released_credits:    releasedAmount,
     });
   } catch (err) { next(err); }
 }
