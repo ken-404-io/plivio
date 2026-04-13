@@ -57,7 +57,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
       `SELECT id, username, email, plan, balance, is_verified, is_banned, is_admin, created_at
        FROM users
        WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
-         AND ($3::text IS NULL OR plan = $3)
+         AND ($3::plan_type IS NULL OR plan = $3::plan_type)
        ORDER BY created_at DESC LIMIT $2 OFFSET $4`,
       [search, limit, planFilter, offset]
     );
@@ -65,7 +65,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM users
        WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
-         AND ($2::text IS NULL OR plan = $2)`,
+         AND ($2::plan_type IS NULL OR plan = $2::plan_type)`,
       [search, planFilter]
     );
 
