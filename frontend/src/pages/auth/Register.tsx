@@ -124,9 +124,10 @@ export default function Register() {
     username: '', email: '', password: '',
     referral_code: searchParams.get('ref') ?? '',
   });
-  const [showPass,   setShowPass]   = useState(false);
-  const [fieldError, setFieldError] = useState<Record<string, string>>({});
-  const [loading,    setLoading]    = useState(false);
+  const [showPass,       setShowPass]       = useState(false);
+  const [fieldError,     setFieldError]     = useState<Record<string, string>>({});
+  const [loading,        setLoading]        = useState(false);
+  const [deviceBlocked,  setDeviceBlocked]  = useState(false);
 
   // OTP verification screen state — shown after successful registration.
   const [verifyEmail,    setVerifyEmail]    = useState<string | null>(null);
@@ -158,6 +159,7 @@ export default function Register() {
     if (Object.keys(errs).length > 0) { setFieldError(errs); return; }
 
     setFieldError({});
+    setDeviceBlocked(false);
     setLoading(true);
     try {
       const result = await register({ ...form, device_id: getDeviceId() });
@@ -166,7 +168,12 @@ export default function Register() {
       setTimeout(() => otpInputRefs.current[0]?.focus(), 50);
     } catch (err) {
       const axErr = err as AxiosError<{ error: string }>;
-      setFieldError({ form: axErr.response?.data?.error || 'Registration failed. Please try again.' });
+      const msg = axErr.response?.data?.error || '';
+      if (msg.toLowerCase().includes('already been registered from this device')) {
+        setDeviceBlocked(true);
+      } else {
+        setFieldError({ form: msg || 'Registration failed. Please try again.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -352,6 +359,18 @@ export default function Register() {
           <h1 className="brand-name">Plivio</h1>
           <p className="auth-subtitle">Create your free account</p>
         </div>
+
+        {deviceBlocked && (
+          <div className="alert alert--error" role="alert" style={{ marginBottom: 16 }}>
+            <strong>Registration Blocked</strong>
+            <p style={{ margin: '6px 0 4px', fontSize: 13 }}>
+              An account has already been registered from this device. Each device can only have one Plivio account.
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+              If you believe this is an error, please contact support.
+            </p>
+          </div>
+        )}
 
         {fieldError.form && (
           <p className="form-field-error" role="alert" style={{ marginBottom: 12 }}>
