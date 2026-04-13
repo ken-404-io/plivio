@@ -58,7 +58,7 @@ export const PLANS: Record<string, PlanInfo> = {
   },
   elite: {
     name:        'Elite',
-    price_php:   999,
+    price_php:   1599,
     daily_limit: null,
     features:    [
       'Unlimited quiz questions',
