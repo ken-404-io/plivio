@@ -18,6 +18,9 @@ import {
   listWithdrawalHistory,
   processWithdrawal,
   resetUserDevice,
+  listReferrals,
+  listNotificationLogs,
+  exportCsv,
 } from '../controllers/adminController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
@@ -87,6 +90,10 @@ router.put('/withdrawals/:id',
   validateBody({ action: { required: true, enum: ['approve', 'reject'] } }),
   processWithdrawal,
 );
+
+router.get('/referrals', listReferrals);
+router.get('/notifications', listNotificationLogs);
+router.get('/export/:section', exportCsv);
 
 router.get('/kyc', listKycSubmissions);
 router.put('/kyc/:id',

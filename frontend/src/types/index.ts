@@ -319,6 +319,29 @@ export interface AdminKycSubmission {
   reviewed_at: string | null;
 }
 
+export interface AdminReferral {
+  referrer_id: string;
+  referrer_username: string;
+  referral_batches_credited: number;
+  invited_username: string;
+  invited_email: string;
+  invited_plan: PlanType;
+  is_email_verified: boolean;
+  invited_at: string;
+}
+
+export interface AdminNotificationLog {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+  username: string;
+  email: string;
+}
+
 export interface RegisterPayload {
   username: string;
   email: string;
