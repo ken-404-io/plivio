@@ -49,18 +49,24 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const limit  = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
     const offset = (page - 1) * limit;
     const search = req.query.search ? `%${req.query.search as string}%` : null;
+    const planFilter = ['free', 'premium', 'elite'].includes(req.query.plan as string)
+      ? (req.query.plan as string)
+      : null;
 
     const { rows } = await pool.query(
       `SELECT id, username, email, plan, balance, is_verified, is_banned, is_admin, created_at
        FROM users
        WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
-       ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-      [search, limit, offset]
+         AND ($3::text IS NULL OR plan = $3)
+       ORDER BY created_at DESC LIMIT $2 OFFSET $4`,
+      [search, limit, planFilter, offset]
     );
 
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM users WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)`,
-      [search]
+      `SELECT COUNT(*) FROM users
+       WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
+         AND ($2::text IS NULL OR plan = $2)`,
+      [search, planFilter]
     );
 
     res.json({

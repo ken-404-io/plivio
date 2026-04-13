@@ -2439,6 +2439,39 @@ a, button, [role="button"], [tabindex] {
   width: 100%;
 }
 
+/* Plan filter tabs */
+.adm-plan-filter-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.adm-plan-filter-tab {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.adm-plan-filter-tab--active {
+  background: var(--bg-elevated);
+  color: var(--text-heading);
+  border-color: var(--text-muted);
+}
+.adm-plan-filter-tab--premium.adm-plan-filter-tab--active {
+  background: rgba(139, 92, 246, 0.12);
+  color: #a78bfa;
+  border-color: #a78bfa;
+}
+.adm-plan-filter-tab--elite.adm-plan-filter-tab--active {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border-color: #fbbf24;
+}
+
 /* List */
 .adm-list { display: flex; flex-direction: column; gap: 8px; }
 

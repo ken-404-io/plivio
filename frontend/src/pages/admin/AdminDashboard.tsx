@@ -180,8 +180,9 @@ export default function AdminDashboard() {
   const [users,         setUsers]         = useState<AdminUser[]>([]);
   const [usersMeta,     setUsersMeta]     = useState({ page: 1, total: 0, limit: 25 });
   const [usersLoading,  setUsersLoading]  = useState(false);
-  const [userSearch,    setUserSearch]    = useState('');
-  const [userPage,      setUserPage]      = useState(1);
+  const [userSearch,      setUserSearch]      = useState('');
+  const [userPlanFilter,  setUserPlanFilter]  = useState<'all' | 'premium' | 'elite'>('all');
+  const [userPage,        setUserPage]        = useState(1);
   const [withdrawals,   setWithdrawals]   = useState<AdminWithdrawal[]>([]);
   const [kycList,       setKycList]       = useState<AdminKycSubmission[]>([]);
   const [loading,       setLoading]       = useState(true);
@@ -224,13 +225,13 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadUsers = useCallback(async (search: string, page: number) => {
+  const loadUsers = useCallback(async (search: string, page: number, plan: 'all' | 'premium' | 'elite') => {
     setUsersLoading(true);
     try {
       const { data } = await api.get<{
         data: AdminUser[];
         meta: { page: number; total: number; limit: number };
-      }>('/admin/users', { params: { search: search || undefined, page, limit: 25 } });
+      }>('/admin/users', { params: { search: search || undefined, page, limit: 25, plan: plan !== 'all' ? plan : undefined } });
       setUsers(data.data);
       setUsersMeta(data.meta);
     } catch {
@@ -241,7 +242,7 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { void loadUsers(userSearch, userPage); }, [loadUsers, userPage]);
+  useEffect(() => { void loadUsers(userSearch, userPage, userPlanFilter); }, [loadUsers, userPage, userPlanFilter]);
 
   const loadUserDetails = useCallback(async (userId: string) => {
     if (userDetails[userId] || userDetailsLoad[userId]) return;
@@ -264,8 +265,15 @@ export default function AdminDashboard() {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
       setUserPage(1);
-      void loadUsers(value, 1);
+      void loadUsers(value, 1, userPlanFilter);
     }, 400);
+  }
+
+  function handlePlanFilter(plan: 'all' | 'premium' | 'elite') {
+    setUserPlanFilter(plan);
+    setUserPage(1);
+    setExpandedUser(null);
+    // loadUsers will re-fire via the useEffect dependency on userPlanFilter
   }
 
   async function toggleBan(userId: string, isBanned: boolean) {
@@ -471,6 +479,19 @@ export default function AdminDashboard() {
       {/* ── Users ── */}
       {tab === 'users' && (
         <>
+          {/* Plan filter tabs */}
+          <div className="adm-plan-filter-tabs">
+            {(['all', 'premium', 'elite'] as const).map((p) => (
+              <button
+                key={p}
+                className={`adm-plan-filter-tab${userPlanFilter === p ? ' adm-plan-filter-tab--active' : ''} ${p !== 'all' ? `adm-plan-filter-tab--${p}` : ''}`}
+                onClick={() => handlePlanFilter(p)}
+              >
+                {p === 'all' ? 'All Users' : p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
+          </div>
+
           <div className="adm-search-wrap">
             <Search size={15} className="adm-search-icon" />
             <input
