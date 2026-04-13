@@ -15,7 +15,9 @@ import {
   deleteTask,
   updateAdNetworks,
   listPendingWithdrawals,
+  listWithdrawalHistory,
   processWithdrawal,
+  resetUserDevice,
 } from '../controllers/adminController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
@@ -52,6 +54,7 @@ router.post('/notify-all',
 
 router.get('/users', listUsers);
 router.get('/users/:id/details', validateParam('id'), getUserDetails);
+router.put('/users/:id/reset-device', validateParam('id'), resetUserDevice);
 router.put('/users/:id',
   validateParam('id'),
   validateBody({
@@ -78,6 +81,7 @@ router.put('/tasks/:id/ad-networks', validateParam('id'), updateAdNetworks);
 router.delete('/tasks/:id',          validateParam('id'), deleteTask);
 
 router.get('/withdrawals', listPendingWithdrawals);
+router.get('/withdrawals/history', listWithdrawalHistory);
 router.put('/withdrawals/:id',
   validateIntParam('id'),
   validateBody({ action: { required: true, enum: ['approve', 'reject'] } }),

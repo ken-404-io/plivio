@@ -5342,6 +5342,101 @@ a, button, [role="button"], [tabindex] {
   50%      { opacity: 0.85; }
 }
 
+/* ─── Admin withdrawal history filters ──────────────────────────────────────── */
+.adm-wd-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.adm-wd-filter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.adm-wd-filter-select {
+  min-width: 110px;
+  max-width: 140px;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+.adm-wd-filter-date {
+  font-size: 13px;
+  padding: 6px 10px;
+  max-width: 150px;
+}
+.adm-wd-filter-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.adm-wd-card--clickable {
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.adm-wd-card--clickable:hover {
+  border-color: var(--accent-border);
+}
+.adm-wd-card--expanded {
+  border-color: var(--accent-border);
+}
+.adm-wd-expanded {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 8px;
+}
+.adm-wd-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+.adm-wd-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adm-wd-detail-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.adm-wd-detail-value {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ─── Admin device card ────────────────────────────────────────────────────── */
+.adm-device-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.adm-device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adm-device-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.adm-device-fp {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+.adm-device-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 /* Keep old form-hint / form-label-hint classes used elsewhere */
 .form-label-hint { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 4px; }
 .form-hint       { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block; }

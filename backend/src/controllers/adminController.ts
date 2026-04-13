@@ -238,6 +238,55 @@ export async function listPendingWithdrawals(req: Request, res: Response, next: 
   } catch (err) { next(err); }
 }
 
+/** GET /admin/withdrawals/history – full withdrawal history with filters */
+export async function listWithdrawalHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const page   = Math.max(1, Number(req.query.page)  || 1);
+    const limit  = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const offset = (page - 1) * limit;
+
+    const status   = ['pending', 'processing', 'paid', 'rejected', 'cancelled'].includes(req.query.status as string)
+      ? (req.query.status as string) : null;
+    const plan     = ['free', 'premium', 'elite'].includes(req.query.plan as string)
+      ? (req.query.plan as string) : null;
+    const search   = req.query.search ? `%${req.query.search as string}%` : null;
+    const dateFrom = req.query.date_from ? (req.query.date_from as string) : null;
+    const dateTo   = req.query.date_to   ? (req.query.date_to as string)   : null;
+
+    const { rows } = await pool.query(
+      `SELECT w.id, w.amount, w.fee_amount, w.net_amount, w.method, w.status,
+              w.account_name, w.account_number, w.rejection_reason,
+              w.requested_at, w.processed_at,
+              u.username, u.email, u.plan AS user_plan
+       FROM withdrawals w JOIN users u ON u.id = w.user_id
+       WHERE ($1::text IS NULL OR w.status = $1)
+         AND ($2::plan_type IS NULL OR u.plan = $2::plan_type)
+         AND ($3::text IS NULL OR u.username ILIKE $3 OR u.email ILIKE $3)
+         AND ($4::timestamptz IS NULL OR w.requested_at >= $4::timestamptz)
+         AND ($5::timestamptz IS NULL OR w.requested_at <= ($5::timestamptz + INTERVAL '1 day'))
+       ORDER BY w.requested_at DESC
+       LIMIT $6 OFFSET $7`,
+      [status, plan, search, dateFrom, dateTo, limit, offset],
+    );
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM withdrawals w JOIN users u ON u.id = w.user_id
+       WHERE ($1::text IS NULL OR w.status = $1)
+         AND ($2::plan_type IS NULL OR u.plan = $2::plan_type)
+         AND ($3::text IS NULL OR u.username ILIKE $3 OR u.email ILIKE $3)
+         AND ($4::timestamptz IS NULL OR w.requested_at >= $4::timestamptz)
+         AND ($5::timestamptz IS NULL OR w.requested_at <= ($5::timestamptz + INTERVAL '1 day'))`,
+      [status, plan, search, dateFrom, dateTo],
+    );
+
+    res.json({
+      success: true,
+      data: rows,
+      meta: { page, limit, total: Number((countResult.rows[0] as { count: string }).count) },
+    });
+  } catch (err) { next(err); }
+}
+
 export async function processWithdrawal(req: Request, res: Response, next: NextFunction): Promise<void> {
   const client = await pool.connect();
   try {
@@ -314,7 +363,7 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
   try {
     const { id } = req.params as Record<string, string>;
 
-    const [subResult, invitesResult, withdrawalsResult] = await Promise.all([
+    const [subResult, invitesResult, withdrawalsResult, deviceResult] = await Promise.all([
       // Current active subscription (if any)
       pool.query(
         `SELECT plan, starts_at, expires_at, is_active
@@ -342,14 +391,42 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
          LIMIT 50`,
         [id],
       ),
+      // Device info
+      pool.query(
+        `SELECT device_fingerprint, device_name, device_registered_at
+         FROM users WHERE id = $1`,
+        [id],
+      ),
     ]);
+
+    const deviceRow = deviceResult.rows[0] as { device_fingerprint: string | null; device_name: string | null; device_registered_at: string | null } | undefined;
 
     res.json({
       success:      true,
       subscription: subResult.rows[0] ?? null,
       invites:      invitesResult.rows,
       withdrawals:  withdrawalsResult.rows,
+      device:       deviceRow?.device_fingerprint ? {
+        fingerprint:    deviceRow.device_fingerprint,
+        device_name:    deviceRow.device_name,
+        registered_at:  deviceRow.device_registered_at,
+      } : null,
     });
+  } catch (err) { next(err); }
+}
+
+/** PUT /admin/users/:id/reset-device – admin resets user's bound device */
+export async function resetUserDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params as Record<string, string>;
+
+    const { rowCount } = await pool.query(
+      `UPDATE users SET device_fingerprint = NULL, device_name = NULL, device_registered_at = NULL WHERE id = $1`,
+      [id],
+    );
+    if (!rowCount) throw new NotFoundError('User not found');
+
+    res.json({ success: true, message: 'Device unlinked. User can now log in from any device.' });
   } catch (err) { next(err); }
 }
 

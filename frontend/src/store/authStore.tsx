@@ -6,6 +6,19 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const SESSION_KEY = 'plivio_active_session';
 const CHANNEL_NAME = 'plivio_session';
+const DEVICE_KEY = 'plivio_did';
+
+/** Returns a persistent device UUID stored in localStorage. */
+function getDeviceId(): string {
+  let id = localStorage.getItem(DEVICE_KEY);
+  if (!id) {
+    id = typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(DEVICE_KEY, id);
+  }
+  return id;
+}
 
 interface AuthState {
   user:            User | null;
@@ -134,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // validation / invalid-credential error, which looked like the user
     // was being logged in when they actually weren't.
     try {
-      const { data } = await api.post<{ requires_2fa?: boolean }>('/auth/login', { email, password });
+      const { data } = await api.post<{ requires_2fa?: boolean }>('/auth/login', { email, password, device_id: getDeviceId() });
       if (data.requires_2fa) {
         // Don't animate — user still needs to enter their 2FA code
         return { requires_2fa: true, is_admin: false };

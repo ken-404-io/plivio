@@ -4,13 +4,13 @@ import {
   UserPlus, LayoutDashboard, Bell, Send,
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
   XCircle, Eye, EyeOff, Coins, MessageSquare, Clock,
-  CreditCard, UserCheck, Info,
+  CreditCard, UserCheck, Info, History, Smartphone, RotateCcw, Filter,
 } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type {
-  AdminUser, AdminWithdrawal, AdminStats, AdminKycSubmission,
-  AdminUserDetails,
+  AdminUser, AdminWithdrawal, AdminWithdrawalHistory, AdminStats,
+  AdminKycSubmission, AdminUserDetails, PlanType,
 } from '../../types/index.ts';
 
 const TABS = ['overview', 'users', 'withdrawals', 'kyc'] as const;
@@ -201,7 +201,23 @@ export default function AdminDashboard() {
   const [rejectTarget,  setRejectTarget]  = useState<string | null>(null);
   const [wdRejectTarget,setWdRejectTarget]= useState<string | null>(null);
 
+  // Withdrawal history state
+  const [wdSubTab,         setWdSubTab]         = useState<'pending' | 'history'>('pending');
+  const [wdHistory,        setWdHistory]        = useState<AdminWithdrawalHistory[]>([]);
+  const [wdHistoryMeta,    setWdHistoryMeta]    = useState({ page: 1, total: 0, limit: 25 });
+  const [wdHistoryLoading, setWdHistoryLoading] = useState(false);
+  const [wdHistoryPage,    setWdHistoryPage]    = useState(1);
+  const [wdFilters,        setWdFilters]        = useState({
+    status: '' as string,
+    plan:   '' as string,
+    search: '' as string,
+    date_from: '' as string,
+    date_to:   '' as string,
+  });
+  const [wdExpanded,       setWdExpanded]       = useState<string | null>(null);
+
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wdSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load non-user data once
   useEffect(() => {
@@ -259,6 +275,66 @@ export default function AdminDashboard() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userDetails, userDetailsLoad]);
+
+  const loadWdHistory = useCallback(async (page: number, filters: typeof wdFilters) => {
+    setWdHistoryLoading(true);
+    try {
+      const params: Record<string, string | number> = { page, limit: 25 };
+      if (filters.status)    params.status    = filters.status;
+      if (filters.plan)      params.plan      = filters.plan;
+      if (filters.search)    params.search    = filters.search;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to)   params.date_to   = filters.date_to;
+
+      const { data } = await api.get<{
+        data: AdminWithdrawalHistory[];
+        meta: { page: number; total: number; limit: number };
+      }>('/admin/withdrawals/history', { params });
+      setWdHistory(data.data);
+      setWdHistoryMeta(data.meta);
+    } catch {
+      toast.error('Failed to load withdrawal history.');
+    } finally {
+      setWdHistoryLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (wdSubTab === 'history') void loadWdHistory(wdHistoryPage, wdFilters);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wdSubTab, wdHistoryPage]);
+
+  function handleWdFilterChange(key: string, value: string) {
+    const updated = { ...wdFilters, [key]: value };
+    setWdFilters(updated);
+    if (key === 'search') {
+      if (wdSearchDebounceRef.current) clearTimeout(wdSearchDebounceRef.current);
+      wdSearchDebounceRef.current = setTimeout(() => {
+        setWdHistoryPage(1);
+        void loadWdHistory(1, updated);
+      }, 400);
+    } else {
+      setWdHistoryPage(1);
+      void loadWdHistory(1, updated);
+    }
+  }
+
+  async function resetDevice(userId: string) {
+    try {
+      await api.put(`/admin/users/${userId}/reset-device`);
+      toast.success('Device unlinked. User can now log in from any device.');
+      // Refresh user details
+      setUserDetails((prev) => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+      void loadUserDetails(userId);
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Failed to reset device.');
+    }
+  }
 
   function handleUserSearch(value: string) {
     setUserSearch(value);
@@ -721,6 +797,37 @@ export default function AdminDashboard() {
                                     </div>
                                   )}
                                 </div>
+
+                                {/* Device Info */}
+                                <div className="adm-details-section">
+                                  <h4 className="adm-details-section-title">
+                                    <Smartphone size={13} /> Registered Device
+                                  </h4>
+                                  {details.device ? (
+                                    <div className="adm-device-card">
+                                      <div className="adm-device-info">
+                                        <span className="adm-device-name">{details.device.device_name || 'Unknown device'}</span>
+                                        <span className="adm-device-fp">ID: {details.device.fingerprint.slice(0, 16)}…</span>
+                                        {details.device.registered_at && (
+                                          <span className="adm-device-date">
+                                            Registered {new Date(details.device.registered_at).toLocaleDateString('en-PH', {
+                                              month: 'short', day: 'numeric', year: 'numeric',
+                                            })}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <button
+                                        className="btn btn-danger btn-sm"
+                                        onClick={() => { void resetDevice(u.id); }}
+                                        title="Unlink device so user can log in from a new device"
+                                      >
+                                        <RotateCcw size={12} /> Reset
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <p className="adm-details-empty">No device registered.</p>
+                                  )}
+                                </div>
                               </>
                             )}
                           </div>
@@ -759,50 +866,232 @@ export default function AdminDashboard() {
 
       {/* ── Withdrawals ── */}
       {tab === 'withdrawals' && (
-        <div className="adm-list">
-          {withdrawals.length === 0 ? (
-            <div className="empty-state"><p>No pending withdrawals.</p></div>
-          ) : withdrawals.map((w) => (
-            <div key={w.id} className="adm-wd-card">
-              <div className="adm-wd-top">
-                <div className="adm-wd-user">
-                  <span className="adm-wd-username">{w.username}</span>
-                  <span className="adm-wd-email">{w.email}</span>
-                </div>
-                <div className="adm-wd-amounts">
-                  <div className="adm-wd-amount">₱{Number(w.net_amount || w.amount).toFixed(2)}</div>
-                  <div className="adm-wd-amount-sub">
-                    Requested ₱{Number(w.amount).toFixed(2)} · Fee ₱{Number(w.fee_amount || 0).toFixed(2)}
+        <>
+          {/* Sub-tabs: Pending / History */}
+          <div className="adm-details-tabs" style={{ marginBottom: 12 }}>
+            <button
+              className={`adm-details-tab${wdSubTab === 'pending' ? ' adm-details-tab--active' : ''}`}
+              onClick={() => setWdSubTab('pending')}
+            >
+              <Clock size={13} /> Pending {withdrawals.length > 0 && <span className="adm-tab-badge" style={{ marginLeft: 4 }}>{withdrawals.length}</span>}
+            </button>
+            <button
+              className={`adm-details-tab${wdSubTab === 'history' ? ' adm-details-tab--active' : ''}`}
+              onClick={() => setWdSubTab('history')}
+            >
+              <History size={13} /> All History
+            </button>
+          </div>
+
+          {/* Pending withdrawals */}
+          {wdSubTab === 'pending' && (
+            <div className="adm-list">
+              {withdrawals.length === 0 ? (
+                <div className="empty-state"><p>No pending withdrawals.</p></div>
+              ) : withdrawals.map((w) => (
+                <div key={w.id} className="adm-wd-card">
+                  <div className="adm-wd-top">
+                    <div className="adm-wd-user">
+                      <span className="adm-wd-username">{w.username}</span>
+                      <span className="adm-wd-email">{w.email}</span>
+                    </div>
+                    <div className="adm-wd-amounts">
+                      <div className="adm-wd-amount">₱{Number(w.net_amount || w.amount).toFixed(2)}</div>
+                      <div className="adm-wd-amount-sub">
+                        Requested ₱{Number(w.amount).toFixed(2)} · Fee ₱{Number(w.fee_amount || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="adm-wd-payment">
+                    <span className="adm-wd-method">{w.method.toUpperCase()}</span>
+                    <div className="adm-wd-account">
+                      <span className="adm-wd-account-name">{w.account_name}</span>
+                      <span className="adm-wd-account-num">{w.account_number}</span>
+                    </div>
+                    <span className="adm-wd-date">
+                      {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                  <div className="adm-wd-actions">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => { void processWithdrawal(w.id, 'approve'); }}
+                    >
+                      <CheckCircle2 size={13} /> Approve
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => setWdRejectTarget(w.id)}
+                    >
+                      <XCircle size={13} /> Reject
+                    </button>
                   </div>
                 </div>
-              </div>
-              <div className="adm-wd-payment">
-                <span className="adm-wd-method">{w.method.toUpperCase()}</span>
-                <div className="adm-wd-account">
-                  <span className="adm-wd-account-name">{w.account_name}</span>
-                  <span className="adm-wd-account-num">{w.account_number}</span>
-                </div>
-                <span className="adm-wd-date">
-                  {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-              </div>
-              <div className="adm-wd-actions">
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => { void processWithdrawal(w.id, 'approve'); }}
-                >
-                  <CheckCircle2 size={13} /> Approve
-                </button>
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => setWdRejectTarget(w.id)}
-                >
-                  <XCircle size={13} /> Reject
-                </button>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+
+          {/* Withdrawal history with filters */}
+          {wdSubTab === 'history' && (
+            <>
+              {/* Filters row */}
+              <div className="adm-wd-filters">
+                <div className="adm-wd-filter-row">
+                  <div className="adm-search-wrap" style={{ flex: 1 }}>
+                    <Search size={15} className="adm-search-icon" />
+                    <input
+                      className="form-input adm-search-input"
+                      placeholder="Search user…"
+                      value={wdFilters.search}
+                      onChange={(e) => handleWdFilterChange('search', e.target.value)}
+                    />
+                  </div>
+                  <select
+                    className="form-input adm-wd-filter-select"
+                    value={wdFilters.status}
+                    onChange={(e) => handleWdFilterChange('status', e.target.value)}
+                  >
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="paid">Paid</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                  <select
+                    className="form-input adm-wd-filter-select"
+                    value={wdFilters.plan}
+                    onChange={(e) => handleWdFilterChange('plan', e.target.value)}
+                  >
+                    <option value="">All Plans</option>
+                    <option value="free">Free</option>
+                    <option value="premium">Premium</option>
+                    <option value="elite">Elite</option>
+                  </select>
+                </div>
+                <div className="adm-wd-filter-row">
+                  <label className="adm-wd-filter-label">From</label>
+                  <input
+                    type="date"
+                    className="form-input adm-wd-filter-date"
+                    value={wdFilters.date_from}
+                    onChange={(e) => handleWdFilterChange('date_from', e.target.value)}
+                  />
+                  <label className="adm-wd-filter-label">To</label>
+                  <input
+                    type="date"
+                    className="form-input adm-wd-filter-date"
+                    value={wdFilters.date_to}
+                    onChange={(e) => handleWdFilterChange('date_to', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Results */}
+              <div className="adm-list" style={{ opacity: wdHistoryLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
+                {wdHistory.length === 0 && !wdHistoryLoading ? (
+                  <div className="empty-state"><p>No withdrawal records found.</p></div>
+                ) : wdHistory.map((w) => (
+                  <div
+                    key={w.id}
+                    className={`adm-wd-card adm-wd-card--clickable${wdExpanded === w.id ? ' adm-wd-card--expanded' : ''}`}
+                    onClick={() => setWdExpanded(wdExpanded === w.id ? null : w.id)}
+                  >
+                    <div className="adm-wd-top">
+                      <div className="adm-wd-user">
+                        <span className="adm-wd-username">{w.username}</span>
+                        <span className="adm-wd-email">{w.email}</span>
+                      </div>
+                      <div className="adm-wd-amounts">
+                        <div className="adm-wd-amount">₱{Number(w.net_amount || w.amount).toFixed(2)}</div>
+                        <div className="adm-wd-amount-sub">
+                          Requested ₱{Number(w.amount).toFixed(2)} · Fee ₱{Number(w.fee_amount || 0).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="adm-wd-payment">
+                      <span className="adm-wd-method">{w.method.toUpperCase()}</span>
+                      <span className={`adm-details-wd-status adm-details-wd-status--${w.status}`}>{w.status}</span>
+                      <span className={`plan-badge plan-badge--${w.user_plan}`}>{w.user_plan}</span>
+                      <span className="adm-wd-date">
+                        {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
+                    {/* Expanded details */}
+                    {wdExpanded === w.id && (
+                      <div className="adm-wd-expanded" onClick={(e) => e.stopPropagation()}>
+                        <div className="adm-wd-detail-grid">
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Account Name</span>
+                            <span className="adm-wd-detail-value">{w.account_name}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Account Number</span>
+                            <span className="adm-wd-detail-value" style={{ fontFamily: 'monospace' }}>{w.account_number}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Requested Amount</span>
+                            <span className="adm-wd-detail-value">₱{Number(w.amount).toFixed(2)}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Fee</span>
+                            <span className="adm-wd-detail-value">₱{Number(w.fee_amount || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Net Amount</span>
+                            <span className="adm-wd-detail-value">₱{Number(w.net_amount || w.amount).toFixed(2)}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">User Plan</span>
+                            <span className={`plan-badge plan-badge--${w.user_plan}`}>{w.user_plan}</span>
+                          </div>
+                          {w.processed_at && (
+                            <div className="adm-wd-detail-item">
+                              <span className="adm-wd-detail-label">Processed At</span>
+                              <span className="adm-wd-detail-value">
+                                {new Date(w.processed_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          )}
+                          {w.rejection_reason && (
+                            <div className="adm-wd-detail-item" style={{ gridColumn: '1 / -1' }}>
+                              <span className="adm-wd-detail-label">Rejection Reason</span>
+                              <span className="adm-wd-detail-value" style={{ color: 'var(--error)' }}>{w.rejection_reason}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {wdHistoryMeta.total > wdHistoryMeta.limit && (
+                <div className="adm-pagination">
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    disabled={wdHistoryPage <= 1}
+                    onClick={() => setWdHistoryPage((p) => p - 1)}
+                  >
+                    <ChevronLeft size={15} /> Prev
+                  </button>
+                  <span className="adm-pagination-info">
+                    Page {wdHistoryMeta.page} of {Math.ceil(wdHistoryMeta.total / wdHistoryMeta.limit)} · {wdHistoryMeta.total} records
+                  </span>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    disabled={wdHistoryPage * wdHistoryMeta.limit >= wdHistoryMeta.total}
+                    onClick={() => setWdHistoryPage((p) => p + 1)}
+                  >
+                    Next <ChevronRight size={15} />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {/* ── KYC ── */}

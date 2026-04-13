@@ -34,6 +34,29 @@ function deviceFingerprint(req: Request): string {
   return Buffer.from(`${req.ip}|${ua}|${lang}|${enc}`).toString('base64').slice(0, 64);
 }
 
+/** Extract a human-readable device name from User-Agent string */
+function parseDeviceName(ua: string): string {
+  // Try to extract OS
+  let os = 'Unknown OS';
+  if (/Windows NT 10/i.test(ua))       os = 'Windows 10/11';
+  else if (/Windows/i.test(ua))        os = 'Windows';
+  else if (/Mac OS X/i.test(ua))       os = 'macOS';
+  else if (/Android/i.test(ua))        os = 'Android';
+  else if (/iPhone|iPad/i.test(ua))    os = 'iOS';
+  else if (/Linux/i.test(ua))          os = 'Linux';
+  else if (/CrOS/i.test(ua))          os = 'Chrome OS';
+
+  // Try to extract browser
+  let browser = 'Unknown Browser';
+  if (/Edg\//i.test(ua))              browser = 'Edge';
+  else if (/OPR\//i.test(ua))         browser = 'Opera';
+  else if (/Chrome\//i.test(ua))      browser = 'Chrome';
+  else if (/Firefox\//i.test(ua))     browser = 'Firefox';
+  else if (/Safari\//i.test(ua))      browser = 'Safari';
+
+  return `${browser} on ${os}`;
+}
+
 // ─── Disposable / throwaway email domains ─────────────────────────────────
 const DISPOSABLE_DOMAINS = new Set([
   'mailinator.com', 'guerrillamail.com', 'guerrillamail.net', 'guerrillamail.org',
@@ -120,12 +143,13 @@ export async function register(req: Request, res: Response, next: NextFunction):
     const newReferralCode = makeReferralCode();
     // Prefer the client-supplied device UUID; fall back to server-side headers fingerprint
     const fingerprint     = deviceKey ?? deviceFingerprint(req);
+    const devName         = parseDeviceName(req.headers['user-agent'] ?? '');
 
     const { rows } = await pool.query(
-      `INSERT INTO users (username, email, password_hash, referral_code, referred_by, device_fingerprint)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO users (username, email, password_hash, referral_code, referred_by, device_fingerprint, device_name, device_registered_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        RETURNING id, username, email, plan, balance, referral_code, is_admin`,
-      [username.toLowerCase(), normalisedEmail, passwordHash, newReferralCode, referredById, fingerprint]
+      [username.toLowerCase(), normalisedEmail, passwordHash, newReferralCode, referredById, fingerprint, devName]
     );
 
     const user = rows[0] as Record<string, unknown>;
@@ -164,12 +188,12 @@ export async function register(req: Request, res: Response, next: NextFunction):
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { email, password } = req.body as Record<string, string>;
+    const { email, password, device_id: loginDeviceId } = req.body as Record<string, string>;
 
     const { rows } = await pool.query(
       `SELECT id, username, email, password_hash, totp_secret, plan,
               balance, referral_code, is_admin, is_banned, is_verified,
-              is_email_verified
+              is_email_verified, device_fingerprint
        FROM users WHERE email = $1 LIMIT 1`,
       [email.toLowerCase()]
     );
@@ -197,6 +221,30 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       return;
     }
 
+    // ── Device binding enforcement (one user, one device) ────────────────
+    // Admins are exempt from device binding so they can access from anywhere.
+    const currentDeviceId = loginDeviceId?.trim().slice(0, 128) || null;
+    const storedFingerprint = user.device_fingerprint as string | null;
+
+    if (!user.is_admin && storedFingerprint && currentDeviceId && storedFingerprint !== currentDeviceId) {
+      res.status(403).json({
+        success: false,
+        error:   'Access denied. This account is already linked to another device. Please use your registered device to log in, or contact support to request a device change.',
+        code:    'device_mismatch',
+      });
+      return;
+    }
+
+    // If user has no device bound yet (e.g. pre-migration, device reset), bind the current device
+    if (!user.is_admin && !storedFingerprint && currentDeviceId) {
+      const ua = req.headers['user-agent'] ?? '';
+      const deviceName = parseDeviceName(ua);
+      await pool.query(
+        `UPDATE users SET device_fingerprint = $1, device_name = $2, device_registered_at = NOW() WHERE id = $3`,
+        [currentDeviceId, deviceName, user.id],
+      );
+    }
+
     if (user.totp_secret) {
       const preToken = generateAccessToken({ id: user.id as string, pending_2fa: true });
       res.cookie('pre_auth_token', preToken, {
@@ -210,8 +258,8 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     }
 
     issueTokenCookies(res, { id: user.id as string, username: user.username as string, is_admin: user.is_admin as boolean });
-    const { password_hash, totp_secret, ...safeUser } = user;
-    void password_hash; void totp_secret;
+    const { password_hash, totp_secret, device_fingerprint, ...safeUser } = user;
+    void password_hash; void totp_secret; void device_fingerprint;
     res.json({ success: true, user: safeUser });
   } catch (err) { next(err); }
 }
