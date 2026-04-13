@@ -63,17 +63,55 @@ function GitHubLogo() {
   );
 }
 
-/** Returns a persistent device UUID stored in localStorage. */
+/**
+ * Generate a deterministic hardware fingerprint from stable browser/device
+ * properties. Produces the SAME value in incognito / private browsing.
+ */
 function getDeviceId(): string {
   const KEY = 'plivio_did';
-  let id = localStorage.getItem(KEY);
-  if (!id) {
-    // crypto.randomUUID is available in all modern browsers
-    id = typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2) + Date.now().toString(36);
-    localStorage.setItem(KEY, id);
+  try {
+    const cached = localStorage.getItem(KEY);
+    if (cached) return cached;
+  } catch { /* localStorage may be disabled */ }
+
+  const parts: string[] = [
+    navigator.userAgent,
+    navigator.language,
+    `${screen.width}x${screen.height}x${screen.colorDepth}`,
+    String(new Date().getTimezoneOffset()),
+    String(navigator.hardwareConcurrency || 0),
+    String((navigator as Record<string, unknown>).deviceMemory || 0),
+    navigator.platform || '',
+  ];
+
+  try {
+    const c = document.createElement('canvas');
+    c.width = 200; c.height = 50;
+    const ctx = c.getContext('2d');
+    if (ctx) {
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = '14px Arial';
+      ctx.fillStyle = '#f60';
+      ctx.fillRect(125, 1, 62, 20);
+      ctx.fillStyle = '#069';
+      ctx.fillText('Plivio\ud83d\ude00', 2, 15);
+      ctx.fillStyle = 'rgba(102,204,0,0.7)';
+      ctx.fillText('Plivio\ud83d\ude00', 4, 17);
+      parts.push(c.toDataURL());
+    }
+  } catch { /* canvas not available */ }
+
+  const str = parts.join('|||');
+  let h1 = 0x811c9dc5 >>> 0;
+  let h2 = 0x01000193 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ ch, 0x0100019d) >>> 0;
   }
+
+  const id = 'hw_' + h1.toString(36) + h2.toString(36);
+  try { localStorage.setItem(KEY, id); } catch {}
   return id;
 }
 

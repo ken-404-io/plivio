@@ -8,15 +8,73 @@ const SESSION_KEY = 'plivio_active_session';
 const CHANNEL_NAME = 'plivio_session';
 const DEVICE_KEY = 'plivio_did';
 
-/** Returns a persistent device UUID stored in localStorage. */
-function getDeviceId(): string {
-  let id = localStorage.getItem(DEVICE_KEY);
-  if (!id) {
-    id = typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2) + Date.now().toString(36);
-    localStorage.setItem(DEVICE_KEY, id);
+/**
+ * Generate a deterministic hardware fingerprint from stable browser/device
+ * properties. Unlike localStorage UUIDs, this produces the SAME value in
+ * incognito / private browsing because it reads from hardware, not storage.
+ *
+ * Signals used: canvas rendering (GPU-dependent), screen geometry, timezone,
+ * platform, CPU cores, device memory, User-Agent.
+ */
+function generateHardwareFingerprint(): string {
+  const parts: string[] = [
+    navigator.userAgent,
+    navigator.language,
+    `${screen.width}x${screen.height}x${screen.colorDepth}`,
+    String(new Date().getTimezoneOffset()),
+    String(navigator.hardwareConcurrency || 0),
+    String((navigator as Record<string, unknown>).deviceMemory || 0),
+    navigator.platform || '',
+  ];
+
+  // Canvas fingerprint — unique per GPU/driver/font combination
+  try {
+    const c = document.createElement('canvas');
+    c.width = 200;
+    c.height = 50;
+    const ctx = c.getContext('2d');
+    if (ctx) {
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = '14px Arial';
+      ctx.fillStyle = '#f60';
+      ctx.fillRect(125, 1, 62, 20);
+      ctx.fillStyle = '#069';
+      ctx.fillText('Plivio\ud83d\ude00', 2, 15);
+      ctx.fillStyle = 'rgba(102,204,0,0.7)';
+      ctx.fillText('Plivio\ud83d\ude00', 4, 17);
+      parts.push(c.toDataURL());
+    }
+  } catch { /* canvas not available */ }
+
+  // FNV-1a 64-bit-ish hash (two 32-bit halves) for better collision resistance
+  const str = parts.join('|||');
+  let h1 = 0x811c9dc5 >>> 0;
+  let h2 = 0x01000193 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x0100019d) >>> 0;
   }
+  return 'hw_' + h1.toString(36) + h2.toString(36);
+}
+
+/**
+ * Returns a stable device identifier.
+ * - Normal browsing: cached in localStorage for fast lookup
+ * - Incognito / private: regenerated from hardware (same value each time)
+ */
+function getDeviceId(): string {
+  try {
+    const cached = localStorage.getItem(DEVICE_KEY);
+    if (cached) return cached;
+  } catch { /* localStorage may be disabled */ }
+
+  const id = generateHardwareFingerprint();
+
+  try {
+    localStorage.setItem(DEVICE_KEY, id);
+  } catch { /* private mode — can't persist, but fingerprint is stable */ }
+
   return id;
 }
 
