@@ -2533,6 +2533,106 @@ a, button, [role="button"], [tabindex] {
 .adm-manage-select { width: 100%; max-width: 200px; }
 .adm-manage-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 4px; }
 
+/* Admin user – details tab bar */
+.adm-details-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.adm-details-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.adm-details-tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Admin user – details panel */
+.adm-details-panel { display: flex; flex-direction: column; gap: 14px; }
+.adm-details-loading { font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0; }
+.adm-details-section { display: flex; flex-direction: column; gap: 8px; }
+.adm-details-section-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.adm-details-empty { font-size: 12px; color: var(--text-muted); }
+.adm-details-sub-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+.adm-details-sub-expiry { font-size: 12px; color: var(--text-muted); }
+
+/* Invite list */
+.adm-details-invites-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.adm-details-invite-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+}
+.adm-details-invite-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--bg-elevated);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  flex-shrink: 0;
+}
+.adm-details-invite-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.adm-details-invite-name  { font-size: 12px; font-weight: 600; color: var(--text-heading); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm-details-invite-email { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm-details-invite-date  { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+
+/* Withdrawal history */
+.adm-details-wd-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.adm-details-wd-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+}
+.adm-details-wd-left  { display: flex; align-items: center; gap: 8px; }
+.adm-details-wd-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.adm-details-wd-method { font-size: 10px; font-weight: 700; background: var(--bg-elevated); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; }
+.adm-details-wd-amount { font-size: 14px; font-weight: 700; color: var(--text-heading); }
+.adm-details-wd-gross  { font-size: 11px; color: var(--text-muted); }
+.adm-details-wd-date   { font-size: 11px; color: var(--text-muted); }
+.adm-details-wd-status { font-size: 11px; font-weight: 600; text-transform: capitalize; }
+.adm-details-wd-status--pending    { color: var(--warning); }
+.adm-details-wd-status--processing { color: var(--accent); }
+.adm-details-wd-status--paid       { color: var(--success); }
+.adm-details-wd-status--rejected   { color: var(--error); }
+.adm-details-wd-status--cancelled  { color: var(--text-muted); }
+
 /* Pagination */
 .adm-pagination {
   display: flex;

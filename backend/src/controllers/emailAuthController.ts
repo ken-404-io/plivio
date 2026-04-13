@@ -296,45 +296,94 @@ export async function verifyEmail(
       }
 
       // ── Credit referral bonus now that we know the email is real ─────────
-      // This is the path that attributes manually-signed-up users to their
-      // referrer. OAuth accounts are credited at upsert time because the
-      // provider has already verified their email; manual accounts rely on
-      // this block running successfully after the user clicks the link.
+      // Batch crediting: each valid invite is worth ₱10 (pending until a
+      // full batch of 10 is reached). Every 10 verified referrals releases
+      // ₱100 to the referrer's balance. We track `referral_batches_credited`
+      // on the users row to avoid double-crediting.
       if (userRow?.referred_by) {
         try {
-          const refTaskRes = await client.query<{ id: string; reward_amount: string }>(
-            `SELECT id, reward_amount FROM tasks
-             WHERE type = 'referral' AND is_active = TRUE
-               AND (min_plan IS NULL OR min_plan = 'free')
-             ORDER BY reward_amount ASC LIMIT 1`,
+          const INVITE_VALUE = 10;   // ₱10 per invite (used for display only)
+          const BATCH_SIZE   = 10;   // 10 invites per batch
+          const BATCH_VALUE  = INVITE_VALUE * BATCH_SIZE; // ₱100 per batch
+
+          // Count total verified referrals for this referrer (the UPDATE above
+          // set is_email_verified = TRUE for the current user before this
+          // query, so they are already included in the count).
+          const countRes = await client.query<{ count: string }>(
+            `SELECT COUNT(*) AS count FROM users
+             WHERE referred_by = $1 AND is_email_verified = TRUE`,
+            [userRow.referred_by],
           );
-          if (refTaskRes.rowCount && refTaskRes.rowCount > 0) {
-            const refTask = refTaskRes.rows[0];
-            await client.query(
-              'UPDATE users SET balance = balance + $1 WHERE id = $2',
-              [refTask.reward_amount, userRow.referred_by],
+          const totalReferrals = Number(countRes.rows[0]?.count ?? 0);
+          const batchesDue     = Math.floor(totalReferrals / BATCH_SIZE);
+
+          // Lock the referrer's row so we can safely read + update the counter
+          const referrerRes = await client.query<{ referral_batches_credited: number }>(
+            'SELECT referral_batches_credited FROM users WHERE id = $1 FOR UPDATE',
+            [userRow.referred_by],
+          );
+          const batchesCredited = referrerRes.rows[0]?.referral_batches_credited ?? 0;
+          const newBatches      = batchesDue - batchesCredited;
+
+          if (newBatches > 0) {
+            const creditAmount = newBatches * BATCH_VALUE;
+
+            // Find the referral task to link the completion record
+            const refTaskRes = await client.query<{ id: string }>(
+              `SELECT id FROM tasks
+               WHERE type = 'referral' AND is_active = TRUE
+                 AND (min_plan IS NULL OR min_plan = 'free')
+               LIMIT 1`,
             );
+
             await client.query(
-              `INSERT INTO task_completions
-                 (user_id, task_id, type, status, reward_earned, completed_at, proof, server_data)
-               VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
-              [userRow.referred_by, refTask.id, refTask.reward_amount],
+              `UPDATE users
+               SET balance = balance + $1,
+                   referral_batches_credited = referral_batches_credited + $2
+               WHERE id = $3`,
+              [creditAmount, newBatches, userRow.referred_by],
             );
+
+            // Record one task_completion entry per newly released batch
+            if (refTaskRes.rowCount && refTaskRes.rowCount > 0) {
+              const refTaskId = refTaskRes.rows[0].id;
+              for (let i = 0; i < newBatches; i++) {
+                await client.query(
+                  `INSERT INTO task_completions
+                     (user_id, task_id, type, status, reward_earned, completed_at, proof, server_data)
+                   VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
+                  [userRow.referred_by, refTaskId, BATCH_VALUE],
+                );
+              }
+            }
+
             logger.info(
-              { referrerId: userRow.referred_by, referredUserId: row.user_id, amount: refTask.reward_amount },
-              '✅ Referral bonus credited on manual email verification',
+              {
+                referrerId:       userRow.referred_by,
+                referredUserId:   row.user_id,
+                totalReferrals,
+                newBatches,
+                creditAmount,
+              },
+              '✅ Referral batch credit released on email verification',
             );
           } else {
-            logger.warn(
-              { referrerId: userRow.referred_by, referredUserId: row.user_id },
-              '⚠️ No active referral task found — referral bonus NOT credited',
+            logger.info(
+              {
+                referrerId:     userRow.referred_by,
+                referredUserId: row.user_id,
+                totalReferrals,
+                batchesDue,
+                batchesCredited,
+              },
+              'ℹ️ Referral recorded — no new batch threshold reached yet (pending)',
             );
           }
         } catch (bonusErr) {
           // Log but don't fail verification — the account is still verified
           logger.error(
             { err: (bonusErr as Error).message, referrerId: userRow.referred_by, referredUserId: row.user_id },
-            '❌ Failed to credit referral bonus on email verification',
+            '❌ Failed to process referral batch credit on email verification',
           );
         }
       }

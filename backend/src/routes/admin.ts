@@ -6,6 +6,7 @@ import {
   getStats,
   listUsers,
   updateUser,
+  getUserDetails,
   notifyUser,
   broadcastNotification,
   listAllTasks,
@@ -50,6 +51,7 @@ router.post('/notify-all',
 );
 
 router.get('/users', listUsers);
+router.get('/users/:id/details', validateParam('id'), getUserDetails);
 router.put('/users/:id',
   validateParam('id'),
   validateBody({

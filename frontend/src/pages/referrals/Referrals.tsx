@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Check, Copy, Share2, DollarSign, Trophy, Lock, ChevronRight } from 'lucide-react';
+import { Users, Check, CheckCircle, Copy, Share2, DollarSign, Trophy, Lock, Clock } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
@@ -15,10 +15,17 @@ interface ReferredUser {
 }
 
 interface ReferralsResponse {
-  success:      boolean;
-  referrals:    ReferredUser[];
-  total_earned: number;
+  success:                   boolean;
+  referrals:                 ReferredUser[];
+  total_earned:              number;
+  referral_batches_credited: number;
+  pending_credits:           number;
+  released_credits:          number;
 }
+
+const INVITE_VALUE = 10;  // ₱10 per invite
+const BATCH_SIZE   = 10;  // invites per batch
+const BATCH_VALUE  = INVITE_VALUE * BATCH_SIZE; // ₱100 per batch
 
 // ─── Tier logic ────────────────────────────────────────────────────────────────
 
@@ -50,38 +57,21 @@ function getTierProgress(totalInvites: number, tier: Tier): number {
   return Math.min(100, Math.round((progress / range) * 100));
 }
 
-function computeTierEarnings(totalInvites: number): number {
-  let remaining = totalInvites;
-  let earnings = 0;
-  for (let i = TIERS.length - 1; i >= 0; i--) {
-    const t = TIERS[i];
-    if (remaining > t.unlockAt) {
-      const invitesInTier = remaining - t.unlockAt;
-      const batches = Math.floor(invitesInTier / 10);
-      earnings += batches * t.rewardPer10;
-      remaining = t.unlockAt;
-    }
-  }
-  return earnings;
-}
-
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 const HAS_SHARE_API = typeof navigator !== 'undefined' && 'share' in navigator;
-
-function planOrder(plan: PlanType): number {
-  return plan === 'elite' ? 2 : plan === 'premium' ? 1 : 0;
-}
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
 export default function Referrals() {
   const { user } = useAuth();
 
-  const [referrals,    setReferrals]    = useState<ReferredUser[]>([]);
-  const [totalEarned,  setTotalEarned]  = useState(0);
-  const [loading,      setLoading]      = useState(true);
-  const [copied,       setCopied]       = useState<'code' | 'link' | null>(null);
+  const [referrals,          setReferrals]          = useState<ReferredUser[]>([]);
+  const [batchesCredited,    setBatchesCredited]    = useState(0);
+  const [pendingCredits,     setPendingCredits]     = useState(0);
+  const [releasedCredits,    setReleasedCredits]    = useState(0);
+  const [loading,            setLoading]            = useState(true);
+  const [copied,             setCopied]             = useState<'code' | 'link' | null>(null);
 
   const referralCode = user?.referral_code ?? '';
   const referralLink = `${window.location.origin}/register?ref=${referralCode}`;
@@ -90,7 +80,9 @@ export default function Referrals() {
     api.get<ReferralsResponse>('/users/me/referrals')
       .then(({ data }) => {
         setReferrals(data.referrals);
-        setTotalEarned(data.total_earned);
+        setBatchesCredited(data.referral_batches_credited ?? 0);
+        setPendingCredits(data.pending_credits ?? 0);
+        setReleasedCredits(data.released_credits ?? 0);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -122,19 +114,23 @@ export default function Referrals() {
     window.open(`https://wa.me/?text=${msg}`, '_blank', 'noopener,noreferrer');
   }
 
-  const premiumCount = referrals.filter((r) => r.plan !== 'free').length;
-  // Sort: premium/elite first, then by join date
-  const sortedReferrals = [...referrals].sort((a, b) => {
-    const pd = planOrder(b.plan) - planOrder(a.plan);
-    if (pd !== 0) return pd;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
+  const totalInvites  = referrals.length;
+  const creditedCount = batchesCredited * BATCH_SIZE; // how many invites are in completed batches
+  const pendingInBatch = totalInvites - creditedCount; // invites in the current partial batch
 
-  // ─── Tier state ────────────────────────────────────────────────────────────
-  const totalInvites   = referrals.length;
-  const currentTier    = getCurrentTier(totalInvites);
-  const tierProgress   = getTierProgress(totalInvites, currentTier);
-  const tierEarnings   = computeTierEarnings(totalInvites);
+  // Batch progress toward the next ₱100 release
+  const batchProgress = Math.round((pendingInBatch / BATCH_SIZE) * 100);
+
+  // Referrals list — sorted oldest first (oldest are credited first)
+  // referrals are already sorted oldest-first from the API
+  const referralsWithStatus = referrals.map((r, i) => ({
+    ...r,
+    isCredited: i < creditedCount,
+  }));
+
+  // ─── Tier state (kept for tier-level overview card) ────────────────────────
+  const currentTier  = getCurrentTier(totalInvites);
+  const tierProgress = getTierProgress(totalInvites, currentTier);
 
   if (loading) return (
     <div className="page">
@@ -195,21 +191,49 @@ export default function Referrals() {
       {/* Stats row */}
       <div className="ref-stats-row">
         <div className="ref-stat">
-          <span className="ref-stat-num">{referrals.length}</span>
-          <span className="ref-stat-lbl">Referred</span>
+          <span className="ref-stat-num">{totalInvites}</span>
+          <span className="ref-stat-lbl">Invites</span>
         </div>
         <div className="ref-stat-divider" />
         <div className="ref-stat">
-          <span className="ref-stat-num">{premiumCount}</span>
-          <span className="ref-stat-lbl">Premium</span>
+          <span className="ref-stat-num" style={{ color: 'var(--warning)' }}>
+            ₱{pendingCredits.toFixed(2)}
+          </span>
+          <span className="ref-stat-lbl">Pending</span>
         </div>
         <div className="ref-stat-divider" />
         <div className="ref-stat">
           <span className="ref-stat-num ref-stat-num--accent">
-            ₱{totalEarned.toFixed(2)}
+            ₱{releasedCredits.toFixed(2)}
           </span>
-          <span className="ref-stat-lbl">Earned</span>
+          <span className="ref-stat-lbl">Released</span>
         </div>
+      </div>
+
+      {/* Batch progress card */}
+      <div className="card" style={{ padding: '14px 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <DollarSign size={14} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              ₱{BATCH_VALUE} credit every {BATCH_SIZE} invites
+            </span>
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            {pendingInBatch}/{BATCH_SIZE} this batch
+          </span>
+        </div>
+        <div className="tier-progress-bar">
+          <div className="tier-progress-fill" style={{ width: `${batchProgress}%` }} />
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+          {pendingInBatch === 0 && totalInvites === 0
+            ? 'Invite friends to start earning. Every 10 verified invites releases ₱100.'
+            : pendingInBatch === 0
+            ? `${batchesCredited} batch${batchesCredited !== 1 ? 'es' : ''} released — ₱${releasedCredits} credited to your account.`
+            : `${BATCH_SIZE - pendingInBatch} more invite${BATCH_SIZE - pendingInBatch !== 1 ? 's' : ''} needed to release ₱${BATCH_VALUE}.`
+          }
+        </p>
       </div>
 
       {/* ─── Tier Progress Card ────────────────────────────────────────────── */}
@@ -226,7 +250,7 @@ export default function Referrals() {
           </div>
           <div className="tier-earnings-pill">
             <DollarSign size={14} />
-            <span>₱{tierEarnings.toLocaleString()}</span>
+            <span>₱{releasedCredits.toLocaleString()}</span>
           </div>
         </div>
 
@@ -369,7 +393,7 @@ export default function Referrals() {
           </h2>
         </div>
 
-        {sortedReferrals.length === 0 ? (
+        {referralsWithStatus.length === 0 ? (
           <div className="empty-state">
             <p>No referrals yet.</p>
             <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
@@ -379,7 +403,7 @@ export default function Referrals() {
           </div>
         ) : (
           <div className="earnings-list">
-            {sortedReferrals.map((r) => (
+            {referralsWithStatus.map((r) => (
               <div key={r.username} className="earning-row">
                 <div className="earning-row-icon ref-user-avatar">
                   {r.username[0]?.toUpperCase()}
@@ -397,10 +421,23 @@ export default function Referrals() {
                     </span>
                   </div>
                 </div>
-                <div className="ref-user-reward">
-                  <span className="earning-row-amount">
-                    +₱{r.plan !== 'free' ? '25' : '10'}
-                  </span>
+                <div className="ref-user-reward" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+                  <span className="earning-row-amount">+₱{INVITE_VALUE}</span>
+                  {r.isCredited ? (
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, color: 'var(--success)',
+                      display: 'flex', alignItems: 'center', gap: 3,
+                    }}>
+                      <CheckCircle size={11} /> Credited
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, color: 'var(--warning)',
+                      display: 'flex', alignItems: 'center', gap: 3,
+                    }}>
+                      <Clock size={11} /> Pending
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

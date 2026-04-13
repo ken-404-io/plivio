@@ -12,12 +12,46 @@ import {
   Wallet,
   ChevronDown,
   ChevronUp,
+  ArrowUpRight,
 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
 import type { Withdrawal } from '../../types/index.ts';
+
+// ─── Free Plan Upgrade Modal ──────────────────────────────────────────────────
+
+function FreePlanUpgradeModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal wd-confirm" onClick={(e) => e.stopPropagation()}>
+        <div className="wd-confirm-hero" style={{ background: 'var(--bg-card)' }}>
+          <AlertCircle size={32} style={{ color: 'var(--warning)', marginBottom: 8 }} />
+          <span className="wd-confirm-hero-label">Withdrawal Limit Reached</span>
+          <span className="wd-confirm-hero-amount" style={{ fontSize: 18, marginTop: 4 }}>
+            Free Plan Limit
+          </span>
+        </div>
+        <div style={{ padding: '0 20px 4px' }}>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', margin: '12px 0 16px' }}>
+            Free plan users can only make <strong>1 withdrawal</strong> in total.
+            Upgrade your plan to continue making withdrawals.
+          </p>
+          <div className="wd-confirm-actions">
+            <button className="btn btn-ghost wd-confirm-back" onClick={onClose}>
+              Close
+            </button>
+            <Link to="/plans" className="btn btn-primary wd-confirm-submit" style={{ textDecoration: 'none', textAlign: 'center' }}>
+              <ArrowUpRight size={15} />
+              Upgrade Plan
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -119,12 +153,13 @@ export default function Withdraw() {
   const [form, setForm] = useState<WithdrawForm>({
     amount: '', method: 'gcash', account_name: '', account_number: '',
   });
-  const [history,      setHistory]      = useState<Withdrawal[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [showConfirm,  setShowConfirm]  = useState(false);
-  const [submitting,   setSubmitting]   = useState(false);
-  const [cancelling,   setCancelling]   = useState<string | null>(null);
-  const [historyOpen,  setHistoryOpen]  = useState(false);
+  const [history,           setHistory]           = useState<Withdrawal[]>([]);
+  const [loading,           setLoading]           = useState(true);
+  const [showConfirm,       setShowConfirm]       = useState(false);
+  const [showUpgradeModal,  setShowUpgradeModal]  = useState(false);
+  const [submitting,        setSubmitting]        = useState(false);
+  const [cancelling,        setCancelling]        = useState<string | null>(null);
+  const [historyOpen,       setHistoryOpen]       = useState(false);
 
   async function loadHistory() {
     try {
@@ -163,8 +198,15 @@ export default function Withdraw() {
     return null;
   }
 
+  // Check proactively if free-plan user has already used their one withdrawal
+  const isFreePlan = user?.plan === 'free';
+  const hasUsedFreeWithdrawal = isFreePlan && history.some(
+    (w) => !['cancelled'].includes(w.status),
+  );
+
   function handleReview(e: React.FormEvent) {
     e.preventDefault();
+    if (hasUsedFreeWithdrawal) { setShowUpgradeModal(true); return; }
     const err = validate();
     if (err) { toast.error(err); return; }
     setShowConfirm(true);
@@ -184,8 +226,13 @@ export default function Withdraw() {
       toast.success('Withdrawal submitted — we\'ll process it within 24 hours.');
       await Promise.all([loadHistory(), fetchMe()]);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      toast.error(msg ?? 'Request failed. Please try again.');
+      const errData = (err as { response?: { data?: { error?: string; code?: string } } }).response?.data;
+      if (errData?.code === 'free_plan_limit_reached') {
+        setShowConfirm(false);
+        setShowUpgradeModal(true);
+        return;
+      }
+      toast.error(errData?.error ?? 'Request failed. Please try again.');
     } finally { setSubmitting(false); }
   }
 
@@ -240,6 +287,9 @@ export default function Withdraw() {
           loading={submitting}
         />
       )}
+      {showUpgradeModal && (
+        <FreePlanUpgradeModal onClose={() => setShowUpgradeModal(false)} />
+      )}
 
       <header className="page-header">
         <div>
@@ -257,6 +307,17 @@ export default function Withdraw() {
             {kycStatus === 'pending'  && <><strong>KYC under review.</strong> Withdrawals unlock once verified.</>}
             {kycStatus === 'rejected' && <><strong>KYC rejected.</strong> <Link to="/kyc">Resubmit documents →</Link></>}
             {kycStatus === 'none'     && <><strong>Verification required.</strong> <Link to="/kyc">Complete KYC to withdraw →</Link></>}
+          </div>
+        </div>
+      )}
+
+      {/* Free plan withdrawal limit banner */}
+      {!kycBlocked && hasUsedFreeWithdrawal && (
+        <div className="alert alert--warning">
+          <AlertCircle size={18} />
+          <div>
+            <strong>Withdrawal limit reached.</strong> Free plan users can only make 1 withdrawal.{' '}
+            <Link to="/plans" className="link">Upgrade your plan →</Link>
           </div>
         </div>
       )}
@@ -392,7 +453,8 @@ export default function Withdraw() {
         <button
           type="submit"
           className="btn btn-primary wd-submit"
-          disabled={kycBlocked}
+          disabled={kycBlocked || hasUsedFreeWithdrawal}
+          onClick={hasUsedFreeWithdrawal ? (e) => { e.preventDefault(); setShowUpgradeModal(true); } : undefined}
         >
           Review Withdrawal
           <ArrowRight size={16} />
