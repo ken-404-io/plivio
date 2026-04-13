@@ -254,13 +254,13 @@ export async function listWithdrawalHistory(req: Request, res: Response, next: N
     const dateTo   = req.query.date_to   ? (req.query.date_to as string)   : null;
 
     const { rows } = await pool.query(
-      `SELECT w.id, w.amount, w.fee_amount, w.net_amount, w.method, w.status,
+      `SELECT w.id, w.amount, w.fee_amount, w.net_amount, w.method, w.status::text,
               w.account_name, w.account_number, w.rejection_reason,
               w.requested_at, w.processed_at,
-              u.username, u.email, u.plan AS user_plan
+              u.username, u.email, u.plan::text AS user_plan
        FROM withdrawals w JOIN users u ON u.id = w.user_id
-       WHERE ($1::text IS NULL OR w.status = $1)
-         AND ($2::plan_type IS NULL OR u.plan = $2::plan_type)
+       WHERE ($1::text IS NULL OR w.status::text = $1)
+         AND ($2::text IS NULL OR u.plan::text = $2)
          AND ($3::text IS NULL OR u.username ILIKE $3 OR u.email ILIKE $3)
          AND ($4::timestamptz IS NULL OR w.requested_at >= $4::timestamptz)
          AND ($5::timestamptz IS NULL OR w.requested_at <= ($5::timestamptz + INTERVAL '1 day'))
@@ -271,8 +271,8 @@ export async function listWithdrawalHistory(req: Request, res: Response, next: N
 
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM withdrawals w JOIN users u ON u.id = w.user_id
-       WHERE ($1::text IS NULL OR w.status = $1)
-         AND ($2::plan_type IS NULL OR u.plan = $2::plan_type)
+       WHERE ($1::text IS NULL OR w.status::text = $1)
+         AND ($2::text IS NULL OR u.plan::text = $2)
          AND ($3::text IS NULL OR u.username ILIKE $3 OR u.email ILIKE $3)
          AND ($4::timestamptz IS NULL OR w.requested_at >= $4::timestamptz)
          AND ($5::timestamptz IS NULL OR w.requested_at <= ($5::timestamptz + INTERVAL '1 day'))`,
@@ -391,15 +391,26 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
          LIMIT 50`,
         [id],
       ),
-      // Device info
+      // Device info — use a safe query that won't fail if new columns don't exist yet
       pool.query(
-        `SELECT device_fingerprint, device_name, device_registered_at
-         FROM users WHERE id = $1`,
+        `SELECT device_fingerprint FROM users WHERE id = $1`,
         [id],
-      ),
+      ).then(async (baseResult) => {
+        const row = baseResult.rows[0] as { device_fingerprint: string | null } | undefined;
+        if (!row?.device_fingerprint) return { rows: [{ device_fingerprint: null, device_name: null, device_registered_at: null }] };
+        // Try to fetch new columns; fall back gracefully if migration hasn't run
+        try {
+          return await pool.query(
+            `SELECT device_fingerprint, device_name, device_registered_at FROM users WHERE id = $1`,
+            [id],
+          );
+        } catch {
+          return baseResult;
+        }
+      }),
     ]);
 
-    const deviceRow = deviceResult.rows[0] as { device_fingerprint: string | null; device_name: string | null; device_registered_at: string | null } | undefined;
+    const deviceRow = deviceResult.rows[0] as { device_fingerprint: string | null; device_name?: string | null; device_registered_at?: string | null } | undefined;
 
     res.json({
       success:      true,
@@ -408,8 +419,8 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
       withdrawals:  withdrawalsResult.rows,
       device:       deviceRow?.device_fingerprint ? {
         fingerprint:    deviceRow.device_fingerprint,
-        device_name:    deviceRow.device_name,
-        registered_at:  deviceRow.device_registered_at,
+        device_name:    deviceRow.device_name ?? null,
+        registered_at:  deviceRow.device_registered_at ?? null,
       } : null,
     });
   } catch (err) { next(err); }
@@ -420,11 +431,18 @@ export async function resetUserDevice(req: Request, res: Response, next: NextFun
   try {
     const { id } = req.params as Record<string, string>;
 
-    const { rowCount } = await pool.query(
-      `UPDATE users SET device_fingerprint = NULL, device_name = NULL, device_registered_at = NULL WHERE id = $1`,
-      [id],
-    );
-    if (!rowCount) throw new NotFoundError('User not found');
+    // Try resetting all device columns; fall back to just fingerprint if new columns don't exist
+    try {
+      await pool.query(
+        `UPDATE users SET device_fingerprint = NULL, device_name = NULL, device_registered_at = NULL WHERE id = $1`,
+        [id],
+      );
+    } catch {
+      await pool.query(
+        `UPDATE users SET device_fingerprint = NULL WHERE id = $1`,
+        [id],
+      );
+    }
 
     res.json({ success: true, message: 'Device unlinked. User can now log in from any device.' });
   } catch (err) { next(err); }

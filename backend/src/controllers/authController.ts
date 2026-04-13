@@ -145,12 +145,25 @@ export async function register(req: Request, res: Response, next: NextFunction):
     const fingerprint     = deviceKey ?? deviceFingerprint(req);
     const devName         = parseDeviceName(req.headers['user-agent'] ?? '');
 
-    const { rows } = await pool.query(
-      `INSERT INTO users (username, email, password_hash, referral_code, referred_by, device_fingerprint, device_name, device_registered_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-       RETURNING id, username, email, plan, balance, referral_code, is_admin`,
-      [username.toLowerCase(), normalisedEmail, passwordHash, newReferralCode, referredById, fingerprint, devName]
-    );
+    let rows: Record<string, unknown>[];
+    try {
+      const result = await pool.query(
+        `INSERT INTO users (username, email, password_hash, referral_code, referred_by, device_fingerprint, device_name, device_registered_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         RETURNING id, username, email, plan, balance, referral_code, is_admin`,
+        [username.toLowerCase(), normalisedEmail, passwordHash, newReferralCode, referredById, fingerprint, devName]
+      );
+      rows = result.rows as Record<string, unknown>[];
+    } catch {
+      // Fallback if device_name / device_registered_at columns don't exist yet
+      const result = await pool.query(
+        `INSERT INTO users (username, email, password_hash, referral_code, referred_by, device_fingerprint)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, username, email, plan, balance, referral_code, is_admin`,
+        [username.toLowerCase(), normalisedEmail, passwordHash, newReferralCode, referredById, fingerprint]
+      );
+      rows = result.rows as Record<string, unknown>[];
+    }
 
     const user = rows[0] as Record<string, unknown>;
 
@@ -239,10 +252,18 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     if (!user.is_admin && !storedFingerprint && currentDeviceId) {
       const ua = req.headers['user-agent'] ?? '';
       const deviceName = parseDeviceName(ua);
-      await pool.query(
-        `UPDATE users SET device_fingerprint = $1, device_name = $2, device_registered_at = NOW() WHERE id = $3`,
-        [currentDeviceId, deviceName, user.id],
-      );
+      try {
+        await pool.query(
+          `UPDATE users SET device_fingerprint = $1, device_name = $2, device_registered_at = NOW() WHERE id = $3`,
+          [currentDeviceId, deviceName, user.id],
+        );
+      } catch {
+        // Fallback if device_name / device_registered_at columns don't exist yet
+        await pool.query(
+          `UPDATE users SET device_fingerprint = $1 WHERE id = $2`,
+          [currentDeviceId, user.id],
+        );
+      }
     }
 
     if (user.totp_secret) {
