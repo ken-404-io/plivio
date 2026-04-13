@@ -122,11 +122,16 @@ export async function register(req: Request, res: Response, next: NextFunction):
     if (exists.rowCount && exists.rowCount > 0) throw new ConflictError('Email or username is already taken');
 
     // ── Device-ID uniqueness (1 registration per device) ─────────────────
+    // The client sends a hardware fingerprint (hw_...) derived from canvas,
+    // screen, timezone, etc. — identical in normal and incognito modes.
     const deviceKey = deviceId?.trim().slice(0, 128) || null;
-    if (deviceKey) {
+    const serverFp  = deviceFingerprint(req);
+    const fpToCheck = deviceKey || serverFp;
+
+    if (fpToCheck) {
       const devRes = await pool.query(
         'SELECT id FROM users WHERE device_fingerprint = $1 LIMIT 1',
-        [deviceKey],
+        [fpToCheck],
       );
       if (devRes.rowCount && devRes.rowCount > 0) {
         throw new ConflictError('An account has already been registered from this device.');
@@ -238,14 +243,47 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     // Admins are exempt from device binding so they can access from anywhere.
     const currentDeviceId = loginDeviceId?.trim().slice(0, 128) || null;
     const storedFingerprint = user.device_fingerprint as string | null;
+    const isHardwareFp  = currentDeviceId?.startsWith('hw_');
+    const storedIsLegacy = storedFingerprint && !storedFingerprint.startsWith('hw_');
 
-    if (!user.is_admin && storedFingerprint && currentDeviceId && storedFingerprint !== currentDeviceId) {
-      res.status(403).json({
-        success: false,
-        error:   'Access denied. This account is already linked to another device. Please use your registered device to log in, or contact support to request a device change.',
-        code:    'device_mismatch',
-      });
-      return;
+    if (!user.is_admin && storedFingerprint && currentDeviceId) {
+      if (storedIsLegacy && isHardwareFp) {
+        // Legacy UUID → hardware fingerprint migration: rebind to hardware fp
+        // so subsequent logins (including incognito) match correctly.
+        const ua = req.headers['user-agent'] ?? '';
+        const deviceName = parseDeviceName(ua);
+        try {
+          await pool.query(
+            `UPDATE users SET device_fingerprint = $1, device_name = $2, device_registered_at = NOW() WHERE id = $3`,
+            [currentDeviceId, deviceName, user.id],
+          );
+        } catch {
+          await pool.query(
+            `UPDATE users SET device_fingerprint = $1 WHERE id = $2`,
+            [currentDeviceId, user.id],
+          );
+        }
+      } else if (storedFingerprint !== currentDeviceId) {
+        // Also check if this hardware fp is already taken by another account
+        const { rows: fpCheck } = await pool.query(
+          'SELECT id FROM users WHERE device_fingerprint = $1 AND id != $2 LIMIT 1',
+          [currentDeviceId, user.id],
+        );
+        if (fpCheck.length > 0) {
+          res.status(403).json({
+            success: false,
+            error:   'Access denied. This device is already linked to another account.',
+            code:    'device_mismatch',
+          });
+          return;
+        }
+        res.status(403).json({
+          success: false,
+          error:   'Access denied. This account is already linked to another device. Please use your registered device to log in, or contact support to request a device change.',
+          code:    'device_mismatch',
+        });
+        return;
+      }
     }
 
     // If user has no device bound yet (e.g. pre-migration, device reset), bind the current device
