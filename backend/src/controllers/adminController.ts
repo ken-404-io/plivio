@@ -50,23 +50,37 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const offset = (page - 1) * limit;
     const search = req.query.search ? `%${req.query.search as string}%` : null;
     const planFilter = ['free', 'premium', 'elite'].includes(req.query.plan as string)
-      ? (req.query.plan as string)
-      : null;
+      ? (req.query.plan as string) : null;
+    const statusFilter = ['active', 'banned'].includes(req.query.status as string)
+      ? (req.query.status as string) : null;
+    const deviceFilter = ['registered', 'unregistered'].includes(req.query.device as string)
+      ? (req.query.device as string) : null;
+    const dateFrom = req.query.date_from ? (req.query.date_from as string) : null;
+    const dateTo   = req.query.date_to   ? (req.query.date_to as string)   : null;
 
     const { rows } = await pool.query(
-      `SELECT id, username, email, plan, balance, is_verified, is_banned, is_admin, created_at
+      `SELECT id, username, email, plan, balance, is_verified, is_banned, is_admin,
+              device_fingerprint, created_at
        FROM users
        WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
          AND ($3::plan_type IS NULL OR plan = $3::plan_type)
+         AND ($5::text IS NULL OR ($5 = 'banned' AND is_banned = TRUE) OR ($5 = 'active' AND is_banned = FALSE))
+         AND ($6::text IS NULL OR ($6 = 'registered' AND device_fingerprint IS NOT NULL) OR ($6 = 'unregistered' AND device_fingerprint IS NULL))
+         AND ($7::timestamptz IS NULL OR created_at >= $7::timestamptz)
+         AND ($8::timestamptz IS NULL OR created_at <= ($8::timestamptz + INTERVAL '1 day'))
        ORDER BY created_at DESC LIMIT $2 OFFSET $4`,
-      [search, limit, planFilter, offset]
+      [search, limit, planFilter, offset, statusFilter, deviceFilter, dateFrom, dateTo]
     );
 
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM users
        WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
-         AND ($2::plan_type IS NULL OR plan = $2::plan_type)`,
-      [search, planFilter]
+         AND ($2::plan_type IS NULL OR plan = $2::plan_type)
+         AND ($3::text IS NULL OR ($3 = 'banned' AND is_banned = TRUE) OR ($3 = 'active' AND is_banned = FALSE))
+         AND ($4::text IS NULL OR ($4 = 'registered' AND device_fingerprint IS NOT NULL) OR ($4 = 'unregistered' AND device_fingerprint IS NULL))
+         AND ($5::timestamptz IS NULL OR created_at >= $5::timestamptz)
+         AND ($6::timestamptz IS NULL OR created_at <= ($6::timestamptz + INTERVAL '1 day'))`,
+      [search, planFilter, statusFilter, deviceFilter, dateFrom, dateTo]
     );
 
     res.json({
@@ -252,6 +266,8 @@ export async function listWithdrawalHistory(req: Request, res: Response, next: N
     const search   = req.query.search ? `%${req.query.search as string}%` : null;
     const dateFrom = req.query.date_from ? (req.query.date_from as string) : null;
     const dateTo   = req.query.date_to   ? (req.query.date_to as string)   : null;
+    const amountMin = req.query.amount_min ? Number(req.query.amount_min) : null;
+    const amountMax = req.query.amount_max ? Number(req.query.amount_max) : null;
 
     const { rows } = await pool.query(
       `SELECT w.id, w.amount, w.fee_amount, w.net_amount, w.method, w.status::text,
@@ -264,9 +280,11 @@ export async function listWithdrawalHistory(req: Request, res: Response, next: N
          AND ($3::text IS NULL OR u.username ILIKE $3 OR u.email ILIKE $3)
          AND ($4::timestamptz IS NULL OR w.requested_at >= $4::timestamptz)
          AND ($5::timestamptz IS NULL OR w.requested_at <= ($5::timestamptz + INTERVAL '1 day'))
+         AND ($8::numeric IS NULL OR w.amount >= $8)
+         AND ($9::numeric IS NULL OR w.amount <= $9)
        ORDER BY w.requested_at DESC
        LIMIT $6 OFFSET $7`,
-      [status, plan, search, dateFrom, dateTo, limit, offset],
+      [status, plan, search, dateFrom, dateTo, limit, offset, amountMin, amountMax],
     );
 
     const countResult = await pool.query(
@@ -275,8 +293,10 @@ export async function listWithdrawalHistory(req: Request, res: Response, next: N
          AND ($2::text IS NULL OR u.plan::text = $2)
          AND ($3::text IS NULL OR u.username ILIKE $3 OR u.email ILIKE $3)
          AND ($4::timestamptz IS NULL OR w.requested_at >= $4::timestamptz)
-         AND ($5::timestamptz IS NULL OR w.requested_at <= ($5::timestamptz + INTERVAL '1 day'))`,
-      [status, plan, search, dateFrom, dateTo],
+         AND ($5::timestamptz IS NULL OR w.requested_at <= ($5::timestamptz + INTERVAL '1 day'))
+         AND ($6::numeric IS NULL OR w.amount >= $6)
+         AND ($7::numeric IS NULL OR w.amount <= $7)`,
+      [status, plan, search, dateFrom, dateTo, amountMin, amountMax],
     );
 
     res.json({
@@ -445,6 +465,174 @@ export async function resetUserDevice(req: Request, res: Response, next: NextFun
     }
 
     res.json({ success: true, message: 'Device unlinked. User can now log in from any device.' });
+  } catch (err) { next(err); }
+}
+
+// ─── GET /admin/referrals — list all referrals across users ─────────────────
+
+export async function listReferrals(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const page   = Math.max(1, Number(req.query.page)  || 1);
+    const limit  = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const offset = (page - 1) * limit;
+    const search   = req.query.search ? `%${req.query.search as string}%` : null;
+    const dateFrom = req.query.date_from ? (req.query.date_from as string) : null;
+    const dateTo   = req.query.date_to   ? (req.query.date_to as string)   : null;
+
+    const { rows } = await pool.query(
+      `SELECT
+         referrer.id AS referrer_id, referrer.username AS referrer_username,
+         referrer.referral_batches_credited,
+         invited.username AS invited_username, invited.email AS invited_email,
+         invited.plan::text AS invited_plan, invited.is_email_verified,
+         invited.created_at AS invited_at
+       FROM users invited
+       JOIN users referrer ON referrer.id = invited.referred_by
+       WHERE invited.is_email_verified = TRUE
+         AND ($1::text IS NULL OR referrer.username ILIKE $1 OR invited.username ILIKE $1)
+         AND ($2::timestamptz IS NULL OR invited.created_at >= $2::timestamptz)
+         AND ($3::timestamptz IS NULL OR invited.created_at <= ($3::timestamptz + INTERVAL '1 day'))
+       ORDER BY invited.created_at DESC
+       LIMIT $4 OFFSET $5`,
+      [search, dateFrom, dateTo, limit, offset],
+    );
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM users invited
+       JOIN users referrer ON referrer.id = invited.referred_by
+       WHERE invited.is_email_verified = TRUE
+         AND ($1::text IS NULL OR referrer.username ILIKE $1 OR invited.username ILIKE $1)
+         AND ($2::timestamptz IS NULL OR invited.created_at >= $2::timestamptz)
+         AND ($3::timestamptz IS NULL OR invited.created_at <= ($3::timestamptz + INTERVAL '1 day'))`,
+      [search, dateFrom, dateTo],
+    );
+
+    res.json({
+      success: true,
+      data: rows,
+      meta: { page, limit, total: Number((countResult.rows[0] as { count: string }).count) },
+    });
+  } catch (err) { next(err); }
+}
+
+// ─── GET /admin/notifications — notification logs ───────────────────────────
+
+export async function listNotificationLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const page   = Math.max(1, Number(req.query.page)  || 1);
+    const limit  = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const offset = (page - 1) * limit;
+    const search   = req.query.search ? `%${req.query.search as string}%` : null;
+    const dateFrom = req.query.date_from ? (req.query.date_from as string) : null;
+    const dateTo   = req.query.date_to   ? (req.query.date_to as string)   : null;
+    const readFilter = ['read', 'unread'].includes(req.query.status as string)
+      ? (req.query.status as string) : null;
+
+    const { rows } = await pool.query(
+      `SELECT n.id, n.type, n.title, n.message, n.link, n.is_read, n.created_at,
+              u.username, u.email
+       FROM notifications n
+       JOIN users u ON u.id = n.user_id
+       WHERE ($1::text IS NULL OR u.username ILIKE $1 OR n.title ILIKE $1)
+         AND ($2::timestamptz IS NULL OR n.created_at >= $2::timestamptz)
+         AND ($3::timestamptz IS NULL OR n.created_at <= ($3::timestamptz + INTERVAL '1 day'))
+         AND ($4::text IS NULL OR ($4 = 'read' AND n.is_read = TRUE) OR ($4 = 'unread' AND n.is_read = FALSE))
+       ORDER BY n.created_at DESC
+       LIMIT $5 OFFSET $6`,
+      [search, dateFrom, dateTo, readFilter, limit, offset],
+    );
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM notifications n
+       JOIN users u ON u.id = n.user_id
+       WHERE ($1::text IS NULL OR u.username ILIKE $1 OR n.title ILIKE $1)
+         AND ($2::timestamptz IS NULL OR n.created_at >= $2::timestamptz)
+         AND ($3::timestamptz IS NULL OR n.created_at <= ($3::timestamptz + INTERVAL '1 day'))
+         AND ($4::text IS NULL OR ($4 = 'read' AND n.is_read = TRUE) OR ($4 = 'unread' AND n.is_read = FALSE))`,
+      [search, dateFrom, dateTo, readFilter],
+    );
+
+    res.json({
+      success: true,
+      data: rows,
+      meta: { page, limit, total: Number((countResult.rows[0] as { count: string }).count) },
+    });
+  } catch (err) { next(err); }
+}
+
+// ─── GET /admin/export/:section — CSV export ────────────────────────────────
+
+export async function exportCsv(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { section } = req.params as Record<string, string>;
+    let rows: Record<string, unknown>[] = [];
+    let filename = 'export.csv';
+
+    if (section === 'users') {
+      const result = await pool.query(
+        `SELECT username, email, plan::text, balance, is_banned, is_verified, device_fingerprint, created_at
+         FROM users ORDER BY created_at DESC`,
+      );
+      rows = result.rows as Record<string, unknown>[];
+      filename = 'users.csv';
+    } else if (section === 'withdrawals') {
+      const result = await pool.query(
+        `SELECT w.id, u.username, u.email, u.plan::text AS user_plan, w.amount, w.fee_amount, w.net_amount,
+                w.method, w.status::text, w.account_name, w.account_number, w.rejection_reason,
+                w.requested_at, w.processed_at
+         FROM withdrawals w JOIN users u ON u.id = w.user_id
+         ORDER BY w.requested_at DESC`,
+      );
+      rows = result.rows as Record<string, unknown>[];
+      filename = 'withdrawals.csv';
+    } else if (section === 'referrals') {
+      const result = await pool.query(
+        `SELECT referrer.username AS referrer, invited.username AS invited_user,
+                invited.email AS invited_email, invited.plan::text AS plan, invited.created_at
+         FROM users invited
+         JOIN users referrer ON referrer.id = invited.referred_by
+         WHERE invited.is_email_verified = TRUE
+         ORDER BY invited.created_at DESC`,
+      );
+      rows = result.rows as Record<string, unknown>[];
+      filename = 'referrals.csv';
+    } else if (section === 'notifications') {
+      const result = await pool.query(
+        `SELECT u.username, n.type, n.title, n.message, n.is_read, n.created_at
+         FROM notifications n JOIN users u ON u.id = n.user_id
+         ORDER BY n.created_at DESC LIMIT 5000`,
+      );
+      rows = result.rows as Record<string, unknown>[];
+      filename = 'notifications.csv';
+    } else {
+      throw new ValidationError('Invalid section. Valid: users, withdrawals, referrals, notifications');
+    }
+
+    if (rows.length === 0) {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('No data');
+      return;
+    }
+
+    const headers = Object.keys(rows[0]);
+    const csvLines = [
+      headers.join(','),
+      ...rows.map((row) =>
+        headers.map((h) => {
+          const val = row[h];
+          if (val === null || val === undefined) return '';
+          const str = String(val);
+          return str.includes(',') || str.includes('"') || str.includes('\n')
+            ? `"${str.replace(/"/g, '""')}"`
+            : str;
+        }).join(',')
+      ),
+    ];
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csvLines.join('\n'));
   } catch (err) { next(err); }
 }
 
