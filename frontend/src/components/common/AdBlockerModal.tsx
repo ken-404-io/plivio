@@ -11,7 +11,10 @@ import { useAdBlockDetector } from '../../hooks/useAdBlockDetector.ts';
 export default function AdBlockerModal() {
   const { status, recheck } = useAdBlockDetector();
 
-  if (status === 'allowed') return null;
+  // Only block when an ad blocker is definitively detected.
+  // During 'checking' (initial detection) or 'allowed' the modal stays hidden,
+  // so users without an ad blocker never see it — not even a flash.
+  if (status !== 'blocked') return null;
 
   return (
     <div className="adblocker-overlay" role="dialog" aria-modal="true" aria-labelledby="adblocker-title">
