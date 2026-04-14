@@ -23,6 +23,17 @@ import { useAdBlockDetector } from '../../hooks/useAdBlockDetector.ts';
  *  the user disables the blocker. A single reload gives those tags a
  *  fresh, unblocked request cycle, which is the only universally
  *  reliable way to restore ad rendering across third-party ad scripts.
+ *
+ *  We use a *cache-busting* navigation rather than location.reload(),
+ *  because:
+ *    1. A failed /js/p1.js request can be cached by the browser as the
+ *       SPA's index.html (when the Vercel rewrite was misconfigured) —
+ *       location.reload() may serve that bad response from disk cache.
+ *    2. Subresource fetches that failed at the DNS layer can be cached
+ *       as failures for the lifetime of the navigation; only a fresh
+ *       URL guarantees they're re-requested.
+ *  Appending a one-shot ?_ab=<ts> param sidesteps both.
+ *
  *  We only reload when status actually went 'blocked' → 'allowed' during
  *  this session; a user who was never blocked never sees a reload.
  */
@@ -40,7 +51,9 @@ export default function AdBlockerModal() {
       // Reset the flag in case the reload is somehow cancelled, so we
       // don't loop on a subsequent allowed → blocked → allowed cycle.
       wasBlockedRef.current = false;
-      window.location.reload();
+      const url = new URL(window.location.href);
+      url.searchParams.set('_ab', Date.now().toString());
+      window.location.replace(url.toString());
     }
   }, [status]);
 
