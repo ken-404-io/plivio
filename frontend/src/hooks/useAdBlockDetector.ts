@@ -2,79 +2,62 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 export type AdBlockStatus = 'checking' | 'allowed' | 'blocked';
 
-/**
- * Canonical ad-serving script URLs. A failed fetch here indicates
- * that an ad blocker extension (uBlock Origin, AdBlock Plus, Brave
- * Shields, etc.) is filtering the request by URL pattern.
- */
-const AD_SCRIPT_PROBES = [
-  'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js',
-  'https://www.googletagservices.com/tag/js/gpt.js',
-] as const;
-
-/**
- * Well-known ad / tracking hostnames. A failed fetch here with no
- * corresponding "online: false" event indicates the hostname is
- * being blocked at the DNS layer — a filtering resolver such as
- * Pi-hole, NextDNS, AdGuard DNS or Cloudflare-for-Families.
- */
-const DNS_PROBES = [
-  'https://static.doubleclick.net/instream/ad_status.js',
-  'https://securepubads.g.doubleclick.net/tag/js/gpt.js',
-] as const;
-
 const PROBE_TIMEOUT_MS = 5000;
 
 /**
- * Fetch-based probe. Resolves `true` if the request fails (network
- * error, DNS failure, aborted by extension, or timeout).
+ * Script-tag probes.
  *
- * Uses `mode: 'no-cors'` so the probe behaves like a plain `<script>`
- * tag load: any HTTP response (even 4xx/5xx) counts as "reached the
- * origin", which is the signal we care about. A CORS preflight
- * rejection on a host that actually served the response would
- * otherwise false-positive.
+ * This is the gold standard for ad-blocker detection because it
+ * mirrors how ad networks actually load their code, which is what
+ * filter lists are written to catch.
+ *
+ *   • If an extension blocks the request, `script.onerror` fires
+ *     and the global never gets defined.
+ *   • If a filtering DNS (AdGuard, NextDNS, Pi-hole, Cloudflare for
+ *     Families) sinkholes the host with NXDOMAIN, the request fails
+ *     at the network layer and `script.onerror` fires.
+ *   • If the sinkhole instead redirects to a 200 OK with empty
+ *     body (some corporate filters do this), `script.onload` fires
+ *     normally — but the script body never ran, so the expected
+ *     global is undefined. The `expect()` check catches this case.
+ *
+ * Each probe pairs the script URL with a function that returns
+ * `true` once the script's bootstrap global is present.
  */
-function fetchFails(url: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      controller.abort();
-      resolve(true);
-    }, PROBE_TIMEOUT_MS);
+type ScriptProbe = { url: string; expect: () => boolean };
 
-    fetch(`${url}?_=${Date.now()}`, {
-      method: 'GET',
-      mode: 'no-cors',
-      cache: 'no-store',
-      credentials: 'omit',
-      redirect: 'follow',
-      signal: controller.signal,
-    })
-      .then(() => {
-        clearTimeout(timer);
-        resolve(false);
-      })
-      .catch(() => {
-        clearTimeout(timer);
-        resolve(true);
-      });
-  });
-}
+const SCRIPT_PROBES: readonly ScriptProbe[] = [
+  {
+    url: 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js',
+    // adsbygoogle.js sets window.adsbygoogle = window.adsbygoogle || [].
+    expect: () => Array.isArray((window as unknown as { adsbygoogle?: unknown[] }).adsbygoogle),
+  },
+  {
+    url: 'https://www.googletagservices.com/tag/js/gpt.js',
+    // gpt.js installs the googletag command queue.
+    expect: () => {
+      const g = (window as unknown as { googletag?: { cmd?: unknown } }).googletag;
+      return !!g && typeof g === 'object';
+    },
+  },
+];
 
 /**
- * Ad-blocker detection — bait element.
- *
- * Injects a DIV whose class names appear on every major filter list
- * (EasyList, uBlock, ABP). Active extensions hide or collapse the
- * element via CSS rules like `display:none !important`.
- *
- *   • position:absolute (not fixed) — fixed elements always have
- *     `offsetParent === null`, which would make the check useless.
- *   • no `opacity:0` on the element itself — doing so would make the
- *     computed-style check always report "blocked".
- *   • two rAFs + short delay — gives the extension a chance to apply
- *     its hiding stylesheet before we measure.
+ * DNS / hostname probes — fetch requests to known ad and tracking
+ * hosts. Failure (rejection or timeout) signals a DNS-layer block.
+ */
+const DNS_PROBE_HOSTS: readonly string[] = [
+  'https://static.doubleclick.net/instream/ad_status.js',
+  'https://securepubads.g.doubleclick.net/tag/js/gpt.js',
+  'https://www.google-analytics.com/analytics.js',
+];
+
+/**
+ * Bait DOM check — extensions hide DIVs whose class names appear
+ * on EasyList / uBlock / ABP. Position must be `absolute`, never
+ * `fixed` (fixed elements always have offsetParent === null), and
+ * we must not set our own opacity/visibility on the element since
+ * those are exactly the properties we measure.
  */
 function baitBlocked(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -99,58 +82,130 @@ function baitBlocked(): Promise<boolean> {
             cs.visibility === 'hidden';
           try { el.remove(); } catch { /* ignore */ }
           resolve(blocked);
-        }, 150);
+        }, 250);
       });
     });
   });
 }
 
 /**
- * Ad-blocker detection — any ad-serving script fetch fails.
- */
-async function adScriptBlocked(): Promise<boolean> {
-  const results = await Promise.all(AD_SCRIPT_PROBES.map(fetchFails));
-  return results.some(Boolean);
-}
-
-/**
- * Private / filtering DNS detection — any ad/tracking domain fails to
- * resolve. Guarded by the navigator.onLine check so a device that is
- * simply offline doesn't get gated.
- */
-async function dnsBlocked(): Promise<boolean> {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-    return false;
-  }
-  const results = await Promise.all(DNS_PROBES.map(fetchFails));
-  return results.some(Boolean);
-}
-
-/**
- * Single detection pass.
+ * Inject a <script> tag and report whether the script truly loaded.
  *
- * Returns `true` (blocked) if ANY of the signals fire — per spec:
- * "if either is detected, show … overlay". A bait element that
- * extensions hide, an ad-serving script that won't load, or a
- * DNS-level filter on a tracking domain is each sufficient on its
- * own to gate the user.
+ * "Truly loaded" means BOTH:
+ *   1. The browser fired `onload` (no extension/DNS block at the
+ *      transport layer), AND
+ *   2. The script's expected bootstrap global is present (catches
+ *      DNS sinkholes that return 200 OK with empty body).
+ */
+function scriptProbeFails(probe: ScriptProbe): Promise<boolean> {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `${probe.url}?_=${Date.now()}`;
+
+    let resolved = false;
+    const finish = (blocked: boolean) => {
+      if (resolved) return;
+      resolved = true;
+      window.clearTimeout(timer);
+      try { script.remove(); } catch { /* ignore */ }
+      resolve(blocked);
+    };
+
+    const timer = window.setTimeout(() => finish(true), PROBE_TIMEOUT_MS);
+
+    script.onload = () => {
+      // One tick for the loaded script body to execute and
+      // install its global (adsbygoogle, googletag, …).
+      window.setTimeout(() => {
+        try {
+          finish(!probe.expect());
+        } catch {
+          finish(true);
+        }
+      }, 60);
+    };
+    script.onerror = () => finish(true);
+
+    document.head.appendChild(script);
+  });
+}
+
+/**
+ * Cross-origin fetch probe. Resolves `true` on any failure.
+ * Uses `mode:'no-cors'` so we observe transport-layer failure
+ * (DNS rejection, connection refused, extension abort) without
+ * tripping CORS preflight.
+ */
+function fetchFails(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      controller.abort();
+      resolve(true);
+    }, PROBE_TIMEOUT_MS);
+
+    fetch(`${url}?_=${Date.now()}`, {
+      method: 'GET',
+      mode: 'no-cors',
+      cache: 'no-store',
+      credentials: 'omit',
+      redirect: 'follow',
+      signal: controller.signal,
+    })
+      .then(() => { window.clearTimeout(timer); resolve(false); })
+      .catch(() => { window.clearTimeout(timer); resolve(true); });
+  });
+}
+
+async function adScriptBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
+  const details = await Promise.all(SCRIPT_PROBES.map(scriptProbeFails));
+  return { blocked: details.some(Boolean), details };
+}
+
+async function dnsBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return { blocked: false, details: [] };
+  }
+  const details = await Promise.all(DNS_PROBE_HOSTS.map(fetchFails));
+  return { blocked: details.some(Boolean), details };
+}
+
+/**
+ * Run one detection pass. Returns true (blocked) if ANY signal
+ * fires — bait hidden, ad-script blocked/sinkholed, or any DNS
+ * probe rejected. Per spec: "if either is detected, show overlay".
  */
 async function detectOnce(): Promise<boolean> {
-  const [bait, adScript, dns] = await Promise.all([
+  const [bait, script, dns] = await Promise.all([
     baitBlocked(),
     adScriptBlocked(),
     dnsBlocked(),
   ]);
-  return bait || adScript || dns;
+
+  // Diagnostic log so the failure mode is visible in devtools when
+  // the gate behaves unexpectedly. Emoji prefix makes it easy to
+  // grep the console.
+  // eslint-disable-next-line no-console
+  console.debug('[AdBlock] probe', {
+    bait,
+    scriptBlocked: script.blocked,
+    scriptUrls: SCRIPT_PROBES.map((p, i) => ({
+      url: p.url,
+      blocked: script.details[i],
+    })),
+    dnsBlocked: dns.blocked,
+    dnsHosts: DNS_PROBE_HOSTS.map((u, i) => ({
+      url: u,
+      blocked: dns.details[i],
+    })),
+  });
+
+  return bait || script.blocked || dns.blocked;
 }
 
 const AUTO_RECHECK_INTERVAL_MS = 3000;
 
-/**
- * React hook: runs detection on mount, exposes a manual `recheck()`,
- * and auto-polls while the gate is visible so the overlay dismisses
- * the moment the user disables their blocker.
- */
 export function useAdBlockDetector() {
   const [status, setStatus] = useState<AdBlockStatus>('checking');
   const inFlightRef = useRef(false);
@@ -169,13 +224,12 @@ export function useAdBlockDetector() {
 
   const recheck = useCallback(() => runDetect(false), [runDetect]);
 
-  // Initial detection.
   useEffect(() => {
     runDetect(false);
   }, [runDetect]);
 
-  // While the gate is visible, silently poll so it auto-dismisses as
-  // soon as the user disables their blocker / DNS filter.
+  // While the gate is visible, silently re-probe so the overlay
+  // dismisses the moment the user disables their blocker.
   useEffect(() => {
     if (status !== 'blocked') return;
 
