@@ -3,45 +3,49 @@ import { useState, useEffect, useCallback } from 'react';
 export type AdBlockStatus = 'checking' | 'blocked' | 'allowed';
 
 /**
- * Bait element check — the only check used.
+ * Bait element check.
  *
- * We inject a <div> whose class names appear in every major ad-blocker
- * filter list (EasyList, uBlock filters, ABP list, etc.).  If an active
- * extension is hiding or collapsing ad elements, it will zero-out or
- * hide this element.
+ * Injects a <div> whose class names appear in every major ad-blocker
+ * filter list (EasyList, uBlock, ABP, etc.).  Active extensions hide or
+ * collapse such elements via CSS rules like `display:none !important`.
  *
- * Why not a network fetch?
- * Fetching an ad-network URL (nap5k.com, etc.) produces false positives
- * whenever the external server is slow, down, or unreachable from the
- * user's region — regardless of whether an ad blocker is running.
- * The DOM check is accurate and instant.
+ * Key implementation notes
+ * ─────────────────────────
+ * 1. Use `position:absolute`, NOT `position:fixed`.
+ *    For fixed elements `offsetParent` is always null (browser spec),
+ *    making that signal useless.  For absolute elements `offsetParent`
+ *    is only null when the element or an ancestor has `display:none`.
+ *
+ * 2. Do NOT set `opacity:0` on the element itself.
+ *    If we do, `getComputedStyle(el).opacity` is always '0' and the
+ *    opacity check produces a false positive for every user.
+ *
+ * 3. Two rAF frames + 200 ms lets extensions re-apply their rules after
+ *    the user has just paused/disabled the blocker.
  */
 async function checkBaitElement(): Promise<boolean> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
     el.innerHTML = '&nbsp;';
-    // Class names that trigger virtually every ad-blocker filter list
     el.className =
       'adsbox ad-unit ad-placement doubleclick ads advertisement ad textAd pub_300x250';
     el.setAttribute('data-ad', 'true');
-    // Place off-screen but still in layout so offsetHeight is reliable
+    // Absolute + far off-screen: visible to layout but invisible to user.
+    // No opacity/visibility overrides — those are what we're measuring.
     el.style.cssText =
-      'position:fixed;top:-999px;left:-999px;width:1px;height:1px;' +
-      'opacity:0;pointer-events:none;';
+      'position:absolute;top:-9999px;left:-9999px;width:1px;height:1px;';
     document.body.appendChild(el);
 
-    // Two rAF frames + 200 ms gives extensions enough time to apply
-    // their CSS/DOM rules even after the user just disabled them.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setTimeout(() => {
           const cs = window.getComputedStyle(el);
           const blocked =
-            el.offsetHeight === 0 ||
-            el.offsetWidth === 0 ||
+            el.offsetParent === null ||  // display:none makes offsetParent null
+            el.offsetHeight === 0 ||     // blocker may force height to 0
+            el.offsetWidth === 0 ||      // blocker may force width to 0
             cs.display === 'none' ||
-            cs.visibility === 'hidden' ||
-            cs.opacity === '0';
+            cs.visibility === 'hidden';
           try { document.body.removeChild(el); } catch { /* ignore */ }
           resolve(blocked);
         }, 200);
