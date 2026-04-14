@@ -326,7 +326,11 @@ export async function verifyEmail(
           const newBatches      = batchesDue - batchesCredited;
 
           if (newBatches > 0) {
-            const creditAmount = newBatches * BATCH_VALUE;
+            // Always release exactly one batch (₱100) per email-verification event.
+            // If multiple batches are due (e.g. after a backfill), they are
+            // credited one at a time — the next referral verification will pick
+            // up the remainder.
+            const creditAmount = BATCH_VALUE;
 
             // Find the referral task to link the completion record
             const refTaskRes = await client.query<{ id: string }>(
@@ -339,22 +343,20 @@ export async function verifyEmail(
             await client.query(
               `UPDATE users
                SET balance = balance + $1,
-                   referral_batches_credited = referral_batches_credited + $2
-               WHERE id = $3`,
-              [creditAmount, newBatches, userRow.referred_by],
+                   referral_batches_credited = referral_batches_credited + 1
+               WHERE id = $2`,
+              [creditAmount, userRow.referred_by],
             );
 
-            // Record one task_completion entry per newly released batch
+            // Record one task_completion entry for the released batch
             if (refTaskRes.rowCount && refTaskRes.rowCount > 0) {
               const refTaskId = refTaskRes.rows[0].id;
-              for (let i = 0; i < newBatches; i++) {
-                await client.query(
-                  `INSERT INTO task_completions
-                     (user_id, task_id, type, status, reward_earned, completed_at, proof, server_data)
-                   VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
-                  [userRow.referred_by, refTaskId, BATCH_VALUE],
-                );
-              }
+              await client.query(
+                `INSERT INTO task_completions
+                   (user_id, task_id, type, status, reward_earned, completed_at, proof, server_data)
+                 VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
+                [userRow.referred_by, refTaskId, BATCH_VALUE],
+              );
             }
 
             logger.info(
