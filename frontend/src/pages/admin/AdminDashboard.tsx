@@ -26,7 +26,7 @@ const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
   kyc:           { label: 'KYC',           Icon: ShieldCheck     },
 };
 
-// ─── Rejection modal ──────────────────────────────────────────────────────────
+// ─── Rejection modal (KYC – free text) ───────────────────────────────────────
 function RejectModal({ onConfirm, onCancel }: {
   onConfirm: (reason: string) => void;
   onCancel: () => void;
@@ -51,6 +51,76 @@ function RejectModal({ onConfirm, onCancel }: {
             className="btn btn-danger btn-sm"
             disabled={!reason.trim()}
             onClick={() => { if (reason.trim()) onConfirm(reason.trim()); }}
+          >
+            Confirm Reject
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Withdrawal rejection modal (predefined reasons) ─────────────────────────
+const WITHDRAWAL_REJECT_REASONS = [
+  'PayPal is currently under maintenance.',
+  'GCash is currently under maintenance.',
+  'Account information mismatch. Please verify your account details.',
+  'Insufficient verification details for this transaction.',
+  'Transaction temporarily suspended for security review.',
+  'Other',
+] as const;
+
+function WithdrawalRejectModal({ onConfirm, onCancel }: {
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [selected, setSelected] = useState('');
+  const [custom,   setCustom]   = useState('');
+
+  const isOther    = selected === 'Other';
+  const finalReason = isOther ? custom.trim() : selected;
+
+  return (
+    <div className="adm-modal-overlay" onClick={onCancel}>
+      <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title">Withdrawal Rejection Reason</h3>
+        <p className="adm-modal-hint">
+          Select a reason — it will be sent to the user by email and in-app notification.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '12px 0' }}>
+          {WITHDRAWAL_REJECT_REASONS.map((r) => (
+            <label key={r} className="adm-reject-option">
+              <input
+                type="radio"
+                name="wd-reject-reason"
+                value={r}
+                checked={selected === r}
+                onChange={() => setSelected(r)}
+                className="adm-reject-radio"
+              />
+              <span>{r}</span>
+            </label>
+          ))}
+        </div>
+
+        {isOther && (
+          <textarea
+            className="form-input adm-modal-textarea"
+            placeholder="Describe the reason…"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            rows={3}
+            autoFocus
+          />
+        )}
+
+        <div className="adm-modal-actions">
+          <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+          <button
+            className="btn btn-danger btn-sm"
+            disabled={!finalReason}
+            onClick={() => { if (finalReason) onConfirm(finalReason); }}
           >
             Confirm Reject
           </button>
@@ -599,7 +669,7 @@ export default function AdminDashboard() {
         />
       )}
       {wdRejectTarget && (
-        <RejectModal
+        <WithdrawalRejectModal
           onConfirm={(reason) => { void processWithdrawal(wdRejectTarget, 'reject', reason); setWdRejectTarget(null); }}
           onCancel={() => setWdRejectTarget(null)}
         />

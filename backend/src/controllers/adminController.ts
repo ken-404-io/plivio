@@ -350,13 +350,19 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
     // Send email + in-app notification (outside transaction — non-fatal)
     if (userRows.length > 0) {
       const u = userRows[0] as { email: string; username: string };
-      void sendWithdrawalStatusEmail(u.email, u.username, netAmount, newStatus as 'paid' | 'rejected');
+      void sendWithdrawalStatusEmail(
+        u.email,
+        u.username,
+        netAmount,
+        newStatus as 'paid' | 'rejected',
+        action === 'reject' ? (rejection_reason ?? undefined) : undefined,
+      );
 
       const isPaid  = newStatus === 'paid';
       const wdTitle = isPaid ? 'Withdrawal Approved' : 'Withdrawal Rejected';
       const wdBody  = isPaid
         ? `Your withdrawal of ₱${netAmount.toFixed(2)} has been approved and is being sent to your account.`
-        : `Your withdrawal was rejected. ₱${Number(withdrawal.amount).toFixed(2)} has been refunded to your balance.`;
+        : `Your withdrawal was rejected. ₱${Number(withdrawal.amount).toFixed(2)} has been refunded to your balance.${rejection_reason?.trim() ? ` Reason: ${rejection_reason.trim()}` : ''}`;
 
       void createNotification(
         withdrawal.user_id as string,
