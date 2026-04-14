@@ -318,11 +318,12 @@ export async function verifyEmail(
           const batchesDue     = Math.floor(totalReferrals / BATCH_SIZE);
 
           // Lock the referrer's row so we can safely read + update the counter
-          const referrerRes = await client.query<{ referral_batches_credited: number }>(
-            'SELECT referral_batches_credited FROM users WHERE id = $1 FOR UPDATE',
+          const referrerRes = await client.query<{ referral_batches_credited: number; username: string }>(
+            'SELECT referral_batches_credited, username FROM users WHERE id = $1 FOR UPDATE',
             [userRow.referred_by],
           );
-          const batchesCredited = referrerRes.rows[0]?.referral_batches_credited ?? 0;
+          const batchesCredited  = referrerRes.rows[0]?.referral_batches_credited ?? 0;
+          const referrerUsername = referrerRes.rows[0]?.username ?? 'unknown';
           const newBatches      = batchesDue - batchesCredited;
 
           if (newBatches > 0) {
@@ -361,8 +362,10 @@ export async function verifyEmail(
 
             logger.info(
               {
-                referrerId:       userRow.referred_by,
-                referredUserId:   row.user_id,
+                referrerUsername,
+                referrerId:         userRow.referred_by,
+                referredUsername:   userRow.username,
+                referredUserId:     row.user_id,
                 totalReferrals,
                 newBatches,
                 creditAmount,
@@ -372,8 +375,10 @@ export async function verifyEmail(
           } else {
             logger.info(
               {
-                referrerId:     userRow.referred_by,
-                referredUserId: row.user_id,
+                referrerUsername,
+                referrerId:       userRow.referred_by,
+                referredUsername: userRow.username,
+                referredUserId:   row.user_id,
                 totalReferrals,
                 batchesDue,
                 batchesCredited,
