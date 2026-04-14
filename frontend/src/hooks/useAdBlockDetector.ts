@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export type AdBlockStatus = 'checking' | 'blocked' | 'allowed';
 
@@ -124,23 +124,84 @@ async function checkBaitElement(): Promise<boolean> {
   });
 }
 
+/**
+ * Poll interval for the silent re-check that runs while the gate is
+ * visible. Short enough that the modal dismisses "instantly" after the
+ * user disables their blocker, long enough that we don't spam ad-network
+ * endpoints with probe traffic.
+ */
+const AUTO_RECHECK_INTERVAL_MS = 2500;
+
 export function useAdBlockDetector() {
   const [status, setStatus] = useState<AdBlockStatus>('checking');
+  // Keep the latest status in a ref so the poll loop (captured at mount)
+  // sees current values without having to re-subscribe every render.
+  const statusRef = useRef<AdBlockStatus>('checking');
+  statusRef.current = status;
+  // Prevent overlapping detections — if the previous probe is still in
+  // flight when a visibilitychange/focus event fires, skip the new one.
+  const inFlightRef = useRef(false);
 
-  const detect = useCallback(async () => {
-    setStatus('checking');
-    // Run both probes in parallel. The user is gated if *either* signal
-    // fires: a DOM-level extension block OR a DNS/network-level block.
-    const [baitBlocked, networkBlocked] = await Promise.all([
-      checkBaitElement(),
-      checkNetworkBlocked(),
-    ]);
-    setStatus(baitBlocked || networkBlocked ? 'blocked' : 'allowed');
+  const runDetect = useCallback(async (silent: boolean) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    try {
+      // Silent path: don't flip to 'checking' — that would briefly hide
+      // the modal mid-poll and make it flicker while still blocked.
+      if (!silent) setStatus('checking');
+      const [baitBlocked, networkBlocked] = await Promise.all([
+        checkBaitElement(),
+        checkNetworkBlocked(),
+      ]);
+      setStatus(baitBlocked || networkBlocked ? 'blocked' : 'allowed');
+    } finally {
+      inFlightRef.current = false;
+    }
   }, []);
 
+  // Explicit recheck (e.g. the "Check Again" button) — visible state
+  // transition via 'checking', which the modal shows as a spinner.
+  const detect = useCallback(() => runDetect(false), [runDetect]);
+
+  // Initial detection on mount.
   useEffect(() => {
-    detect();
-  }, [detect]);
+    runDetect(false);
+  }, [runDetect]);
+
+  // While the gate is showing, auto-recheck so the modal dismisses on
+  // its own the moment the user disables their extension or switches
+  // off their private DNS — no "Check Again" click required.
+  //
+  // Triggers:
+  //   • periodic poll       (catches inline extension toggles)
+  //   • visibilitychange    (user alt-tabbed to disable, then back)
+  //   • window focus        (same, on browsers that don't fire
+  //                          visibilitychange for window blur)
+  //   • online              (user reconnected / switched network)
+  //
+  // All listeners are torn down once status flips to 'allowed' so we
+  // don't keep hammering ad-network endpoints after the gate clears.
+  useEffect(() => {
+    if (status !== 'blocked') return;
+
+    const trigger = () => {
+      if (statusRef.current === 'blocked' && !document.hidden) {
+        void runDetect(true);
+      }
+    };
+
+    const interval = window.setInterval(trigger, AUTO_RECHECK_INTERVAL_MS);
+    document.addEventListener('visibilitychange', trigger);
+    window.addEventListener('focus', trigger);
+    window.addEventListener('online', trigger);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', trigger);
+      window.removeEventListener('focus', trigger);
+      window.removeEventListener('online', trigger);
+    };
+  }, [status, runDetect]);
 
   return { status, recheck: detect };
 }
