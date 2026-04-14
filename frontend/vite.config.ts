@@ -30,12 +30,28 @@ function removeCrossOriginPlugin(): Plugin {
 export default defineConfig({
   plugins: [react(), removeCrossOriginPlugin()],
 
-  // In dev, proxy /api requests to the local backend so you don't need CORS
+  // In dev, proxy /api requests to the local backend so you don't need CORS.
+  // Also mirror the Vercel rewrites for the Monetag ad tags so /js/p1.js
+  // and /js/p2.js resolve to real JavaScript during `vite dev` instead of
+  // falling through to the SPA fallback and triggering
+  // "Uncaught SyntaxError: Unexpected token '<'" in the console.
   server: {
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+      },
+      '/js/p1.js': {
+        target:       'https://nap5k.com',
+        changeOrigin: true,
+        secure:       true,
+        rewrite:      () => '/tag.min.js',
+      },
+      '/js/p2.js': {
+        target:       'https://quge5.com',
+        changeOrigin: true,
+        secure:       true,
+        rewrite:      () => '/88/tag.min.js',
       },
     },
   },
