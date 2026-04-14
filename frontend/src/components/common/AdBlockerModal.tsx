@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ShieldOff, RefreshCw, Ban } from 'lucide-react';
 import { useAdBlockDetector } from '../../hooks/useAdBlockDetector.ts';
 
@@ -14,10 +14,35 @@ import { useAdBlockDetector } from '../../hooks/useAdBlockDetector.ts';
  *  - status 'blocked'                           → shown
  *  - user clicks Check Again (rechecking=true)  → modal stays visible
  *    with a spinner; hides only once allowed, or re-shows if still blocked
+ *
+ * Post-unblock reload:
+ *  The ad-network tags in index.html (/js/p1.js, /js/p2.js) run at
+ *  initial page-load. If they executed while the network was blocked,
+ *  they failed silently and do not re-initialise on their own — no
+ *  banners appear even after the user disables the blocker. A single
+ *  reload gives those tags a fresh, unblocked request cycle, which is
+ *  the only universally reliable way to restore ad rendering across
+ *  third-party ad scripts. We only reload when status actually went
+ *  'blocked' → 'allowed' during this session; a user who was never
+ *  blocked never sees a reload.
  */
 export default function AdBlockerModal() {
   const { status, recheck } = useAdBlockDetector();
   const [rechecking, setRechecking] = useState(false);
+  const wasBlockedRef = useRef(false);
+
+  useEffect(() => {
+    if (status === 'blocked') {
+      wasBlockedRef.current = true;
+      return;
+    }
+    if (status === 'allowed' && wasBlockedRef.current) {
+      // Reset the flag in case the reload is somehow cancelled, so we
+      // don't loop on a subsequent allowed → blocked → allowed cycle.
+      wasBlockedRef.current = false;
+      window.location.reload();
+    }
+  }, [status]);
 
   // Keep modal visible while the user-initiated re-check runs,
   // but hide it during the silent initial detection (status='checking').
