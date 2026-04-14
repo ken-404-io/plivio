@@ -44,6 +44,20 @@ const NETWORK_PROBE_TIMEOUT_MS = 6000;
  * when **all** of them fail. A single transient error therefore can't
  * trigger the gate.
  *
+ *   • mode: 'no-cors'     — makes fetch behave the way a <script> tag
+ *                           loading the same URL behaves: it doesn't
+ *                           care about CORS headers, follows redirects
+ *                           transparently, and resolves on *any* HTTP
+ *                           response as an opaque success. This matters
+ *                           here because Vercel rewrites to external
+ *                           origins (nap5k.com / quge5.com) can surface
+ *                           cross-origin behaviour to the browser in
+ *                           some configurations; a default CORS fetch
+ *                           then rejects with a TypeError while the
+ *                           script tag at /js/p1.js loads fine and ads
+ *                           render. Matching the script tag's fetch
+ *                           semantics avoids gating users whose ads
+ *                           are verifiably loading.
  *   • cache: 'no-store'   — never reuse a cached response; we need to
  *                           observe the *current* network state.
  *   • credentials: 'omit' — don't send app cookies on the probe request.
@@ -62,6 +76,7 @@ async function checkNetworkBlocked(): Promise<boolean> {
 
       fetch(`${url}?_=${Date.now()}`, {
         method:      'GET',
+        mode:        'no-cors',
         cache:       'no-store',
         credentials: 'omit',
         redirect:    'follow',
