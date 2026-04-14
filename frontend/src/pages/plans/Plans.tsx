@@ -7,6 +7,71 @@ import { useToast } from '../../components/common/Toast.tsx';
 import { useAchievement } from '../../components/common/Achievement.tsx';
 import type { Subscription, PlansResponse, PlanInfo } from '../../types/index.ts';
 
+// ─── Branded redirect page shown in the new tab while the API call runs ───────
+// Prevents users seeing a blank white page and thinking the app hung.
+function writeRedirectPage(win: Window) {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Plivio · Finance — Secure Payment</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      background:#181818;color:#c8d8f0;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      display:flex;flex-direction:column;align-items:center;
+      justify-content:center;min-height:100vh;gap:20px;padding:24px;
+    }
+    .logo-row{display:flex;align-items:center;gap:12px}
+    .brand-name{font-size:28px;font-weight:700;color:#f0f4ff}
+    .brand-sep{color:#3b5a7a;font-weight:300;font-size:22px}
+    .brand-sub{font-size:18px;color:#6b85a8;font-weight:500}
+    .spinner{
+      width:36px;height:36px;
+      border:3px solid rgba(24,119,242,0.2);
+      border-top-color:#1877f2;
+      border-radius:50%;
+      animation:spin 0.8s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .msg{font-size:15px;color:#c8d8f0}
+    .secure{font-size:12px;color:#3b5a7a;display:flex;align-items:center;gap:6px}
+  </style>
+</head>
+<body>
+  <div class="logo-row">
+    <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 56 56" fill="none">
+      <defs>
+        <linearGradient id="g" x1="8" y1="4" x2="50" y2="56" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#64b5f6"/>
+          <stop offset="55%" stop-color="#1877f2"/>
+          <stop offset="100%" stop-color="#0d5abf"/>
+        </linearGradient>
+      </defs>
+      <path fill="url(#g)" fill-rule="evenodd" d="M 28,4 L 46,22 L 36,22 C 52,22 52,46 36,46 L 36,52 L 20,52 L 20,22 L 10,22 Z M 36,30 C 44,30 44,40 36,40 L 36,30 Z"/>
+    </svg>
+    <span class="brand-name">Plivio</span>
+    <span class="brand-sep">·</span>
+    <span class="brand-sub">Finance</span>
+  </div>
+  <div class="spinner"></div>
+  <p class="msg">Redirecting to secure payment&hellip;</p>
+  <p class="secure">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+    Powered by PayMongo &middot; 256-bit SSL
+  </p>
+</body>
+</html>`;
+  win.document.write(html);
+  win.document.close();
+}
+
 const PLAN_ORDER = ['free', 'premium', 'elite'];
 
 // ─── Feature comparison rows ──────────────────────────────────────────────────
@@ -139,6 +204,9 @@ export default function Plans() {
     // browsers don't treat it as a blocked popup. We'll redirect it after the
     // API call returns the checkout URL.
     const payWin = window.open('', '_blank');
+    // Render branded loading page immediately so users don't see a blank tab
+    // while the API call is in-flight.
+    if (payWin) writeRedirectPage(payWin);
 
     try {
       const returnBase = `${window.location.origin}/plans`;
