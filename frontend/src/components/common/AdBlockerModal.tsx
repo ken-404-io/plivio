@@ -1,20 +1,33 @@
+import { useState } from 'react';
 import { ShieldOff, RefreshCw, Ban } from 'lucide-react';
 import { useAdBlockDetector } from '../../hooks/useAdBlockDetector.ts';
 
 /**
  * AdBlockerModal
  *
- * Full-screen, non-dismissible gate shown whenever an ad blocker or
- * private/filtering DNS is detected.  The user must disable the
- * blocker and click "Check Again" before the app becomes usable.
+ * Full-screen, non-dismissible gate shown when an ad blocker or private
+ * DNS is detected.  The user must disable it and click "Check Again".
+ *
+ * Guard logic:
+ *  - status 'checking'  (initial auto-detect)  → hidden, no flash
+ *  - status 'allowed'                           → hidden, never shown
+ *  - status 'blocked'                           → shown
+ *  - user clicks Check Again (rechecking=true)  → modal stays visible
+ *    with a spinner; hides only once allowed, or re-shows if still blocked
  */
 export default function AdBlockerModal() {
   const { status, recheck } = useAdBlockDetector();
+  const [rechecking, setRechecking] = useState(false);
 
-  // Only block when an ad blocker is definitively detected.
-  // During 'checking' (initial detection) or 'allowed' the modal stays hidden,
-  // so users without an ad blocker never see it — not even a flash.
-  if (status !== 'blocked') return null;
+  // Keep modal visible while the user-initiated re-check runs,
+  // but hide it during the silent initial detection (status='checking').
+  if (status !== 'blocked' && !rechecking) return null;
+
+  async function handleRecheck() {
+    setRechecking(true);
+    await recheck();
+    setRechecking(false);
+  }
 
   return (
     <div className="adblocker-overlay" role="dialog" aria-modal="true" aria-labelledby="adblocker-title">
@@ -62,11 +75,11 @@ export default function AdBlockerModal() {
 
         {/* CTA */}
         <button
-          className={`btn btn-primary btn-full adblocker-btn${status === 'checking' ? ' adblocker-btn--loading' : ''}`}
-          onClick={recheck}
-          disabled={status === 'checking'}
+          className={`btn btn-primary btn-full adblocker-btn${rechecking ? ' adblocker-btn--loading' : ''}`}
+          onClick={handleRecheck}
+          disabled={rechecking}
         >
-          {status === 'checking' ? (
+          {rechecking ? (
             <>
               <RefreshCw size={16} className="adblocker-spin" />
               Checking…
