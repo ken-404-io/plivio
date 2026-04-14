@@ -3,42 +3,52 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 export type AdBlockStatus = 'checking' | 'blocked' | 'allowed';
 
 /**
- * Known ad/tracking endpoints that appear on every major DNS filter
- * list (Pi-hole default, NextDNS ads, AdGuard DNS, Control D, Quad9, …)
- * *and* every browser filter list (EasyList, uBlock, ABP, Brave).
+ * Same-origin probe endpoints — the exact Monetag script URLs the app
+ * itself loads in index.html, served through the Vercel rewrites
+ * (/js/p1.js → nap5k.com, /js/p2.js → quge5.com).
  *
- * Picked to be diverse (different TLDs / CDNs) so a single upstream
- * outage doesn't trip the detector for everyone.
+ * Why same-origin rather than hitting third-party ad CDNs directly:
+ *
+ *  - Probing external domains (pagead2.googlesyndication.com,
+ *    doubleclick.net, …) produced large numbers of false positives for
+ *    users who are NOT running any blocker: regional CDN restrictions,
+ *    carrier/ISP filters, corporate firewalls, privacy browsers that
+ *    partition third-party requests (Safari ITP, Brave Shields default,
+ *    Firefox ETP strict), transient CDN errors, or slow mobile links
+ *    hitting the short request timeout. Those requests fail for reasons
+ *    that have nothing to do with ad blocking, yet trip the gate and
+ *    lock the user out of the app.
+ *
+ *  - The same-origin proxy URLs are the resources whose success or
+ *    failure actually determines whether ads load for this user. If
+ *    /js/p1.js returns, the Monetag bootstrap can run; if it doesn't,
+ *    ads won't load regardless of the reason, so gating is warranted.
+ *
+ *  - Browser ad-blocker extensions still catch and block these URLs
+ *    (EasyList and similar filter lists pattern-match paths like
+ *    /js/p*.js with ad-zone query params), and network/DNS-level
+ *    blockers that intercept the Vercel rewrite targets will still
+ *    surface as a failed fetch here.
  */
 const AD_NETWORK_PROBES = [
-  'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js',
-  'https://static.doubleclick.net/instream/ad_status.js',
-  'https://securepubads.g.doubleclick.net/tag/js/gpt.js',
+  '/js/p1.js',
+  '/js/p2.js',
 ] as const;
 
-const NETWORK_PROBE_TIMEOUT_MS = 3500;
+const NETWORK_PROBE_TIMEOUT_MS = 6000;
 
 /**
- * DNS / network-level ad-blocker check.
+ * Network-level ad-blocker check.
  *
- * Browser ad-blocker extensions are caught by the bait-element heuristic
- * below, but they miss users who block ads upstream at the DNS layer
- * (Pi-hole, NextDNS, AdGuard DNS, Control D, ISP-level filtering, …).
- * Those resolvers either return NXDOMAIN or a null IP (0.0.0.0 /
- * 127.0.0.1), so an HTTPS request to a blocked hostname never
- * completes — `fetch` rejects with a TypeError.
+ * We fire the probes in parallel and only declare the user "blocked"
+ * when **all** of them fail. A single transient error therefore can't
+ * trigger the gate.
  *
- * We fire off three independent probes in parallel and only declare the
- * user "blocked" when **all** of them fail.  A single flaky CDN (or an
- * aborted tab-switch) therefore can't trigger a false positive.
- *
- *   • mode: 'no-cors'     — opaque response is fine; we only care whether
- *                           the request reached the origin at all.
- *   • credentials: 'omit' — no cookies sent to ad networks from the gate.
  *   • cache: 'no-store'   — never reuse a cached response; we need to
  *                           observe the *current* network state.
+ *   • credentials: 'omit' — don't send app cookies on the probe request.
  *   • AbortController     — bound execution time even when the browser
- *                           silently hangs the socket (some DNS blockers
+ *                           silently hangs the socket (some blockers
  *                           blackhole packets instead of refusing them).
  */
 async function checkNetworkBlocked(): Promise<boolean> {
@@ -52,19 +62,22 @@ async function checkNetworkBlocked(): Promise<boolean> {
 
       fetch(`${url}?_=${Date.now()}`, {
         method:      'GET',
-        mode:        'no-cors',
         cache:       'no-store',
         credentials: 'omit',
         redirect:    'follow',
         signal:      controller.signal,
       })
-        .then(() => {
+        .then((res) => {
           clearTimeout(timer);
-          resolve(false); // reached the origin → not blocked
+          // Same-origin fetch: a 2xx/3xx response means the proxy
+          // delivered the ad script. A 4xx/5xx means the edge rewrite
+          // failed upstream (e.g. the ad CDN is unreachable from the
+          // Vercel edge, or the resource was blocked en route).
+          resolve(!res.ok);
         })
         .catch(() => {
           clearTimeout(timer);
-          resolve(true);  // DNS fail / extension block / network error
+          resolve(true);  // extension block / network error
         });
     });
 
