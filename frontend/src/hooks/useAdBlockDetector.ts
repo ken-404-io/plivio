@@ -3,6 +3,76 @@ import { useState, useEffect, useCallback } from 'react';
 export type AdBlockStatus = 'checking' | 'blocked' | 'allowed';
 
 /**
+ * Known ad/tracking endpoints that appear on every major DNS filter
+ * list (Pi-hole default, NextDNS ads, AdGuard DNS, Control D, Quad9, …)
+ * *and* every browser filter list (EasyList, uBlock, ABP, Brave).
+ *
+ * Picked to be diverse (different TLDs / CDNs) so a single upstream
+ * outage doesn't trip the detector for everyone.
+ */
+const AD_NETWORK_PROBES = [
+  'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js',
+  'https://static.doubleclick.net/instream/ad_status.js',
+  'https://securepubads.g.doubleclick.net/tag/js/gpt.js',
+] as const;
+
+const NETWORK_PROBE_TIMEOUT_MS = 3500;
+
+/**
+ * DNS / network-level ad-blocker check.
+ *
+ * Browser ad-blocker extensions are caught by the bait-element heuristic
+ * below, but they miss users who block ads upstream at the DNS layer
+ * (Pi-hole, NextDNS, AdGuard DNS, Control D, ISP-level filtering, …).
+ * Those resolvers either return NXDOMAIN or a null IP (0.0.0.0 /
+ * 127.0.0.1), so an HTTPS request to a blocked hostname never
+ * completes — `fetch` rejects with a TypeError.
+ *
+ * We fire off three independent probes in parallel and only declare the
+ * user "blocked" when **all** of them fail.  A single flaky CDN (or an
+ * aborted tab-switch) therefore can't trigger a false positive.
+ *
+ *   • mode: 'no-cors'     — opaque response is fine; we only care whether
+ *                           the request reached the origin at all.
+ *   • credentials: 'omit' — no cookies sent to ad networks from the gate.
+ *   • cache: 'no-store'   — never reuse a cached response; we need to
+ *                           observe the *current* network state.
+ *   • AbortController     — bound execution time even when the browser
+ *                           silently hangs the socket (some DNS blockers
+ *                           blackhole packets instead of refusing them).
+ */
+async function checkNetworkBlocked(): Promise<boolean> {
+  const probe = (url: string): Promise<boolean> =>
+    new Promise((resolve) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        controller.abort();
+        resolve(true); // timeout → treat as blocked
+      }, NETWORK_PROBE_TIMEOUT_MS);
+
+      fetch(`${url}?_=${Date.now()}`, {
+        method:      'GET',
+        mode:        'no-cors',
+        cache:       'no-store',
+        credentials: 'omit',
+        redirect:    'follow',
+        signal:      controller.signal,
+      })
+        .then(() => {
+          clearTimeout(timer);
+          resolve(false); // reached the origin → not blocked
+        })
+        .catch(() => {
+          clearTimeout(timer);
+          resolve(true);  // DNS fail / extension block / network error
+        });
+    });
+
+  const results = await Promise.all(AD_NETWORK_PROBES.map(probe));
+  return results.every(Boolean);
+}
+
+/**
  * Bait element check.
  *
  * Injects a <div> whose class names appear in every major ad-blocker
@@ -59,8 +129,13 @@ export function useAdBlockDetector() {
 
   const detect = useCallback(async () => {
     setStatus('checking');
-    const blocked = await checkBaitElement();
-    setStatus(blocked ? 'blocked' : 'allowed');
+    // Run both probes in parallel. The user is gated if *either* signal
+    // fires: a DOM-level extension block OR a DNS/network-level block.
+    const [baitBlocked, networkBlocked] = await Promise.all([
+      checkBaitElement(),
+      checkNetworkBlocked(),
+    ]);
+    setStatus(baitBlocked || networkBlocked ? 'blocked' : 'allowed');
   }, []);
 
   useEffect(() => {
