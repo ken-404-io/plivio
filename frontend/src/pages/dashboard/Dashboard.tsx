@@ -276,7 +276,7 @@ export default function Dashboard() {
           </span>
         </div>
         <div className="dash-quizly-cta-reward">
-          <span className="dash-quizly-cta-reward-amt">₱0.50</span>
+          <span className="dash-quizly-cta-reward-amt">₱0.35</span>
           <span className="dash-quizly-cta-reward-lbl">per answer</span>
         </div>
         <ChevronRight size={18} className="dash-quizly-cta-arrow" />
