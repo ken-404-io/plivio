@@ -1,151 +1,90 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-export type AdBlockStatus = 'checking' | 'blocked' | 'allowed';
+export type AdBlockStatus = 'checking' | 'allowed' | 'blocked';
 
 /**
- * Same-origin probe endpoints — the exact Monetag script URLs the app
- * itself loads in index.html, served through the Vercel rewrites
- * (/js/p1.js → nap5k.com, /js/p2.js → quge5.com).
- *
- * Why same-origin rather than hitting third-party ad CDNs directly:
- *
- *  - Probing external domains (pagead2.googlesyndication.com,
- *    doubleclick.net, …) produced large numbers of false positives for
- *    users who are NOT running any blocker: regional CDN restrictions,
- *    carrier/ISP filters, corporate firewalls, privacy browsers that
- *    partition third-party requests (Safari ITP, Brave Shields default,
- *    Firefox ETP strict), transient CDN errors, or slow mobile links
- *    hitting the short request timeout. Those requests fail for reasons
- *    that have nothing to do with ad blocking, yet trip the gate and
- *    lock the user out of the app.
- *
- *  - The same-origin proxy URLs are the resources whose success or
- *    failure actually determines whether ads load for this user. If
- *    /js/p1.js returns, the Monetag bootstrap can run; if it doesn't,
- *    ads won't load regardless of the reason, so gating is warranted.
- *
- *  - Browser ad-blocker extensions still catch and block these URLs
- *    (EasyList and similar filter lists pattern-match paths like
- *    /js/p*.js with ad-zone query params), and network/DNS-level
- *    blockers that intercept the Vercel rewrite targets will still
- *    surface as a failed fetch here.
+ * Canonical ad-serving script URLs. A failed fetch here indicates
+ * that an ad blocker extension (uBlock Origin, AdBlock Plus, Brave
+ * Shields, etc.) is filtering the request by URL pattern.
  */
-const AD_NETWORK_PROBES = [
-  '/js/p1.js',
-  '/js/p2.js',
+const AD_SCRIPT_PROBES = [
+  'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js',
+  'https://www.googletagservices.com/tag/js/gpt.js',
 ] as const;
 
-const NETWORK_PROBE_TIMEOUT_MS = 6000;
+/**
+ * Well-known ad / tracking hostnames. A failed fetch here with no
+ * corresponding "online: false" event indicates the hostname is
+ * being blocked at the DNS layer — a filtering resolver such as
+ * Pi-hole, NextDNS, AdGuard DNS or Cloudflare-for-Families.
+ */
+const DNS_PROBES = [
+  'https://static.doubleclick.net/instream/ad_status.js',
+  'https://securepubads.g.doubleclick.net/tag/js/gpt.js',
+] as const;
+
+const PROBE_TIMEOUT_MS = 5000;
 
 /**
- * Network-level ad-blocker check.
+ * Fetch-based probe. Resolves `true` if the request fails (network
+ * error, DNS failure, aborted by extension, or timeout).
  *
- * We fire the probes in parallel and only declare the user "blocked"
- * when **all** of them fail. A single transient error therefore can't
- * trigger the gate.
- *
- *   • mode: 'no-cors'     — makes fetch behave the way a <script> tag
- *                           loading the same URL behaves: it doesn't
- *                           care about CORS headers, follows redirects
- *                           transparently, and resolves on *any* HTTP
- *                           response as an opaque success. This matters
- *                           here because Vercel rewrites to external
- *                           origins (nap5k.com / quge5.com) can surface
- *                           cross-origin behaviour to the browser in
- *                           some configurations; a default CORS fetch
- *                           then rejects with a TypeError while the
- *                           script tag at /js/p1.js loads fine and ads
- *                           render. Matching the script tag's fetch
- *                           semantics avoids gating users whose ads
- *                           are verifiably loading.
- *   • cache: 'no-store'   — never reuse a cached response; we need to
- *                           observe the *current* network state.
- *   • credentials: 'omit' — don't send app cookies on the probe request.
- *   • AbortController     — bound execution time even when the browser
- *                           silently hangs the socket (some blockers
- *                           blackhole packets instead of refusing them).
+ * Uses `mode: 'no-cors'` so the probe behaves like a plain `<script>`
+ * tag load: any HTTP response (even 4xx/5xx) counts as "reached the
+ * origin", which is the signal we care about. A CORS preflight
+ * rejection on a host that actually served the response would
+ * otherwise false-positive.
  */
-async function checkNetworkBlocked(): Promise<boolean> {
-  const probe = (url: string): Promise<boolean> =>
-    new Promise((resolve) => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => {
-        controller.abort();
-        resolve(true); // timeout → treat as blocked
-      }, NETWORK_PROBE_TIMEOUT_MS);
+function fetchFails(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
+      resolve(true);
+    }, PROBE_TIMEOUT_MS);
 
-      fetch(`${url}?_=${Date.now()}`, {
-        method:      'GET',
-        mode:        'no-cors',
-        cache:       'no-store',
-        credentials: 'omit',
-        redirect:    'follow',
-        signal:      controller.signal,
+    fetch(`${url}?_=${Date.now()}`, {
+      method: 'GET',
+      mode: 'no-cors',
+      cache: 'no-store',
+      credentials: 'omit',
+      redirect: 'follow',
+      signal: controller.signal,
+    })
+      .then(() => {
+        clearTimeout(timer);
+        resolve(false);
       })
-        .then(() => {
-          clearTimeout(timer);
-          // Any HTTP response — even 4xx/5xx — means the request
-          // *reached* the origin. That rules out extension blocking
-          // (which aborts the request outright) and DNS filtering
-          // (which fails at resolve time). Upstream HTTP errors from
-          // the Vercel rewrite (Monetag auth/rate-limit/zone config,
-          // CDN hiccups) are server-side issues that do not indicate
-          // the user is filtering anything, so we must not gate them.
-          resolve(false);
-        })
-        .catch(() => {
-          clearTimeout(timer);
-          resolve(true);  // extension block / DNS fail / network error
-        });
-    });
-
-  const results = await Promise.all(AD_NETWORK_PROBES.map(probe));
-  return results.every(Boolean);
+      .catch(() => {
+        clearTimeout(timer);
+        resolve(true);
+      });
+  });
 }
 
 /**
- * Bait element check.
+ * Ad-blocker detection — bait element.
  *
- * Injects a <div> whose class names appear in every major ad-blocker
- * filter list (EasyList, uBlock, ABP, etc.).  Active extensions hide or
- * collapse such elements via CSS rules like `display:none !important`.
+ * Injects a DIV whose class names appear on every major filter list
+ * (EasyList, uBlock, ABP). Active extensions hide or collapse the
+ * element via CSS rules like `display:none !important`.
  *
- * On its own this signal is too aggressive — browser built-in shields
- * (Brave Shields, Samsung Internet ad block, Firefox ETP strict, Opera
- * ad block) and some accessibility/reader-mode extensions hide
- * ad-shaped DOM without actually blocking the ad network requests, so
- * a user whose ads are verifiably rendering can still trip the bait.
- * We therefore combine this signal with the network probe using AND
- * logic (see detectOnce below): the gate only fires when BOTH the ad
- * DOM is suppressed AND the ad script cannot be fetched, which is the
- * signature of a real ad-blocker extension and not a cosmetic-only
- * shield.
- *
- * Key implementation notes
- * ─────────────────────────
- * 1. Use `position:absolute`, NOT `position:fixed`.
- *    For fixed elements `offsetParent` is always null (browser spec),
- *    making that signal useless.  For absolute elements `offsetParent`
- *    is only null when the element or an ancestor has `display:none`.
- *
- * 2. Do NOT set `opacity:0` on the element itself.
- *    If we do, `getComputedStyle(el).opacity` is always '0' and the
- *    opacity check produces a false positive for every user.
- *
- * 3. Two rAF frames + 200 ms lets extensions re-apply their rules after
- *    the user has just paused/disabled the blocker.
+ *   • position:absolute (not fixed) — fixed elements always have
+ *     `offsetParent === null`, which would make the check useless.
+ *   • no `opacity:0` on the element itself — doing so would make the
+ *     computed-style check always report "blocked".
+ *   • two rAFs + short delay — gives the extension a chance to apply
+ *     its hiding stylesheet before we measure.
  */
-async function checkBaitElement(): Promise<boolean> {
+function baitBlocked(): Promise<boolean> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
-    el.innerHTML = '&nbsp;';
     el.className =
-      'adsbox ad-unit ad-placement doubleclick ads advertisement ad textAd pub_300x250';
+      'adsbox ad-unit ad-banner ads advertisement ad-placement doubleclick google-ads pub_300x250';
     el.setAttribute('data-ad', 'true');
-    // Absolute + far off-screen: visible to layout but invisible to user.
-    // No opacity/visibility overrides — those are what we're measuring.
+    el.innerHTML = '&nbsp;';
     el.style.cssText =
-      'position:absolute;top:-9999px;left:-9999px;width:1px;height:1px;';
+      'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;pointer-events:none;';
     document.body.appendChild(el);
 
     requestAnimationFrame(() => {
@@ -153,123 +92,95 @@ async function checkBaitElement(): Promise<boolean> {
         setTimeout(() => {
           const cs = window.getComputedStyle(el);
           const blocked =
-            el.offsetParent === null ||  // display:none makes offsetParent null
-            el.offsetHeight === 0 ||     // blocker may force height to 0
-            el.offsetWidth === 0 ||      // blocker may force width to 0
+            el.offsetParent === null ||
+            el.offsetHeight === 0 ||
+            el.offsetWidth === 0 ||
             cs.display === 'none' ||
             cs.visibility === 'hidden';
-          try { document.body.removeChild(el); } catch { /* ignore */ }
+          try { el.remove(); } catch { /* ignore */ }
           resolve(blocked);
-        }, 200);
+        }, 150);
       });
     });
   });
 }
 
 /**
- * Poll interval for the silent re-check that runs while the gate is
- * visible. Short enough that the modal dismisses "instantly" after the
- * user disables their blocker, long enough that we don't spam ad-network
- * endpoints with probe traffic.
+ * Ad-blocker detection — any ad-serving script fetch fails.
  */
-const AUTO_RECHECK_INTERVAL_MS = 2500;
-
-/**
- * Run one combined detection cycle.
- *
- * Returns true iff BOTH signals agree that the user is blocking ads —
- * the ad-shaped DOM is suppressed AND the ad script URL can't be
- * fetched. Either signal alone is not enough:
- *
- *  - Bait hidden, network OK:  cosmetic shield / tracking-protection /
- *                              content-script overlay. Ads actually
- *                              render; don't gate.
- *  - Bait visible, network fails: usually a transient network error
- *                              (also caught by the two-phase retry
- *                              below). A true ad-blocker extension
- *                              would also hide the bait DOM, so if
- *                              bait is fine but fetch is failing,
- *                              it's very unlikely to be ad-blocking.
- *  - Both signals fire together: signature of a real ad-blocker
- *                              (uBlock Origin, AdBlock Plus, etc.).
- *                              Gate is warranted.
- */
-async function detectOnce(): Promise<boolean> {
-  const [baitBlocked, networkBlocked] = await Promise.all([
-    checkBaitElement(),
-    checkNetworkBlocked(),
-  ]);
-  return baitBlocked && networkBlocked;
+async function adScriptBlocked(): Promise<boolean> {
+  const results = await Promise.all(AD_SCRIPT_PROBES.map(fetchFails));
+  return results.some(Boolean);
 }
 
+/**
+ * Private / filtering DNS detection — any ad/tracking domain fails to
+ * resolve. Guarded by the navigator.onLine check so a device that is
+ * simply offline doesn't get gated.
+ */
+async function dnsBlocked(): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return false;
+  }
+  const results = await Promise.all(DNS_PROBES.map(fetchFails));
+  return results.some(Boolean);
+}
+
+/**
+ * Single detection pass.
+ *
+ * Returns `true` (blocked) if ANY of the signals fire — per spec:
+ * "if either is detected, show … overlay". A bait element that
+ * extensions hide, an ad-serving script that won't load, or a
+ * DNS-level filter on a tracking domain is each sufficient on its
+ * own to gate the user.
+ */
+async function detectOnce(): Promise<boolean> {
+  const [bait, adScript, dns] = await Promise.all([
+    baitBlocked(),
+    adScriptBlocked(),
+    dnsBlocked(),
+  ]);
+  return bait || adScript || dns;
+}
+
+const AUTO_RECHECK_INTERVAL_MS = 3000;
+
+/**
+ * React hook: runs detection on mount, exposes a manual `recheck()`,
+ * and auto-polls while the gate is visible so the overlay dismisses
+ * the moment the user disables their blocker.
+ */
 export function useAdBlockDetector() {
   const [status, setStatus] = useState<AdBlockStatus>('checking');
-  // Keep the latest status in a ref so the poll loop (captured at mount)
-  // sees current values without having to re-subscribe every render.
-  const statusRef = useRef<AdBlockStatus>('checking');
-  statusRef.current = status;
-  // Prevent overlapping detections — if the previous probe is still in
-  // flight when a visibilitychange/focus event fires, skip the new one.
   const inFlightRef = useRef(false);
 
   const runDetect = useCallback(async (silent: boolean) => {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
     try {
-      // Silent path: don't flip to 'checking' — that would briefly hide
-      // the modal mid-poll and make it flicker while still blocked.
       if (!silent) setStatus('checking');
-
-      // Two-phase detection to eliminate single-blip false positives.
-      //
-      // Users with no ad blocker almost always short-circuit after the
-      // first probe (it reports 'allowed' and we're done). Only if the
-      // first probe reports 'blocked' do we run a second, confirming
-      // probe — that way a dropped request during network switching, a
-      // brief service-worker stall, or a tab that was backgrounded
-      // mid-fetch can't by itself trigger the modal. Real blockers
-      // persist across both probes, so they still get gated.
-      const firstBlocked = await detectOnce();
-      if (!firstBlocked) {
-        setStatus('allowed');
-        return;
-      }
-      const secondBlocked = await detectOnce();
-      setStatus(secondBlocked ? 'blocked' : 'allowed');
+      const blocked = await detectOnce();
+      setStatus(blocked ? 'blocked' : 'allowed');
     } finally {
       inFlightRef.current = false;
     }
   }, []);
 
-  // Explicit recheck (e.g. the "Check Again" button) — visible state
-  // transition via 'checking', which the modal shows as a spinner.
-  const detect = useCallback(() => runDetect(false), [runDetect]);
+  const recheck = useCallback(() => runDetect(false), [runDetect]);
 
-  // Initial detection on mount.
+  // Initial detection.
   useEffect(() => {
     runDetect(false);
   }, [runDetect]);
 
-  // While the gate is showing, auto-recheck so the modal dismisses on
-  // its own the moment the user disables their extension or switches
-  // off their private DNS — no "Check Again" click required.
-  //
-  // Triggers:
-  //   • periodic poll       (catches inline extension toggles)
-  //   • visibilitychange    (user alt-tabbed to disable, then back)
-  //   • window focus        (same, on browsers that don't fire
-  //                          visibilitychange for window blur)
-  //   • online              (user reconnected / switched network)
-  //
-  // All listeners are torn down once status flips to 'allowed' so we
-  // don't keep hammering ad-network endpoints after the gate clears.
+  // While the gate is visible, silently poll so it auto-dismisses as
+  // soon as the user disables their blocker / DNS filter.
   useEffect(() => {
     if (status !== 'blocked') return;
 
     const trigger = () => {
-      if (statusRef.current === 'blocked' && !document.hidden) {
-        void runDetect(true);
-      }
+      if (!document.hidden) void runDetect(true);
     };
 
     const interval = window.setInterval(trigger, AUTO_RECHECK_INTERVAL_MS);
@@ -285,5 +196,5 @@ export function useAdBlockDetector() {
     };
   }, [status, runDetect]);
 
-  return { status, recheck: detect };
+  return { status, recheck };
 }
