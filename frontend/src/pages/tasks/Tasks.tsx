@@ -202,7 +202,7 @@ export default function Tasks() {
               <div className="quiz-task-card-title">Quizly</div>
             </div>
             <div className="quiz-task-card-right">
-              <span className="quiz-task-card-reward">₱0.50</span>
+              <span className="quiz-task-card-reward">₱0.35</span>
               <span className="quiz-task-card-tag">per answer</span>
               <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 4 }} />
             </div>
