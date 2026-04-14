@@ -111,7 +111,7 @@ export default function Kyc() {
       // Don't set Content-Type manually — the axios interceptor strips it
       // for FormData so the browser can compute the multipart boundary.
       await api.post('/kyc', formData);
-      toast.success("KYC submitted! We'll review it within 1–3 business days.");
+      toast.success("KYC submitted! We'll review it within 24–48 hours.");
       setKycData({ status: 'pending', id_type: idType, submitted_at: new Date().toISOString(), reviewed_at: null, rejection_reason: null });
       setIdFront(null);
       setIdSelfie(null);
@@ -199,8 +199,15 @@ export default function Kyc() {
         </div>
       )}
       {currentStatus === 'pending' && (
-        <div className="alert alert--info">
-          Your documents are under review. This typically takes 1–3 business days.
+        <div className="alert alert--info kyc-pending-notice">
+          <div className="kyc-pending-notice-header">
+            <Clock size={16} />
+            Verification Under Review
+          </div>
+          <p className="kyc-pending-notice-body">
+            Your ID verification is currently under review. This process typically takes 24 to 48 hours.
+            We'll notify you once your verification is complete. Thank you for your patience.
+          </p>
         </div>
       )}
 

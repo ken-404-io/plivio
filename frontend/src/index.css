@@ -6061,6 +6061,26 @@ a, button, [role="button"], [tabindex] {
   vertical-align: middle;
 }
 
+/* ─── KYC pending notice ─────────────────────────────────────────────────────── */
+.kyc-pending-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+}
+.kyc-pending-notice-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.kyc-pending-notice-body {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
 /* ─── KYC status banner ──────────────────────────────────────────────────────── */
 .kyc-status-banner {
   display: flex;
