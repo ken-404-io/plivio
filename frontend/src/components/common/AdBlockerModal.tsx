@@ -16,15 +16,15 @@ import { useAdBlockDetector } from '../../hooks/useAdBlockDetector.ts';
  *    with a spinner; hides only once allowed, or re-shows if still blocked
  *
  * Post-unblock reload:
- *  The ad-network tags in index.html (/js/p1.js, /js/p2.js) run at
- *  initial page-load. If they executed while the network was blocked,
- *  they failed silently and do not re-initialise on their own — no
- *  banners appear even after the user disables the blocker. A single
- *  reload gives those tags a fresh, unblocked request cycle, which is
- *  the only universally reliable way to restore ad rendering across
- *  third-party ad scripts. We only reload when status actually went
- *  'blocked' → 'allowed' during this session; a user who was never
- *  blocked never sees a reload.
+ *  The Monetag tags in index.html (/js/p1.js, /js/p2.js — proxied via
+ *  Vercel rewrites to nap5k.com / quge5.com) run at initial page-load.
+ *  If they executed while the network was blocked, they failed silently
+ *  and do not re-initialise on their own — no banners appear even after
+ *  the user disables the blocker. A single reload gives those tags a
+ *  fresh, unblocked request cycle, which is the only universally
+ *  reliable way to restore ad rendering across third-party ad scripts.
+ *  We only reload when status actually went 'blocked' → 'allowed' during
+ *  this session; a user who was never blocked never sees a reload.
  */
 export default function AdBlockerModal() {
   const { status, recheck } = useAdBlockDetector();
