@@ -67,17 +67,20 @@ async function checkNetworkBlocked(): Promise<boolean> {
         redirect:    'follow',
         signal:      controller.signal,
       })
-        .then((res) => {
+        .then(() => {
           clearTimeout(timer);
-          // Same-origin fetch: a 2xx/3xx response means the proxy
-          // delivered the ad script. A 4xx/5xx means the edge rewrite
-          // failed upstream (e.g. the ad CDN is unreachable from the
-          // Vercel edge, or the resource was blocked en route).
-          resolve(!res.ok);
+          // Any HTTP response — even 4xx/5xx — means the request
+          // *reached* the origin. That rules out extension blocking
+          // (which aborts the request outright) and DNS filtering
+          // (which fails at resolve time). Upstream HTTP errors from
+          // the Vercel rewrite (Monetag auth/rate-limit/zone config,
+          // CDN hiccups) are server-side issues that do not indicate
+          // the user is filtering anything, so we must not gate them.
+          resolve(false);
         })
         .catch(() => {
           clearTimeout(timer);
-          resolve(true);  // extension block / network error
+          resolve(true);  // extension block / DNS fail / network error
         });
     });
 
@@ -145,6 +148,18 @@ async function checkBaitElement(): Promise<boolean> {
  */
 const AUTO_RECHECK_INTERVAL_MS = 2500;
 
+/**
+ * Run one bait + network probe cycle, returning true iff either signal
+ * reports blocking.
+ */
+async function detectOnce(): Promise<boolean> {
+  const [baitBlocked, networkBlocked] = await Promise.all([
+    checkBaitElement(),
+    checkNetworkBlocked(),
+  ]);
+  return baitBlocked || networkBlocked;
+}
+
 export function useAdBlockDetector() {
   const [status, setStatus] = useState<AdBlockStatus>('checking');
   // Keep the latest status in a ref so the poll loop (captured at mount)
@@ -162,11 +177,23 @@ export function useAdBlockDetector() {
       // Silent path: don't flip to 'checking' — that would briefly hide
       // the modal mid-poll and make it flicker while still blocked.
       if (!silent) setStatus('checking');
-      const [baitBlocked, networkBlocked] = await Promise.all([
-        checkBaitElement(),
-        checkNetworkBlocked(),
-      ]);
-      setStatus(baitBlocked || networkBlocked ? 'blocked' : 'allowed');
+
+      // Two-phase detection to eliminate single-blip false positives.
+      //
+      // Users with no ad blocker almost always short-circuit after the
+      // first probe (it reports 'allowed' and we're done). Only if the
+      // first probe reports 'blocked' do we run a second, confirming
+      // probe — that way a dropped request during network switching, a
+      // brief service-worker stall, or a tab that was backgrounded
+      // mid-fetch can't by itself trigger the modal. Real blockers
+      // persist across both probes, so they still get gated.
+      const firstBlocked = await detectOnce();
+      if (!firstBlocked) {
+        setStatus('allowed');
+        return;
+      }
+      const secondBlocked = await detectOnce();
+      setStatus(secondBlocked ? 'blocked' : 'allowed');
     } finally {
       inFlightRef.current = false;
     }
