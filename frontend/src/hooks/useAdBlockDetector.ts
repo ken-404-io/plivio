@@ -3,64 +3,51 @@ import { useState, useEffect, useCallback } from 'react';
 export type AdBlockStatus = 'checking' | 'blocked' | 'allowed';
 
 /**
- * Bait element check — catches CSS/DOM-based ad blockers
- * (uBlock Origin, AdBlock Plus, Brave Shields, etc.)
+ * Bait element check — the only check used.
  *
- * We inject a div with class names that appear in every major
- * ad-blocker filter list.  If the element is hidden or collapsed
- * the blocker is active.
+ * We inject a <div> whose class names appear in every major ad-blocker
+ * filter list (EasyList, uBlock filters, ABP list, etc.).  If an active
+ * extension is hiding or collapsing ad elements, it will zero-out or
+ * hide this element.
+ *
+ * Why not a network fetch?
+ * Fetching an ad-network URL (nap5k.com, etc.) produces false positives
+ * whenever the external server is slow, down, or unreachable from the
+ * user's region — regardless of whether an ad blocker is running.
+ * The DOM check is accurate and instant.
  */
 async function checkBaitElement(): Promise<boolean> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
     el.innerHTML = '&nbsp;';
+    // Class names that trigger virtually every ad-blocker filter list
     el.className =
-      'adsbox ad-unit ad-placement doubleclick ads advertisement ad textAd';
+      'adsbox ad-unit ad-placement doubleclick ads advertisement ad textAd pub_300x250';
     el.setAttribute('data-ad', 'true');
+    // Place off-screen but still in layout so offsetHeight is reliable
     el.style.cssText =
-      'position:absolute;top:-10px;left:-10px;width:1px;height:1px;' +
+      'position:fixed;top:-999px;left:-999px;width:1px;height:1px;' +
       'opacity:0;pointer-events:none;';
     document.body.appendChild(el);
 
+    // Two rAF frames + 200 ms gives extensions enough time to apply
+    // their CSS/DOM rules even after the user just disabled them.
     requestAnimationFrame(() => {
-      setTimeout(() => {
-        const cs = window.getComputedStyle(el);
-        const blocked =
-          el.offsetParent === null ||
-          el.offsetHeight === 0 ||
-          el.offsetWidth === 0 ||
-          cs.display === 'none' ||
-          cs.visibility === 'hidden' ||
-          cs.opacity === '0';
-        try { document.body.removeChild(el); } catch { /* ignore */ }
-        resolve(blocked);
-      }, 150);
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const cs = window.getComputedStyle(el);
+          const blocked =
+            el.offsetHeight === 0 ||
+            el.offsetWidth === 0 ||
+            cs.display === 'none' ||
+            cs.visibility === 'hidden' ||
+            cs.opacity === '0';
+          try { document.body.removeChild(el); } catch { /* ignore */ }
+          resolve(blocked);
+        }, 200);
+      });
     });
   });
-}
-
-/**
- * Network bait check — catches DNS-level / network-level blocking
- * (Pi-hole, NextDNS, private DNS, etc.)
- *
- * We attempt a no-cors fetch to the ad network already embedded in
- * index.html.  A successful request returns an opaque response
- * (no error).  DNS/network blocking throws a TypeError.
- */
-async function checkNetworkBait(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    await fetch('https://nap5k.com/tag.min.js?_t=' + Date.now(), {
-      mode: 'no-cors',
-      cache: 'no-store',
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return false; // opaque success → not blocked
-  } catch {
-    return true; // network error / DNS block → blocked
-  }
 }
 
 export function useAdBlockDetector() {
@@ -68,11 +55,8 @@ export function useAdBlockDetector() {
 
   const detect = useCallback(async () => {
     setStatus('checking');
-    const [baitBlocked, networkBlocked] = await Promise.all([
-      checkBaitElement(),
-      checkNetworkBait(),
-    ]);
-    setStatus(baitBlocked || networkBlocked ? 'blocked' : 'allowed');
+    const blocked = await checkBaitElement();
+    setStatus(blocked ? 'blocked' : 'allowed');
   }, []);
 
   useEffect(() => {
