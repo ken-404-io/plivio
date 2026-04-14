@@ -7308,7 +7308,7 @@ a, button, [role="button"], [tabindex] {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ─── Ad Blocker Gate ────────────────────────────────────────────────────────── */
+/* ─── Ad Blocker / DNS Gate ──────────────────────────────────────────────────── */
 
 .adblocker-overlay {
   position: fixed;
@@ -7321,7 +7321,7 @@ a, button, [role="button"], [tabindex] {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   padding: 16px;
-  animation: authTransitionFadeIn 0.25s ease-out;
+  animation: adblockerFadeIn 0.25s ease-out;
 }
 
 .adblocker-modal {
@@ -7336,7 +7336,7 @@ a, button, [role="button"], [tabindex] {
   flex-direction: column;
   gap: 16px;
   box-shadow: var(--shadow-lg);
-  animation: sessionConflictSlideUp 0.3s ease-out;
+  animation: adblockerSlideUp 0.3s ease-out;
   text-align: center;
 }
 
@@ -7427,16 +7427,26 @@ a, button, [role="button"], [tabindex] {
 }
 
 .adblocker-spin {
-  animation: spin 0.9s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  animation: adblockerSpin 0.9s linear infinite;
 }
 
 .adblocker-footer-note {
   font-size: 12px;
   color: var(--text-muted);
   margin: 0;
+}
+
+@keyframes adblockerFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes adblockerSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)  scale(1);    }
+}
+
+@keyframes adblockerSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
