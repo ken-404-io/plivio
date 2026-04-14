@@ -754,6 +754,9 @@ export default function AdminDashboard() {
                     <div className="adm-user-info">
                       <span className="adm-user-name">{u.username}</span>
                       <span className="adm-user-email">{u.email}</span>
+                      <span className="adm-user-date">
+                        Joined {new Date(u.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
                     <div className="adm-user-badges">
                       <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan}</span>
@@ -871,6 +874,18 @@ export default function AdminDashboard() {
                             {detLoading && <p className="adm-details-loading">Loading…</p>}
                             {!detLoading && details && (
                               <>
+                                {/* User Info */}
+                                <div className="adm-details-section">
+                                  <h4 className="adm-details-section-title">
+                                    <Users size={13} /> Account Info
+                                  </h4>
+                                  <div className="adm-details-sub-card">
+                                    <span className="adm-details-sub-expiry">
+                                      Joined {new Date(u.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                </div>
+
                                 {/* Subscription */}
                                 <div className="adm-details-section">
                                   <h4 className="adm-details-section-title">
@@ -882,8 +897,13 @@ export default function AdminDashboard() {
                                         {details.subscription.plan}
                                       </span>
                                       <span className="adm-details-sub-expiry">
+                                        Started {new Date(details.subscription.starts_at).toLocaleDateString('en-PH', {
+                                          month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                                        })}
+                                      </span>
+                                      <span className="adm-details-sub-expiry">
                                         Expires {new Date(details.subscription.expires_at).toLocaleDateString('en-PH', {
-                                          month: 'short', day: 'numeric', year: 'numeric',
+                                          month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
                                         })}
                                       </span>
                                     </div>
@@ -914,7 +934,7 @@ export default function AdminDashboard() {
                                           </div>
                                           <span className={`plan-badge plan-badge--${inv.plan}`}>{inv.plan}</span>
                                           <span className="adm-details-invite-date">
-                                            {new Date(inv.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            {new Date(inv.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                           </span>
                                         </div>
                                       ))}
@@ -949,7 +969,7 @@ export default function AdminDashboard() {
                                               {wd.status}
                                             </span>
                                             <span className="adm-details-wd-date">
-                                              {new Date(wd.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                              {new Date(wd.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                           </div>
                                         </div>
@@ -971,7 +991,7 @@ export default function AdminDashboard() {
                                         {details.device.registered_at && (
                                           <span className="adm-device-date">
                                             Registered {new Date(details.device.registered_at).toLocaleDateString('en-PH', {
-                                              month: 'short', day: 'numeric', year: 'numeric',
+                                              month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
                                             })}
                                           </span>
                                         )}
@@ -1069,7 +1089,7 @@ export default function AdminDashboard() {
                       <span className="adm-wd-account-num">{w.account_number}</span>
                     </div>
                     <span className="adm-wd-date">
-                      {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                   <div className="adm-wd-actions">
@@ -1197,6 +1217,12 @@ export default function AdminDashboard() {
                             <span className="adm-wd-detail-label">User Plan</span>
                             <span className={`plan-badge plan-badge--${w.user_plan}`}>{w.user_plan}</span>
                           </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Requested At</span>
+                            <span className="adm-wd-detail-value">
+                              {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
                           {w.processed_at && (
                             <div className="adm-wd-detail-item">
                               <span className="adm-wd-detail-label">Processed At</span>
@@ -1287,7 +1313,7 @@ export default function AdminDashboard() {
                 <div className="adm-ref-meta">
                   <span className={`plan-badge plan-badge--${r.invited_plan}`}>{r.invited_plan}</span>
                   <span className="adm-ref-date">
-                    {new Date(r.invited_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {new Date(r.invited_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               </div>
@@ -1384,8 +1410,13 @@ export default function AdminDashboard() {
                   <span className={`adm-kyc-badge adm-kyc-badge--${k.status}`}>{k.status}</span>
                   <span className="adm-kyc-type">{k.id_type.replace('_', ' ')}</span>
                   <span className="adm-kyc-date">
-                    {new Date(k.submitted_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                    {new Date(k.submitted_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
+                  {k.reviewed_at && (
+                    <span className="adm-kyc-date">
+                      Reviewed {new Date(k.reviewed_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
                 </div>
               </div>
 
