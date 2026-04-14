@@ -90,7 +90,10 @@ function WithdrawalRejectModal({ onConfirm, onCancel }: {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '12px 0' }}>
           {WITHDRAWAL_REJECT_REASONS.map((r) => (
-            <label key={r} className="adm-reject-option">
+            <label
+              key={r}
+              className={`adm-reject-option${selected === r ? ' adm-reject-option--selected' : ''}`}
+            >
               <input
                 type="radio"
                 name="wd-reject-reason"
