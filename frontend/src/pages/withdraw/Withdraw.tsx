@@ -13,7 +13,6 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowUpRight,
-  Timer,
 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
@@ -395,27 +394,6 @@ export default function Withdraw() {
         </div>
       )}
 
-      {/* Free plan withdrawal limit banner */}
-      {!kycBlocked && hasUsedFreeWithdrawal && (
-        <div className="alert alert--warning">
-          <AlertCircle size={18} />
-          <div>
-            <strong>Withdrawal limit reached.</strong> Free plan users can only make 1 withdrawal.{' '}
-            <Link to="/plans" className="link">Upgrade your plan →</Link>
-          </div>
-        </div>
-      )}
-
-      {/* Cooldown banner for premium/elite users */}
-      {!kycBlocked && onCooldown && (
-        <div className="alert alert--info wd-cooldown-banner">
-          <Timer size={18} />
-          <div>
-            <strong>Withdrawal cooldown active.</strong> You have already made a withdrawal.
-            You can withdraw again in <span className="wd-cooldown-time">{cooldownRemaining}</span>.
-          </div>
-        </div>
-      )}
 
       {/* ── Balance hero card ─────────────────────────────────────────────── */}
       <div className="wd-hero">
@@ -548,20 +526,10 @@ export default function Withdraw() {
         <button
           type="submit"
           className="btn btn-primary wd-submit"
-          disabled={kycBlocked || hasUsedFreeWithdrawal || onCooldown}
-          onClick={hasUsedFreeWithdrawal ? (e) => { e.preventDefault(); setShowUpgradeModal(true); } : undefined}
+          disabled={kycBlocked}
         >
-          {onCooldown ? (
-            <>
-              <Timer size={16} />
-              Cooldown: {cooldownRemaining}
-            </>
-          ) : (
-            <>
-              Review Withdrawal
-              <ArrowRight size={16} />
-            </>
-          )}
+          Review Withdrawal
+          <ArrowRight size={16} />
         </button>
       </form>
 

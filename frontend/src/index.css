@@ -4438,6 +4438,96 @@ a, button, [role="button"], [tabindex] {
   margin-top: 4px;
 }
 
+/* ─── Notification detail modal ──────────────────────────────────────────────── */
+.notif-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+.notif-detail-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.notif-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.notif-detail-emoji {
+  font-size: 22px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+.notif-detail-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0;
+  line-height: 1.35;
+}
+.notif-detail-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.notif-detail-close:hover { color: var(--text); }
+.notif-detail-message {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.notif-detail-time {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+.notif-detail-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* ─── Withdrawal reject radio options ────────────────────────────────────────── */
+.adm-reject-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+.adm-reject-option:has(.adm-reject-radio:checked) {
+  border-color: var(--error);
+  background: rgba(239, 68, 68, 0.08);
+}
+.adm-reject-option:hover { border-color: var(--border-strong); }
+.adm-reject-radio { accent-color: var(--error); cursor: pointer; }
+
 /* ─── Static pages (Terms / Privacy / Contact) ───────────────────────────────── */
 .static-page {
   min-height: 100svh;

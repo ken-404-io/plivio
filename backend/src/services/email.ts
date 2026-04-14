@@ -152,6 +152,7 @@ export async function sendWithdrawalStatusEmail(
   username: string,
   amount: number,
   status: 'paid' | 'rejected',
+  rejectionReason?: string,
 ): Promise<void> {
   const isPaid  = status === 'paid';
   const subject = isPaid
@@ -175,7 +176,12 @@ export async function sendWithdrawalStatusEmail(
       <p>Hi <strong>${username}</strong>,</p>
       <p>Unfortunately your withdrawal request of <strong>₱${amount.toFixed(2)}</strong>
          has been <strong style="color:#ef4444;">rejected</strong>.</p>
-      <p>The amount has been returned to your ${APP_NAME} balance.
+      ${rejectionReason ? `
+      <div style="margin:16px 0;padding:14px 18px;background:#1e1c2a;border-left:3px solid #ef4444;border-radius:6px;">
+        <p style="margin:0;font-size:13px;color:#a09db0;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Reason</p>
+        <p style="margin:0;color:#f1f0f5;font-size:15px;">${rejectionReason}</p>
+      </div>` : ''}
+      <p>The full amount has been returned to your ${APP_NAME} balance.
          Please contact support if you have any questions.</p>
       ${button(`${APP_URL}/withdraw`, 'View Withdrawals')}`;
 
