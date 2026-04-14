@@ -89,56 +89,28 @@ async function checkNetworkBlocked(): Promise<boolean> {
 }
 
 /**
- * Bait element check.
+ * Bait element check — REMOVED.
  *
- * Injects a <div> whose class names appear in every major ad-blocker
- * filter list (EasyList, uBlock, ABP, etc.).  Active extensions hide or
- * collapse such elements via CSS rules like `display:none !important`.
+ * The bait element (a hidden div carrying ad-shaped class names) used
+ * to act as a corroborating signal for browser extensions. In practice
+ * it produced false positives for users whose ads were provably
+ * loading (screenshots showed ad banners rendered behind the gate
+ * modal) because:
  *
- * Key implementation notes
- * ─────────────────────────
- * 1. Use `position:absolute`, NOT `position:fixed`.
- *    For fixed elements `offsetParent` is always null (browser spec),
- *    making that signal useless.  For absolute elements `offsetParent`
- *    is only null when the element or an ancestor has `display:none`.
+ *  - Built-in browser shields (Brave Shields, Samsung Internet ad
+ *    block, Firefox tracking-protection-strict, Opera ad block) hide
+ *    ad-shaped DOM by default even when they don't block this site's
+ *    ad network, so the bait was "hidden" while ads still rendered.
+ *  - Incidental user styles (reader-mode helpers, accessibility
+ *    extensions, content-script overlays) can hide elements by class.
+ *  - The bait check had no way to distinguish "hidden because of an
+ *    active extension" from "hidden for an unrelated reason".
  *
- * 2. Do NOT set `opacity:0` on the element itself.
- *    If we do, `getComputedStyle(el).opacity` is always '0' and the
- *    opacity check produces a false positive for every user.
- *
- * 3. Two rAF frames + 200 ms lets extensions re-apply their rules after
- *    the user has just paused/disabled the blocker.
+ * The network probe below is the ground truth that matches the user's
+ * actual experience: if /js/p1.js can be fetched, the ad script runs
+ * and ads render; if it can't, they don't. Relying on that single
+ * signal eliminates the bait false-positive class entirely.
  */
-async function checkBaitElement(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const el = document.createElement('div');
-    el.innerHTML = '&nbsp;';
-    el.className =
-      'adsbox ad-unit ad-placement doubleclick ads advertisement ad textAd pub_300x250';
-    el.setAttribute('data-ad', 'true');
-    // Absolute + far off-screen: visible to layout but invisible to user.
-    // No opacity/visibility overrides — those are what we're measuring.
-    el.style.cssText =
-      'position:absolute;top:-9999px;left:-9999px;width:1px;height:1px;';
-    document.body.appendChild(el);
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          const cs = window.getComputedStyle(el);
-          const blocked =
-            el.offsetParent === null ||  // display:none makes offsetParent null
-            el.offsetHeight === 0 ||     // blocker may force height to 0
-            el.offsetWidth === 0 ||      // blocker may force width to 0
-            cs.display === 'none' ||
-            cs.visibility === 'hidden';
-          try { document.body.removeChild(el); } catch { /* ignore */ }
-          resolve(blocked);
-        }, 200);
-      });
-    });
-  });
-}
 
 /**
  * Poll interval for the silent re-check that runs while the gate is
@@ -149,15 +121,11 @@ async function checkBaitElement(): Promise<boolean> {
 const AUTO_RECHECK_INTERVAL_MS = 2500;
 
 /**
- * Run one bait + network probe cycle, returning true iff either signal
- * reports blocking.
+ * Run one network probe cycle, returning true iff the user's browser
+ * cannot fetch any of the proxied ad script URLs.
  */
 async function detectOnce(): Promise<boolean> {
-  const [baitBlocked, networkBlocked] = await Promise.all([
-    checkBaitElement(),
-    checkNetworkBlocked(),
-  ]);
-  return baitBlocked || networkBlocked;
+  return checkNetworkBlocked();
 }
 
 export function useAdBlockDetector() {
