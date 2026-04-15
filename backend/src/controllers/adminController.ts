@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { NotFoundError, ValidationError } from '../utils/errors.ts';
-import { sendWithdrawalStatusEmail, sendBroadcastEmail } from '../services/email.ts';
+import { sendWithdrawalStatusEmail, broadcastEmailToAll } from '../services/email.ts';
 import { createNotification } from '../utils/notify.ts';
 import { sendPushToUser }    from '../controllers/pushController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
@@ -197,12 +197,10 @@ export async function broadcastEmail(req: Request, res: Response, next: NextFunc
 
     const count = rows.length;
 
-    // Fire-and-forget: send in background so the request returns immediately
-    void (async () => {
-      for (const user of rows) {
-        await sendBroadcastEmail(user.email, user.username, subject.trim(), message.trim());
-      }
-    })();
+    // Fire-and-forget: chunked batch send in background so the request returns immediately.
+    // broadcastEmailToAll sends 100 at a time with a 700ms pause between chunks to
+    // stay under Resend's 2 requests/second rate limit.
+    void broadcastEmailToAll(rows, subject.trim(), message.trim());
 
     res.json({ success: true, sending_to: count });
   } catch (err) { next(err); }

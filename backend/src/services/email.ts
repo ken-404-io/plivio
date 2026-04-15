@@ -254,28 +254,88 @@ export async function sendSubscriptionConfirmEmail(
   await send(to, `${planName} subscription activated – ${APP_NAME}`, wrap('Subscription', body));
 }
 
+/** Sleep helper */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Sends a custom broadcast email to a single user (called in a loop by the admin broadcast).
- * The message is rendered as paragraphs — newlines become <br> breaks.
+ * Sends a batch of emails via Resend's batch API with automatic retry on 429.
+ * Retries up to 4 times with exponential backoff (1s, 2s, 4s, 8s).
  */
-export async function sendBroadcastEmail(
-  to: string,
-  username: string,
+async function sendBroadcastBatch(
+  recipients: { email: string; username: string }[],
   subject: string,
   message: string,
 ): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY ?? process.env.SMTP_PASS;
+  if (!apiKey) {
+    logger.info({ count: recipients.length }, '[email] no API key configured, skipping batch');
+    return;
+  }
+
   const safeMessage = message
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br />');
 
-  const body = `
-    <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
-      Message from ${APP_NAME}
-    </p>
-    <p>Hi <strong>${username}</strong>,</p>
-    <div style="color:#f1f0f5;line-height:1.7;">${safeMessage}</div>
-    ${button(`${APP_URL}/dashboard`, 'Open Dashboard')}`;
-  await send(to, subject, wrap('Message from ' + APP_NAME, body));
+  const payload = recipients.map(({ email, username }) => {
+    const body = `
+      <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+        Message from ${APP_NAME}
+      </p>
+      <p>Hi <strong>${username}</strong>,</p>
+      <div style="color:#f1f0f5;line-height:1.7;">${safeMessage}</div>
+      ${button(`${APP_URL}/dashboard`, 'Open Dashboard')}`;
+    return { from: FROM, to: email, subject, html: wrap('Message from ' + APP_NAME, body) };
+  });
+
+  const MAX_RETRIES = 4;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { error } = await getResend().batch.send(payload);
+      if (error) {
+        // 429 rate limit — wait and retry
+        if ((error as { statusCode?: number }).statusCode === 429 && attempt < MAX_RETRIES) {
+          const wait = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s, 8s
+          logger.warn({ attempt, wait }, '[email] batch 429 — backing off');
+          await sleep(wait);
+          continue;
+        }
+        logger.error({ error, count: recipients.length }, '[email] batch send failed');
+      } else {
+        logger.info({ count: recipients.length }, '[email] batch sent');
+      }
+      return;
+    } catch (err) {
+      if (attempt < MAX_RETRIES) {
+        const wait = 1000 * Math.pow(2, attempt);
+        logger.warn({ err, attempt, wait }, '[email] batch exception — backing off');
+        await sleep(wait);
+      } else {
+        logger.error({ err, count: recipients.length }, '[email] batch send exception');
+      }
+    }
+  }
+}
+
+/**
+ * Sends a broadcast email to all given recipients.
+ * Splits into chunks of 100 (Resend batch limit) with a 1100ms pause between
+ * chunks — keeps well under the 2 requests/second limit even with concurrent
+ * transactional emails (withdrawal, KYC, OTP) also running.
+ */
+export async function broadcastEmailToAll(
+  recipients: { email: string; username: string }[],
+  subject: string,
+  message: string,
+): Promise<void> {
+  const CHUNK = 100;
+  const DELAY = 1100; // ms between batch calls (~0.9 req/s, leaves room for other emails)
+  for (let i = 0; i < recipients.length; i += CHUNK) {
+    const chunk = recipients.slice(i, i + CHUNK);
+    await sendBroadcastBatch(chunk, subject, message);
+    if (i + CHUNK < recipients.length) {
+      await sleep(DELAY);
+    }
+  }
 }
