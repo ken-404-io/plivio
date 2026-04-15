@@ -176,11 +176,23 @@ async function dnsBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
 }
 
 /**
- * Run one detection pass. Returns true (blocked) when any signal fires:
- *   • Bait element hidden         → extension hiding by CSS
- *   • Any ad script fails         → extension or DNS intercept
- *   • ALL DNS probes fail         → filtering DNS resolver
- *     (single host failure is ignored — could be CDN outage)
+ * Run one detection pass. Returns true (blocked) when:
+ *
+ *   • Bait element is hidden — the extension is actively applying
+ *     element-hiding rules on this page (uBlock, ABP, Brave Shields).
+ *     This is the most reliable signal and the primary gate.
+ *
+ *   OR
+ *
+ *   • ALL ad script probes fail AND ALL DNS probes fail — two
+ *     independent network signals agree, which is the fingerprint
+ *     of a DNS-level filter (Pi-hole, NextDNS, AdGuard DNS).
+ *
+ * A script-only failure (bait visible, DNS passes) is NOT flagged.
+ * This handles the common case where an extension is "paused" for
+ * this site (element hiding disabled) but still intercepts requests
+ * to Google/Doubleclick at the network level globally — the user
+ * has made a good-faith effort to allow ads, so we let them through.
  */
 async function detectOnce(): Promise<boolean> {
   const [bait, script, dns] = await Promise.all([
@@ -204,7 +216,9 @@ async function detectOnce(): Promise<boolean> {
     })),
   });
 
-  return bait || script.blocked || dns.blocked;
+  // Primary: extension hiding elements on this page.
+  // Secondary: network-level filter confirmed by two independent signals.
+  return bait || (script.blocked && dns.blocked);
 }
 
 const AUTO_RECHECK_INTERVAL_MS = 3000;
