@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Users, ArrowUpCircle, ShieldCheck, TrendingUp,
-  UserPlus, LayoutDashboard, Bell, Send,
+  UserPlus, LayoutDashboard, Bell, Send, Mail,
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
   XCircle, Eye, EyeOff, Coins, MessageSquare, Clock,
   CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
@@ -341,6 +341,8 @@ export default function AdminDashboard() {
   const [notifyTarget,  setNotifyTarget]  = useState<{ id: string; username: string } | null>(null);
   const [broadcasting,  setBroadcasting]  = useState(false);
   const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '' });
+  const [emailBroadcasting,  setEmailBroadcasting]  = useState(false);
+  const [emailBroadcastForm, setEmailBroadcastForm] = useState({ subject: '', message: '' });
 
   const [expandedUser,    setExpandedUser]    = useState<string | null>(null);
   const [userDetailsTab,  setUserDetailsTab]  = useState<Record<string, 'manage' | 'details'>>({});
@@ -651,6 +653,21 @@ export default function AdminDashboard() {
     }
   }
 
+  async function sendEmailBroadcast(e: React.FormEvent) {
+    e.preventDefault();
+    if (!emailBroadcastForm.subject.trim() || !emailBroadcastForm.message.trim()) return;
+    setEmailBroadcasting(true);
+    try {
+      const { data } = await api.post<{ sending_to: number }>('/admin/email-everyone', emailBroadcastForm);
+      toast.success(`Email queued for ${data.sending_to} users.`);
+      setEmailBroadcastForm({ subject: '', message: '' });
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Email broadcast failed.');
+    } finally {
+      setEmailBroadcasting(false);
+    }
+  }
+
   async function processWithdrawal(id: string, action: 'approve' | 'reject', rejection_reason?: string) {
     try {
       await api.put(`/admin/withdrawals/${id}`, { action, rejection_reason });
@@ -759,7 +776,7 @@ export default function AdminDashboard() {
             <StatCard icon={Clock}        label="Active Tasks"        value={stats.active_tasks}                                   color="purple" />
           </div>
 
-          {/* Broadcast */}
+          {/* Broadcast notification */}
           <div className="adm-section">
             <div className="adm-section-header">
               <Bell size={15} />
@@ -791,6 +808,42 @@ export default function AdminDashboard() {
               >
                 <Send size={14} />
                 {broadcasting ? 'Sending…' : 'Send to all users'}
+              </button>
+            </form>
+          </div>
+
+          {/* Email broadcast */}
+          <div className="adm-section">
+            <div className="adm-section-header">
+              <Mail size={15} />
+              <h2 className="adm-section-title">Send Email to Everyone</h2>
+            </div>
+            <p className="adm-section-hint">Send an email to all verified, active users. Emails are sent in the background.</p>
+            <form onSubmit={(e) => { void sendEmailBroadcast(e); }} className="adm-broadcast-form">
+              <input
+                className="form-input"
+                placeholder="Subject"
+                value={emailBroadcastForm.subject}
+                onChange={(e) => setEmailBroadcastForm((f) => ({ ...f, subject: e.target.value }))}
+                maxLength={200}
+                required
+              />
+              <textarea
+                className="form-input"
+                placeholder="Message (supports line breaks)"
+                value={emailBroadcastForm.message}
+                onChange={(e) => setEmailBroadcastForm((f) => ({ ...f, message: e.target.value }))}
+                maxLength={5000}
+                rows={5}
+                required
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={emailBroadcasting || !emailBroadcastForm.subject.trim() || !emailBroadcastForm.message.trim()}
+              >
+                <Mail size={14} />
+                {emailBroadcasting ? 'Queueing…' : 'Send email to all users'}
               </button>
             </form>
           </div>

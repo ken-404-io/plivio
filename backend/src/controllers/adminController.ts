@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { NotFoundError, ValidationError } from '../utils/errors.ts';
-import { sendWithdrawalStatusEmail } from '../services/email.ts';
+import { sendWithdrawalStatusEmail, sendBroadcastEmail } from '../services/email.ts';
 import { createNotification } from '../utils/notify.ts';
 import { sendPushToUser }    from '../controllers/pushController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
@@ -180,6 +180,31 @@ export async function broadcastNotification(req: Request, res: Response, next: N
     }
 
     res.json({ success: true, sent_to: rows.length });
+  } catch (err) { next(err); }
+}
+
+/** POST /admin/email-everyone — send a custom email to all verified, non-banned users */
+export async function broadcastEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { subject, message } = req.body as Record<string, string>;
+    if (!subject?.trim() || !message?.trim()) {
+      throw new ValidationError('subject and message are required');
+    }
+
+    const { rows } = await pool.query<{ email: string; username: string }>(
+      `SELECT email, username FROM users WHERE is_banned = FALSE AND is_email_verified = TRUE`,
+    );
+
+    const count = rows.length;
+
+    // Fire-and-forget: send in background so the request returns immediately
+    void (async () => {
+      for (const user of rows) {
+        await sendBroadcastEmail(user.email, user.username, subject.trim(), message.trim());
+      }
+    })();
+
+    res.json({ success: true, sending_to: count });
   } catch (err) { next(err); }
 }
 

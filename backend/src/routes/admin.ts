@@ -9,6 +9,7 @@ import {
   getUserDetails,
   notifyUser,
   broadcastNotification,
+  broadcastEmail,
   listAllTasks,
   createTask,
   updateTask,
@@ -53,6 +54,13 @@ router.post('/notify-all',
     link:    {},
   }),
   broadcastNotification,
+);
+router.post('/email-everyone',
+  validateBody({
+    subject: { required: true, minLength: 1, maxLength: 200 },
+    message: { required: true, minLength: 1, maxLength: 5000 },
+  }),
+  broadcastEmail,
 );
 
 router.get('/users', listUsers);
