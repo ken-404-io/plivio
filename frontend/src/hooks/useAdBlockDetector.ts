@@ -176,17 +176,11 @@ async function dnsBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
 }
 
 /**
- * Run one detection pass. Returns true (blocked) when there is
- * strong evidence of an ad blocker or filtering DNS:
- *
- *   • Bait element hidden                      → blocked (extensions hide by CSS)
- *   • Any ad script fails to load/bootstrap    → blocked (extension or DNS intercept)
- *   • ALL DNS probes fail AND bait or script
- *     also fired                               → blocked (corroborated DNS filter)
- *
- * A lone DNS failure without corroboration is NOT flagged — a single
- * unreachable ad host can be a CDN outage or geo-restriction, not a
- * user-controlled filter.
+ * Run one detection pass. Returns true (blocked) when any signal fires:
+ *   • Bait element hidden         → extension hiding by CSS
+ *   • Any ad script fails         → extension or DNS intercept
+ *   • ALL DNS probes fail         → filtering DNS resolver
+ *     (single host failure is ignored — could be CDN outage)
  */
 async function detectOnce(): Promise<boolean> {
   const [bait, script, dns] = await Promise.all([
@@ -210,9 +204,7 @@ async function detectOnce(): Promise<boolean> {
     })),
   });
 
-  // DNS alone is not sufficient — require corroboration from bait or script.
-  const dnsCorroborated = dns.blocked && (bait || script.blocked);
-  return bait || script.blocked || dnsCorroborated;
+  return bait || script.blocked || dns.blocked;
 }
 
 const AUTO_RECHECK_INTERVAL_MS = 3000;
@@ -222,7 +214,9 @@ export function useAdBlockDetector() {
   const inFlightRef = useRef(false);
 
   const runDetect = useCallback(async (silent: boolean) => {
-    if (inFlightRef.current) return;
+    // Auto-polls (silent) are skipped when a check is already running.
+    // Manual rechecks (not silent) always proceed so the button is responsive.
+    if (silent && inFlightRef.current) return;
     inFlightRef.current = true;
     try {
       if (!silent) setStatus('checking');
