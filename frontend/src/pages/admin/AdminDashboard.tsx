@@ -201,6 +201,36 @@ function NotifyModal({ username, onSend, onCancel }: {
   );
 }
 
+// ─── KYC auto-approval countdown ─────────────────────────────────────────────
+const AUTO_APPROVE_HOURS = 32;
+
+function KycCountdown({ submittedAt }: { submittedAt: string }) {
+  function compute() {
+    const autoAt = new Date(submittedAt).getTime() + AUTO_APPROVE_HOURS * 60 * 60 * 1000;
+    const diff   = autoAt - Date.now();
+    if (diff <= 0) return 'Auto-approving soon…';
+    const h = Math.floor(diff / (1000 * 60 * 60));
+    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `Auto-approves in ${h}h ${m}m`;
+  }
+
+  const [label, setLabel] = useState(compute);
+
+  useEffect(() => {
+    const id = setInterval(() => setLabel(compute()), 60_000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submittedAt]);
+
+  const isImminent = !label.includes('h') || label.startsWith('Auto-approving');
+  return (
+    <span className="adm-kyc-countdown" style={{ color: isImminent ? 'var(--warning)' : undefined }}>
+      <Clock size={11} style={{ marginRight: 3 }} />
+      {label}
+    </span>
+  );
+}
+
 // ─── KYC image with auth ──────────────────────────────────────────────────────
 function KycImage({ kycId, field, alt }: { kycId: string; field: 'id_front' | 'id_selfie'; alt: string }) {
   const [src, setSrc]   = useState<string | null>(null);
@@ -1487,6 +1517,9 @@ export default function AdminDashboard() {
                 <div className="adm-kyc-user">
                   <span className="adm-kyc-username">{k.username}</span>
                   <span className="adm-kyc-email">{k.email}</span>
+                  {k.status === 'pending' && (
+                    <KycCountdown submittedAt={k.submitted_at} />
+                  )}
                 </div>
                 <div className="adm-kyc-meta">
                   <span className={`adm-kyc-badge adm-kyc-badge--${k.status}`}>{k.status}</span>
@@ -1502,13 +1535,22 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <button
-                className="adm-docs-toggle"
-                onClick={() => setExpandedKyc(expandedKyc === k.id ? null : k.id)}
-              >
-                {expandedKyc === k.id ? <EyeOff size={13} /> : <Eye size={13} />}
-                {expandedKyc === k.id ? 'Hide documents' : 'View documents'}
-              </button>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <button
+                  className="adm-docs-toggle"
+                  onClick={() => setExpandedKyc(expandedKyc === k.id ? null : k.id)}
+                >
+                  {expandedKyc === k.id ? <EyeOff size={13} /> : <Eye size={13} />}
+                  {expandedKyc === k.id ? 'Hide documents' : 'View documents'}
+                </button>
+                <Link
+                  to={`/admin/users/${k.user_id}`}
+                  className="adm-docs-toggle"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Users size={13} /> View all user info
+                </Link>
+              </div>
 
               {expandedKyc === k.id && (
                 <div className="adm-kyc-docs">
