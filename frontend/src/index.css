@@ -2733,10 +2733,10 @@ a, button, [role="button"], [tabindex] {
 .adm-kyc-top {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
+.adm-kyc-top .adm-kyc-meta { margin-left: auto; }
 .adm-kyc-user { display: flex; flex-direction: column; gap: 2px; }
 .adm-kyc-username { font-size: 14px; font-weight: 600; color: var(--text-heading); }
 .adm-kyc-email    { font-size: 12px; color: var(--text-muted); }
@@ -2775,6 +2775,54 @@ a, button, [role="button"], [tabindex] {
   gap: 10px;
 }
 .adm-kyc-actions { display: flex; gap: 8px; }
+.adm-kyc-card--selected {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, var(--bg-surface));
+}
+.adm-kyc-check {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.adm-kyc-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+.adm-batch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 8px;
+}
+.adm-batch-select-all {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-body);
+  cursor: pointer;
+  user-select: none;
+}
+.adm-batch-select-all input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+.adm-batch-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
 
 /* Modal */
 .adm-modal-overlay {
@@ -3038,9 +3086,11 @@ a, button, [role="button"], [tabindex] {
 
 .kyc-img-thumb {
   width: 100%;
-  height: 130px;
-  object-fit: cover;
+  height: auto;
+  max-height: 320px;
+  object-fit: contain;
   display: block;
+  background: var(--bg-body);
   transition: opacity 0.2s;
 }
 .kyc-img-thumb:hover { opacity: 0.85; }
