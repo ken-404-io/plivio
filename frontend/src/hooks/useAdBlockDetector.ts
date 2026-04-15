@@ -168,13 +168,25 @@ async function dnsBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
     return { blocked: false, details: [] };
   }
   const details = await Promise.all(DNS_PROBE_HOSTS.map(fetchFails));
-  return { blocked: details.some(Boolean), details };
+  // Require ALL probes to fail before flagging DNS as blocked.
+  // A single unreachable host can be a CDN outage or geo-restriction,
+  // not a filtering DNS. Real resolvers (AdGuard, NextDNS, Pi-hole)
+  // block every ad domain consistently.
+  return { blocked: details.length > 0 && details.every(Boolean), details };
 }
 
 /**
- * Run one detection pass. Returns true (blocked) if ANY signal
- * fires — bait hidden, ad-script blocked/sinkholed, or any DNS
- * probe rejected. Per spec: "if either is detected, show overlay".
+ * Run one detection pass. Returns true (blocked) when there is
+ * strong evidence of an ad blocker or filtering DNS:
+ *
+ *   • Bait element hidden                      → blocked (extensions hide by CSS)
+ *   • Any ad script fails to load/bootstrap    → blocked (extension or DNS intercept)
+ *   • ALL DNS probes fail AND bait or script
+ *     also fired                               → blocked (corroborated DNS filter)
+ *
+ * A lone DNS failure without corroboration is NOT flagged — a single
+ * unreachable ad host can be a CDN outage or geo-restriction, not a
+ * user-controlled filter.
  */
 async function detectOnce(): Promise<boolean> {
   const [bait, script, dns] = await Promise.all([
@@ -183,9 +195,6 @@ async function detectOnce(): Promise<boolean> {
     dnsBlocked(),
   ]);
 
-  // Diagnostic log so the failure mode is visible in devtools when
-  // the gate behaves unexpectedly. Emoji prefix makes it easy to
-  // grep the console.
   // eslint-disable-next-line no-console
   console.debug('[AdBlock] probe', {
     bait,
@@ -201,7 +210,9 @@ async function detectOnce(): Promise<boolean> {
     })),
   });
 
-  return bait || script.blocked || dns.blocked;
+  // DNS alone is not sufficient — require corroboration from bait or script.
+  const dnsCorroborated = dns.blocked && (bait || script.blocked);
+  return bait || script.blocked || dnsCorroborated;
 }
 
 const AUTO_RECHECK_INTERVAL_MS = 3000;
