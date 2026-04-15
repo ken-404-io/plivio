@@ -254,10 +254,12 @@ export async function sendSubscriptionConfirmEmail(
   await send(to, `${planName} subscription activated – ${APP_NAME}`, wrap('Subscription', body));
 }
 
+/** Sleep helper */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Sends a broadcast email to a batch of users in a single Resend batch call.
- * Resend allows up to 100 emails per batch request.
- * Call this in chunks — see broadcastEmailToAll() for the full flow.
+ * Sends a batch of emails via Resend's batch API with automatic retry on 429.
+ * Retries up to 4 times with exponential backoff (1s, 2s, 4s, 8s).
  */
 async function sendBroadcastBatch(
   recipients: { email: string; username: string }[],
@@ -287,22 +289,40 @@ async function sendBroadcastBatch(
     return { from: FROM, to: email, subject, html: wrap('Message from ' + APP_NAME, body) };
   });
 
-  try {
-    const { error } = await getResend().batch.send(payload);
-    if (error) {
-      logger.error({ error, count: recipients.length }, '[email] batch send failed');
-    } else {
-      logger.info({ count: recipients.length }, '[email] batch sent');
+  const MAX_RETRIES = 4;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { error } = await getResend().batch.send(payload);
+      if (error) {
+        // 429 rate limit — wait and retry
+        if ((error as { statusCode?: number }).statusCode === 429 && attempt < MAX_RETRIES) {
+          const wait = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s, 8s
+          logger.warn({ attempt, wait }, '[email] batch 429 — backing off');
+          await sleep(wait);
+          continue;
+        }
+        logger.error({ error, count: recipients.length }, '[email] batch send failed');
+      } else {
+        logger.info({ count: recipients.length }, '[email] batch sent');
+      }
+      return;
+    } catch (err) {
+      if (attempt < MAX_RETRIES) {
+        const wait = 1000 * Math.pow(2, attempt);
+        logger.warn({ err, attempt, wait }, '[email] batch exception — backing off');
+        await sleep(wait);
+      } else {
+        logger.error({ err, count: recipients.length }, '[email] batch send exception');
+      }
     }
-  } catch (err) {
-    logger.error({ err, count: recipients.length }, '[email] batch send exception');
   }
 }
 
 /**
  * Sends a broadcast email to all given recipients.
- * Splits into chunks of 100 (Resend batch limit) with a 700ms pause between
- * chunks to stay safely under the 2 requests/second rate limit.
+ * Splits into chunks of 100 (Resend batch limit) with a 1100ms pause between
+ * chunks — keeps well under the 2 requests/second limit even with concurrent
+ * transactional emails (withdrawal, KYC, OTP) also running.
  */
 export async function broadcastEmailToAll(
   recipients: { email: string; username: string }[],
@@ -310,12 +330,12 @@ export async function broadcastEmailToAll(
   message: string,
 ): Promise<void> {
   const CHUNK = 100;
-  const DELAY = 700; // ms between batch calls — keeps us under 2 req/s
+  const DELAY = 1100; // ms between batch calls (~0.9 req/s, leaves room for other emails)
   for (let i = 0; i < recipients.length; i += CHUNK) {
     const chunk = recipients.slice(i, i + CHUNK);
     await sendBroadcastBatch(chunk, subject, message);
     if (i + CHUNK < recipients.length) {
-      await new Promise((r) => setTimeout(r, DELAY));
+      await sleep(DELAY);
     }
   }
 }
