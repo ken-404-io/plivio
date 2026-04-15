@@ -23,6 +23,7 @@ function getResend(): Resend {
 
 /** Shared HTML wrapper for every email. */
 function wrap(title: string, body: string): string {
+  const logoUrl = `${APP_URL}/logo-mark.svg`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,8 +39,18 @@ function wrap(title: string, body: string): string {
                style="background:#17161f;border-radius:12px;border:1px solid #2a2835;overflow:hidden;max-width:560px;width:100%;">
           <!-- Header -->
           <tr>
-            <td style="background:#aa3bff;padding:24px 32px;text-align:center;">
-              <span style="font-size:24px;font-weight:700;color:#fff;letter-spacing:1px;">${APP_NAME}</span>
+            <td style="background:#aa3bff;padding:20px 32px;text-align:center;">
+              <table cellpadding="0" cellspacing="0" style="display:inline-table;">
+                <tr>
+                  <td style="vertical-align:middle;padding-right:10px;">
+                    <img src="${logoUrl}" alt="${APP_NAME} logo" width="36" height="36"
+                         style="display:block;width:36px;height:36px;" />
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <span style="font-size:24px;font-weight:700;color:#fff;letter-spacing:1px;">${APP_NAME}</span>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           <!-- Body -->
@@ -241,4 +252,30 @@ export async function sendSubscriptionConfirmEmail(
     </p>
     ${button(`${APP_URL}/dashboard`, 'Go to Dashboard')}`;
   await send(to, `${planName} subscription activated – ${APP_NAME}`, wrap('Subscription', body));
+}
+
+/**
+ * Sends a custom broadcast email to a single user (called in a loop by the admin broadcast).
+ * The message is rendered as paragraphs — newlines become <br> breaks.
+ */
+export async function sendBroadcastEmail(
+  to: string,
+  username: string,
+  subject: string,
+  message: string,
+): Promise<void> {
+  const safeMessage = message
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br />');
+
+  const body = `
+    <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+      Message from ${APP_NAME}
+    </p>
+    <p>Hi <strong>${username}</strong>,</p>
+    <div style="color:#f1f0f5;line-height:1.7;">${safeMessage}</div>
+    ${button(`${APP_URL}/dashboard`, 'Open Dashboard')}`;
+  await send(to, subject, wrap('Message from ' + APP_NAME, body));
 }
