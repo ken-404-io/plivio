@@ -255,27 +255,67 @@ export async function sendSubscriptionConfirmEmail(
 }
 
 /**
- * Sends a custom broadcast email to a single user (called in a loop by the admin broadcast).
- * The message is rendered as paragraphs — newlines become <br> breaks.
+ * Sends a broadcast email to a batch of users in a single Resend batch call.
+ * Resend allows up to 100 emails per batch request.
+ * Call this in chunks — see broadcastEmailToAll() for the full flow.
  */
-export async function sendBroadcastEmail(
-  to: string,
-  username: string,
+async function sendBroadcastBatch(
+  recipients: { email: string; username: string }[],
   subject: string,
   message: string,
 ): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY ?? process.env.SMTP_PASS;
+  if (!apiKey) {
+    logger.info({ count: recipients.length }, '[email] no API key configured, skipping batch');
+    return;
+  }
+
   const safeMessage = message
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br />');
 
-  const body = `
-    <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
-      Message from ${APP_NAME}
-    </p>
-    <p>Hi <strong>${username}</strong>,</p>
-    <div style="color:#f1f0f5;line-height:1.7;">${safeMessage}</div>
-    ${button(`${APP_URL}/dashboard`, 'Open Dashboard')}`;
-  await send(to, subject, wrap('Message from ' + APP_NAME, body));
+  const payload = recipients.map(({ email, username }) => {
+    const body = `
+      <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+        Message from ${APP_NAME}
+      </p>
+      <p>Hi <strong>${username}</strong>,</p>
+      <div style="color:#f1f0f5;line-height:1.7;">${safeMessage}</div>
+      ${button(`${APP_URL}/dashboard`, 'Open Dashboard')}`;
+    return { from: FROM, to: email, subject, html: wrap('Message from ' + APP_NAME, body) };
+  });
+
+  try {
+    const { error } = await getResend().batch.send(payload);
+    if (error) {
+      logger.error({ error, count: recipients.length }, '[email] batch send failed');
+    } else {
+      logger.info({ count: recipients.length }, '[email] batch sent');
+    }
+  } catch (err) {
+    logger.error({ err, count: recipients.length }, '[email] batch send exception');
+  }
+}
+
+/**
+ * Sends a broadcast email to all given recipients.
+ * Splits into chunks of 100 (Resend batch limit) with a 700ms pause between
+ * chunks to stay safely under the 2 requests/second rate limit.
+ */
+export async function broadcastEmailToAll(
+  recipients: { email: string; username: string }[],
+  subject: string,
+  message: string,
+): Promise<void> {
+  const CHUNK = 100;
+  const DELAY = 700; // ms between batch calls — keeps us under 2 req/s
+  for (let i = 0; i < recipients.length; i += CHUNK) {
+    const chunk = recipients.slice(i, i + CHUNK);
+    await sendBroadcastBatch(chunk, subject, message);
+    if (i + CHUNK < recipients.length) {
+      await new Promise((r) => setTimeout(r, DELAY));
+    }
+  }
 }
