@@ -247,11 +247,40 @@ export interface AdminDeviceInfo {
   registered_at: string | null;
 }
 
+export interface AdminUserProfile {
+  id: string;
+  username: string;
+  email: string;
+  plan: PlanType;
+  balance: string | number;
+  coins: string | number;
+  streak_count: number;
+  last_streak_date: string | null;
+  is_verified: boolean;
+  is_banned: boolean;
+  is_admin: boolean;
+  is_email_verified: boolean;
+  kyc_status: 'none' | 'pending' | 'approved' | 'rejected';
+  referral_code: string;
+  created_at: string;
+}
+
+export interface AdminUserKyc {
+  id: string;
+  id_type: string;
+  status: KycStatus;
+  rejection_reason: string | null;
+  submitted_at: string;
+  reviewed_at: string | null;
+}
+
 export interface AdminUserDetails {
+  user: AdminUserProfile;
   subscription: AdminUserSubscription | null;
   invites: AdminUserInvite[];
   withdrawals: AdminUserWithdrawal[];
   device: AdminDeviceInfo | null;
+  kyc: AdminUserKyc | null;
 }
 
 export interface AdminWithdrawalHistory {
@@ -293,6 +322,7 @@ export interface AdminWithdrawal {
   requested_at: string;
   username: string;
   email: string;
+  user_plan: PlanType;
 }
 
 export interface AdminStats {

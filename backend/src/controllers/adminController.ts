@@ -243,7 +243,7 @@ export async function listPendingWithdrawals(req: Request, res: Response, next: 
       `SELECT w.id, w.amount, w.fee_amount, w.net_amount, w.method, w.status,
               w.account_name, w.account_number,
               w.requested_at, w.processed_at,
-              u.username, u.email
+              u.username, u.email, u.plan::text AS user_plan
        FROM withdrawals w JOIN users u ON u.id = w.user_id
        WHERE w.status = $1 ORDER BY w.requested_at ASC`,
       [status]
@@ -389,7 +389,15 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
   try {
     const { id } = req.params as Record<string, string>;
 
-    const [subResult, invitesResult, withdrawalsResult, deviceResult] = await Promise.all([
+    const [userResult, subResult, invitesResult, withdrawalsResult, deviceResult, kycResult] = await Promise.all([
+      // Full user profile
+      pool.query(
+        `SELECT id, username, email, plan, balance, coins, streak_count, last_streak_date,
+                is_verified, is_banned, is_admin, is_email_verified, kyc_status, referral_code,
+                device_fingerprint, created_at
+         FROM users WHERE id = $1`,
+        [id],
+      ),
       // Current active subscription (if any)
       pool.query(
         `SELECT plan, starts_at, expires_at, is_active
@@ -434,12 +442,21 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
           return baseResult;
         }
       }),
+      // Most recent KYC submission
+      pool.query(
+        `SELECT id, id_type, status, rejection_reason, submitted_at, reviewed_at
+         FROM kyc_submissions WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 1`,
+        [id],
+      ),
     ]);
+
+    if (userResult.rows.length === 0) throw new NotFoundError('User not found');
 
     const deviceRow = deviceResult.rows[0] as { device_fingerprint: string | null; device_name?: string | null; device_registered_at?: string | null } | undefined;
 
     res.json({
       success:      true,
+      user:         userResult.rows[0],
       subscription: subResult.rows[0] ?? null,
       invites:      invitesResult.rows,
       withdrawals:  withdrawalsResult.rows,
@@ -448,6 +465,7 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
         device_name:    deviceRow.device_name ?? null,
         registered_at:  deviceRow.device_registered_at ?? null,
       } : null,
+      kyc:          kycResult.rows[0] ?? null,
     });
   } catch (err) { next(err); }
 }

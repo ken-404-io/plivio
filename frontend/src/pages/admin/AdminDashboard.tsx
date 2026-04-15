@@ -7,6 +7,7 @@ import {
   CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
   Download, X, Link2,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type {
@@ -840,6 +841,13 @@ export default function AdminDashboard() {
                     </div>
                     <span className="adm-user-balance">₱{Number(u.balance).toFixed(2)}</span>
                     <div className="adm-user-actions">
+                      <Link
+                        to={`/admin/users/${u.id}`}
+                        className="adm-icon-btn"
+                        title="View all details"
+                      >
+                        <Eye size={14} />
+                      </Link>
                       <button
                         className="adm-icon-btn"
                         onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
@@ -1157,6 +1165,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="adm-wd-payment">
                     <span className="adm-wd-method">{w.method.toUpperCase()}</span>
+                    <span className={`plan-badge plan-badge--${w.user_plan}`}>{w.user_plan}</span>
                     <div className="adm-wd-account">
                       <span className="adm-wd-account-name">{w.account_name}</span>
                       <span className="adm-wd-account-num">{w.account_number}</span>
