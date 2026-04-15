@@ -861,7 +861,7 @@ a, button, [role="button"], [tabindex] {
 .btn-social--github:hover   { border-color: #6e5494; }
 
 /* ─── Page ───────────────────────────────────────────────────────────────────── */
-.page { display: flex; flex-direction: column; gap: 24px; max-width: 1100px; padding-top: 8px; }
+.page { display: flex; flex-direction: column; gap: 24px; max-width: 1100px; padding-top: 8px; isolation: isolate; }
 
 /* ─── 404 / Error pages ──────────────────────────────────────────────────────── */
 .error-page {
@@ -2331,17 +2331,14 @@ a, button, [role="button"], [tabindex] {
 .adm-sticky-top {
   position: sticky;
   top: 0;
-  z-index: 20;
-  background: var(--bg-body);
+  /* Must be above all sibling flex items — isolation: isolate on .page
+     creates the stacking context, so z-index is compared within .page */
+  z-index: 50;
+  background-color: var(--bg-body);
   padding-top: 2px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  /* Bleed to cover page horizontal padding gap */
-  margin-left: -2px;
-  margin-right: -2px;
-  padding-left: 2px;
-  padding-right: 2px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.10);
 }
 .adm-header { margin-bottom: 8px; }
 .adm-title  { font-size: 20px; font-weight: 700; color: var(--text-heading); margin: 0; }
@@ -2496,7 +2493,7 @@ a, button, [role="button"], [tabindex] {
 }
 
 /* List */
-.adm-list { display: flex; flex-direction: column; gap: 8px; }
+.adm-list { display: flex; flex-direction: column; gap: 8px; position: relative; z-index: 0; }
 
 /* User rows */
 .adm-user-row {
