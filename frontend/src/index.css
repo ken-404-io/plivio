@@ -2328,7 +2328,22 @@ a, button, [role="button"], [tabindex] {
 }
 
 /* ─── Admin panel redesign ────────────────────────────────────────────────────── */
-.adm-header { margin-bottom: 4px; }
+.adm-sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg-body);
+  padding-top: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  /* Bleed to cover page horizontal padding gap */
+  margin-left: -2px;
+  margin-right: -2px;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+.adm-header { margin-bottom: 8px; }
 .adm-title  { font-size: 20px; font-weight: 700; color: var(--text-heading); margin: 0; }
 .adm-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
@@ -2801,6 +2816,10 @@ a, button, [role="button"], [tabindex] {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   margin-bottom: 8px;
+  position: sticky;
+  top: var(--adm-sticky-top-h, 130px);
+  z-index: 15;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 .adm-batch-select-all {
   display: flex;

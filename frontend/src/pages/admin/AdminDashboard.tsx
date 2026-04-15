@@ -231,12 +231,27 @@ function KycCountdown({ submittedAt }: { submittedAt: string }) {
   );
 }
 
-// ─── KYC image with auth ──────────────────────────────────────────────────────
+// ─── KYC image with auth + lazy loading ─────────────────────────────────────
 function KycImage({ kycId, field, alt }: { kycId: string; field: 'id_front' | 'id_selfie'; alt: string }) {
-  const [src, setSrc]   = useState<string | null>(null);
-  const urlRef = useRef<string | null>(null);
+  const [src,     setSrc]     = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const urlRef       = useRef<string | null>(null);
+
+  // Only start fetching when the element scrolls near the viewport
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect(); } },
+      { rootMargin: '300px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
+    if (!visible) return;
     let cancelled = false;
     api.get(`/kyc/document/${field}?kyc_id=${kycId}`, { responseType: 'blob' })
       .then(({ data }) => {
@@ -250,13 +265,18 @@ function KycImage({ kycId, field, alt }: { kycId: string; field: 'id_front' | 'i
       cancelled = true;
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
     };
-  }, [kycId, field]);
+  }, [visible, kycId, field]);
 
-  if (!src) return <div className="kyc-img-placeholder">Loading…</div>;
   return (
-    <a href={src} target="_blank" rel="noreferrer" className="kyc-img-link">
-      <img src={src} alt={alt} className="kyc-img-thumb" />
-    </a>
+    <div ref={containerRef}>
+      {src ? (
+        <a href={src} target="_blank" rel="noreferrer" className="kyc-img-link">
+          <img src={src} alt={alt} className="kyc-img-thumb" />
+        </a>
+      ) : (
+        <div className="kyc-img-placeholder">Loading…</div>
+      )}
+    </div>
   );
 }
 
@@ -752,33 +772,34 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Header */}
-      <header className="adm-header">
-        <div>
-          <h1 className="adm-title">Admin Panel</h1>
-          <p className="adm-subtitle">{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-        </div>
-      </header>
+      {/* Header + tab bar — sticky */}
+      <div className="adm-sticky-top">
+        <header className="adm-header">
+          <div>
+            <h1 className="adm-title">Admin Panel</h1>
+            <p className="adm-subtitle">{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          </div>
+        </header>
 
-      {/* Tab bar */}
-      <div className="adm-tabs">
-        {TABS.map((t) => {
-          const { label, Icon } = TAB_META[t];
-          const badge = t === 'kyc' ? stats?.pending_kyc
-                      : t === 'withdrawals' ? stats?.pending_withdrawals
-                      : 0;
-          return (
-            <button
-              key={t}
-              className={`adm-tab${tab === t ? ' adm-tab--active' : ''}`}
-              onClick={() => setTab(t)}
-            >
-              <Icon size={15} />
-              <span>{label}</span>
-              {badge != null && badge > 0 && <span className="adm-tab-badge">{badge}</span>}
-            </button>
-          );
-        })}
+        <div className="adm-tabs">
+          {TABS.map((t) => {
+            const { label, Icon } = TAB_META[t];
+            const badge = t === 'kyc' ? stats?.pending_kyc
+                        : t === 'withdrawals' ? stats?.pending_withdrawals
+                        : 0;
+            return (
+              <button
+                key={t}
+                className={`adm-tab${tab === t ? ' adm-tab--active' : ''}`}
+                onClick={() => setTab(t)}
+              >
+                <Icon size={15} />
+                <span>{label}</span>
+                {badge != null && badge > 0 && <span className="adm-tab-badge">{badge}</span>}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Overview ── */}
