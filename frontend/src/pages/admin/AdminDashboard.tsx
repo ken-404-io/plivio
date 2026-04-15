@@ -27,31 +27,71 @@ const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
   kyc:           { label: 'KYC',           Icon: ShieldCheck     },
 };
 
-// ─── Rejection modal (KYC – free text) ───────────────────────────────────────
+// ─── KYC rejection modal (predefined reasons + custom) ───────────────────────
+const KYC_REJECT_REASONS = [
+  'ID photo is blurry or unclear. Please resubmit with a clearer image.',
+  'ID has expired. Please submit a valid, non-expired government-issued ID.',
+  'Selfie does not clearly match the ID photo. Please retake your selfie.',
+  'ID is not fully visible — edges are cut off. Please show the complete ID.',
+  'Glare or flash obscures the ID details. Please retake without flash.',
+  'The name on the ID does not match your registered account name.',
+  'Custom reason…',
+] as const;
+
 function RejectModal({ onConfirm, onCancel }: {
   onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {
-  const [reason, setReason] = useState('');
+  const [selected, setSelected] = useState('');
+  const [custom,   setCustom]   = useState('');
+
+  const isCustom    = selected === 'Custom reason…';
+  const finalReason = isCustom ? custom.trim() : selected;
+
   return (
     <div className="adm-modal-overlay" onClick={onCancel}>
-      <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="adm-modal-title">Rejection Reason</h3>
-        <p className="adm-modal-hint">This message will be shown to the user.</p>
-        <textarea
-          className="form-input adm-modal-textarea"
-          placeholder="e.g. ID photo is blurry, please resubmit…"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
-          autoFocus
-        />
+      <div className="adm-modal adm-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title">KYC Rejection Reason</h3>
+        <p className="adm-modal-hint">
+          Select a reason — it will be sent to the user by email and in-app notification.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '10px 0' }}>
+          {KYC_REJECT_REASONS.map((r) => (
+            <label
+              key={r}
+              className={`adm-reject-option${selected === r ? ' adm-reject-option--selected' : ''}`}
+            >
+              <input
+                type="radio"
+                name="kyc-reject-reason"
+                value={r}
+                checked={selected === r}
+                onChange={() => setSelected(r)}
+                className="adm-reject-radio"
+              />
+              <span>{r}</span>
+            </label>
+          ))}
+        </div>
+
+        {isCustom && (
+          <textarea
+            className="form-input adm-modal-textarea"
+            placeholder="Type a custom rejection reason…"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            rows={3}
+            autoFocus
+          />
+        )}
+
         <div className="adm-modal-actions">
           <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
           <button
             className="btn btn-danger btn-sm"
-            disabled={!reason.trim()}
-            onClick={() => { if (reason.trim()) onConfirm(reason.trim()); }}
+            disabled={!finalReason}
+            onClick={() => { if (finalReason) onConfirm(finalReason); }}
           >
             Confirm Reject
           </button>
@@ -772,7 +812,7 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Header + tab bar — sticky */}
+      {/* Header + tab bar + KYC batch toolbar — sticky */}
       <div className="adm-sticky-top">
         <header className="adm-header">
           <div>
@@ -800,6 +840,37 @@ export default function AdminDashboard() {
             );
           })}
         </div>
+
+        {/* KYC batch select toolbar — only visible on the KYC tab */}
+        {tab === 'kyc' && kycList.length > 0 && (
+          <div className="adm-batch-toolbar">
+            <label className="adm-batch-select-all">
+              <input
+                type="checkbox"
+                checked={selectedKyc.size === kycList.length}
+                onChange={(e) => setSelectedKyc(e.target.checked ? new Set(kycList.map((k) => k.id)) : new Set())}
+              />
+              <span>Select all ({kycList.length})</span>
+            </label>
+            {selectedKyc.size > 0 && (
+              <>
+                <span className="adm-batch-count">{selectedKyc.size} selected</span>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => void batchReviewKyc([...selectedKyc], 'approve')}
+                >
+                  <CheckCircle2 size={13} /> Approve {selectedKyc.size}
+                </button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => setBatchRejectMode(true)}
+                >
+                  <XCircle size={13} /> Reject {selectedKyc.size}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Overview ── */}
@@ -1602,36 +1673,6 @@ export default function AdminDashboard() {
       {/* ── KYC ── */}
       {tab === 'kyc' && (
         <>
-          {kycList.length > 0 && (
-            <div className="adm-batch-toolbar">
-              <label className="adm-batch-select-all">
-                <input
-                  type="checkbox"
-                  checked={selectedKyc.size === kycList.length}
-                  onChange={(e) => setSelectedKyc(e.target.checked ? new Set(kycList.map((k) => k.id)) : new Set())}
-                />
-                <span>Select all ({kycList.length})</span>
-              </label>
-              {selectedKyc.size > 0 && (
-                <>
-                  <span className="adm-batch-count">{selectedKyc.size} selected</span>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => void batchReviewKyc([...selectedKyc], 'approve')}
-                  >
-                    <CheckCircle2 size={13} /> Approve {selectedKyc.size}
-                  </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => setBatchRejectMode(true)}
-                  >
-                    <XCircle size={13} /> Reject {selectedKyc.size}
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
           <div className="adm-list">
             {kycList.length === 0 ? (
               <div className="empty-state"><p>No pending KYC submissions.</p></div>
