@@ -126,7 +126,7 @@ export default function AdminUserDetail() {
             <span className="adm-wd-detail-value">
               {user.email}{' '}
               {user.is_email_verified
-                ? <CheckCircle2 size={11} color="var(--success)" title="Email verified" />
+                ? <CheckCircle2 size={11} color="var(--success)" />
                 : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>(unverified)</span>}
             </span>
           </div>
