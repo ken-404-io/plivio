@@ -3,7 +3,7 @@ import {
   Users, ArrowUpCircle, ShieldCheck, TrendingUp,
   UserPlus, LayoutDashboard, Bell, Send, Mail,
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
-  XCircle, Eye, EyeOff, Coins, MessageSquare, Clock,
+  XCircle, Eye, Coins, MessageSquare, Clock,
   CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
   Download, X, Link2,
 } from 'lucide-react';
@@ -350,9 +350,10 @@ export default function AdminDashboard() {
   const [userDetailsLoad, setUserDetailsLoad] = useState<Record<string, boolean>>({});
   const [adjustDraft,     setAdjustDraft]     = useState<Record<string, { delta: string; plan: string }>>({});
 
-  const [expandedKyc,   setExpandedKyc]   = useState<string | null>(null);
   const [rejectTarget,  setRejectTarget]  = useState<string | null>(null);
   const [wdRejectTarget,setWdRejectTarget]= useState<string | null>(null);
+  const [selectedKyc,   setSelectedKyc]   = useState<Set<string>>(new Set());
+  const [batchRejectMode, setBatchRejectMode] = useState(false);
 
   // Withdrawal history state
   const [wdSubTab,         setWdSubTab]         = useState<'pending' | 'history'>('pending');
@@ -682,10 +683,22 @@ export default function AdminDashboard() {
     try {
       await api.put(`/admin/kyc/${id}`, { action, rejection_reason: reason });
       setKycList((prev) => prev.filter((k) => k.id !== id));
-      setExpandedKyc(null);
       toast.success(`KYC ${action}d.`);
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
+    }
+  }
+
+  async function batchReviewKyc(ids: string[], action: 'approve' | 'reject', reason?: string) {
+    try {
+      await Promise.all(ids.map((id) =>
+        api.put(`/admin/kyc/${id}`, { action, rejection_reason: reason }),
+      ));
+      setKycList((prev) => prev.filter((k) => !ids.includes(k.id)));
+      setSelectedKyc(new Set());
+      toast.success(`${ids.length} KYC submission${ids.length > 1 ? 's' : ''} ${action}d.`);
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Batch action failed.');
     }
   }
 
@@ -717,6 +730,12 @@ export default function AdminDashboard() {
         <RejectModal
           onConfirm={(reason) => { void reviewKyc(rejectTarget, 'reject', reason); setRejectTarget(null); }}
           onCancel={() => setRejectTarget(null)}
+        />
+      )}
+      {batchRejectMode && (
+        <RejectModal
+          onConfirm={(reason) => { void batchReviewKyc([...selectedKyc], 'reject', reason); setBatchRejectMode(false); }}
+          onCancel={() => setBatchRejectMode(false)}
         />
       )}
       {wdRejectTarget && (
@@ -1561,51 +1580,85 @@ export default function AdminDashboard() {
 
       {/* ── KYC ── */}
       {tab === 'kyc' && (
-        <div className="adm-list">
-          {kycList.length === 0 ? (
-            <div className="empty-state"><p>No pending KYC submissions.</p></div>
-          ) : kycList.map((k) => (
-            <div key={k.id} className="adm-kyc-card">
-              <div className="adm-kyc-top">
-                <div className="adm-kyc-user">
-                  <span className="adm-kyc-username">{k.username}</span>
-                  <span className="adm-kyc-email">{k.email}</span>
-                  {k.status === 'pending' && (
-                    <KycCountdown submittedAt={k.submitted_at} />
-                  )}
-                </div>
-                <div className="adm-kyc-meta">
-                  <span className={`adm-kyc-badge adm-kyc-badge--${k.status}`}>{k.status}</span>
-                  <span className="adm-kyc-type">{k.id_type.replace('_', ' ')}</span>
-                  <span className="adm-kyc-date">
-                    {new Date(k.submitted_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  {k.reviewed_at && (
+        <>
+          {kycList.length > 0 && (
+            <div className="adm-batch-toolbar">
+              <label className="adm-batch-select-all">
+                <input
+                  type="checkbox"
+                  checked={selectedKyc.size === kycList.length}
+                  onChange={(e) => setSelectedKyc(e.target.checked ? new Set(kycList.map((k) => k.id)) : new Set())}
+                />
+                <span>Select all ({kycList.length})</span>
+              </label>
+              {selectedKyc.size > 0 && (
+                <>
+                  <span className="adm-batch-count">{selectedKyc.size} selected</span>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => void batchReviewKyc([...selectedKyc], 'approve')}
+                  >
+                    <CheckCircle2 size={13} /> Approve {selectedKyc.size}
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => setBatchRejectMode(true)}
+                  >
+                    <XCircle size={13} /> Reject {selectedKyc.size}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="adm-list">
+            {kycList.length === 0 ? (
+              <div className="empty-state"><p>No pending KYC submissions.</p></div>
+            ) : kycList.map((k) => (
+              <div key={k.id} className={`adm-kyc-card${selectedKyc.has(k.id) ? ' adm-kyc-card--selected' : ''}`}>
+                <div className="adm-kyc-top">
+                  <label className="adm-kyc-check">
+                    <input
+                      type="checkbox"
+                      checked={selectedKyc.has(k.id)}
+                      onChange={(e) => setSelectedKyc((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(k.id); else next.delete(k.id);
+                        return next;
+                      })}
+                    />
+                  </label>
+                  <div className="adm-kyc-user">
+                    <span className="adm-kyc-username">{k.username}</span>
+                    <span className="adm-kyc-email">{k.email}</span>
+                    {k.status === 'pending' && (
+                      <KycCountdown submittedAt={k.submitted_at} />
+                    )}
+                  </div>
+                  <div className="adm-kyc-meta">
+                    <span className={`adm-kyc-badge adm-kyc-badge--${k.status}`}>{k.status}</span>
+                    <span className="adm-kyc-type">{k.id_type.replace('_', ' ')}</span>
                     <span className="adm-kyc-date">
-                      Reviewed {new Date(k.reviewed_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(k.submitted_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
-                  )}
+                    {k.reviewed_at && (
+                      <span className="adm-kyc-date">
+                        Reviewed {new Date(k.reviewed_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <button
-                  className="adm-docs-toggle"
-                  onClick={() => setExpandedKyc(expandedKyc === k.id ? null : k.id)}
-                >
-                  {expandedKyc === k.id ? <EyeOff size={13} /> : <Eye size={13} />}
-                  {expandedKyc === k.id ? 'Hide documents' : 'View documents'}
-                </button>
-                <Link
-                  to={`/admin/users/${k.user_id}`}
-                  className="adm-docs-toggle"
-                  style={{ textDecoration: 'none' }}
-                >
-                  <Users size={13} /> View all user info
-                </Link>
-              </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                  <Link
+                    to={`/admin/users/${k.user_id}`}
+                    className="adm-docs-toggle"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Users size={13} /> View all user info
+                  </Link>
+                </div>
 
-              {expandedKyc === k.id && (
                 <div className="adm-kyc-docs">
                   <div className="kyc-img-wrap">
                     <span className="kyc-img-label">ID Front</span>
@@ -1616,25 +1669,25 @@ export default function AdminDashboard() {
                     <KycImage kycId={k.id} field="id_selfie" alt="Selfie with ID" />
                   </div>
                 </div>
-              )}
 
-              <div className="adm-kyc-actions">
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => { void reviewKyc(k.id, 'approve'); }}
-                >
-                  <CheckCircle2 size={13} /> Approve
-                </button>
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => setRejectTarget(k.id)}
-                >
-                  <XCircle size={13} /> Reject
-                </button>
+                <div className="adm-kyc-actions">
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => { void reviewKyc(k.id, 'approve'); }}
+                  >
+                    <CheckCircle2 size={13} /> Approve
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => setRejectTarget(k.id)}
+                  >
+                    <XCircle size={13} /> Reject
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
 
     </div>
