@@ -28,7 +28,8 @@ import Profile        from './pages/profile/Profile.tsx';
 import Referrals      from './pages/referrals/Referrals.tsx';
 import Kyc            from './pages/kyc/Kyc.tsx';
 import Coins          from './pages/coins/Coins.tsx';
-import AdminDashboard from './pages/admin/AdminDashboard.tsx';
+import AdminDashboard  from './pages/admin/AdminDashboard.tsx';
+import AdminUserDetail from './pages/admin/AdminUserDetail.tsx';
 import Settings       from './pages/settings/Settings.tsx';
 
 export default function App() {
@@ -75,7 +76,8 @@ export default function App() {
               {/* Admin routes */}
               <Route element={<ProtectedRoute adminOnly />}>
                 <Route element={<Layout isAdmin />}>
-                  <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/admin"             element={<AdminDashboard />} />
+                  <Route path="/admin/users/:id"   element={<AdminUserDetail />} />
                 </Route>
               </Route>
 

@@ -11,6 +11,9 @@ import { logger } from './utils/logger.ts';
 import { AppError } from './utils/errors.ts';
 import { rateLimiter } from './middleware/rateLimiter.ts';
 import { csrfMiddleware } from './middleware/csrf.ts';
+import { createNotification } from './utils/notify.ts';
+import { sendPushToUser }    from './controllers/pushController.ts';
+import { sendKycStatusEmail } from './services/email.ts';
 // Cloudinary serves avatars/KYC images — no local AVATARS_DIR needed
 
 import authRoutes         from './routes/auth.ts';
@@ -167,6 +170,50 @@ async function runDiagnostics(): Promise<void> {
   }
 }
 
+// ─── KYC auto-approval scheduler ─────────────────────────────────────────────
+// Any KYC submission that remains 'pending' for 32+ hours is auto-approved.
+async function runKycAutoApproval(): Promise<void> {
+  try {
+    const { rows } = await pool.query<{
+      id: string;
+      user_id: string;
+      id_type: string;
+    }>(
+      `UPDATE kyc_submissions
+       SET status = 'approved', reviewed_at = NOW(), reviewed_by = NULL
+       WHERE status = 'pending'
+         AND submitted_at <= NOW() - INTERVAL '32 hours'
+       RETURNING id, user_id, id_type`,
+    );
+
+    if (rows.length === 0) return;
+
+    logger.info({ count: rows.length }, 'KYC auto-approval: approved submissions');
+
+    for (const row of rows) {
+      // Sync kyc_status on users table
+      await pool.query(`UPDATE users SET kyc_status = 'approved' WHERE id = $1`, [row.user_id]);
+
+      // Fetch user info for notifications
+      const userRes = await pool.query<{ email: string; username: string }>(
+        `SELECT email, username FROM users WHERE id = $1`,
+        [row.user_id],
+      );
+      if (userRes.rows.length === 0) continue;
+
+      const { email, username } = userRes.rows[0];
+      const title = 'KYC Approved';
+      const body  = 'Your identity has been verified. You can now request withdrawals.';
+
+      void createNotification(row.user_id, 'kyc_approved', title, body, '/withdraw');
+      void sendPushToUser(row.user_id, title, body, '/withdraw');
+      void sendKycStatusEmail(email, username, 'approved');
+    }
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, 'KYC auto-approval error');
+  }
+}
+
 async function bootstrap() {
   logger.info({}, 'Connecting to PostgreSQL…');
   await connectDB();
@@ -175,6 +222,10 @@ async function bootstrap() {
   await connectRedis();
 
   await runDiagnostics();
+
+  // Start KYC auto-approval scheduler — runs every hour
+  void runKycAutoApproval();
+  setInterval(() => { void runKycAutoApproval(); }, 60 * 60 * 1000);
 
   app.listen(PORT, () => {
     logger.info({ port: PORT }, `Plivio API running → http://localhost:${PORT}`);
