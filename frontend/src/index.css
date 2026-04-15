@@ -2811,15 +2811,7 @@ a, button, [role="button"], [tabindex] {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 10px 14px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  margin-bottom: 8px;
-  position: sticky;
-  top: var(--adm-sticky-top-h, 130px);
-  z-index: 15;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 8px 4px 0;
 }
 .adm-batch-select-all {
   display: flex;
@@ -2868,6 +2860,7 @@ a, button, [role="button"], [tabindex] {
   gap: 12px;
   box-shadow: var(--shadow-lg);
 }
+.adm-modal--wide { max-width: 480px; }
 .adm-modal-title {
   font-size: 15px;
   font-weight: 700;
