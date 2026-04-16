@@ -86,7 +86,7 @@ function ValidationModal({ message, onClose }: { message: string; onClose: () =>
 const MIN_AMOUNT            = 50;
 const MAX_AMOUNT            = 5000;
 const FREE_PLAN_MAX_AMOUNT  = 100;
-const DAILY_QUIZ_GATE       = 15;
+const QUIZ_EARN_GATE        = 20;
 const DOC_FEE_RATE      = 0.01;
 const HANDLING_FEE_RATE  = 0.04;
 const TOTAL_FEE_RATE    = DOC_FEE_RATE + HANDLING_FEE_RATE;
@@ -349,8 +349,8 @@ export default function Withdraw() {
   const [historyOpen,       setHistoryOpen]       = useState(true);
   const [cooldownEnd,       setCooldownEnd]       = useState<Date | null>(null);
   const [cooldownRemaining, setCooldownRemaining] = useState('');
-  const [quizGatePassed,    setQuizGatePassed]    = useState<boolean | null>(null);
-  const [quizTodayAnswered, setQuizTodayAnswered] = useState(0);
+  const [quizGatePassed,  setQuizGatePassed]  = useState<boolean | null>(null);
+  const [quizTodayEarned, setQuizTodayEarned] = useState(0);
 
   async function loadHistory() {
     try {
@@ -366,7 +366,7 @@ export default function Withdraw() {
         on_cooldown: boolean;
         cooldown_end?: string;
         quiz_gate_passed?: boolean;
-        quiz_today_answered?: number;
+        quiz_today_earned?: number;
       }>('/withdrawals/cooldown');
       if (data.on_cooldown && data.cooldown_end) {
         setCooldownEnd(new Date(data.cooldown_end));
@@ -374,7 +374,7 @@ export default function Withdraw() {
         setCooldownEnd(null);
       }
       setQuizGatePassed(data.quiz_gate_passed ?? true);
-      setQuizTodayAnswered(data.quiz_today_answered ?? 0);
+      setQuizTodayEarned(data.quiz_today_earned ?? 0);
     } catch { /* silent */ }
   }
 
@@ -612,14 +612,13 @@ export default function Withdraw() {
         </div>
       )}
 
-      {/* Quiz gate */}
+      {/* Quiz earn gate */}
       {quizGatePassed === false && (
         <div className="alert alert--warning">
           <BookOpen size={18} style={{ flexShrink: 0 }} />
           <div>
-            <strong>Daily quiz session required.</strong>{' '}
-            Answer {Math.max(0, DAILY_QUIZ_GATE - quizTodayAnswered)} more question{Math.max(0, DAILY_QUIZ_GATE - quizTodayAnswered) === 1 ? '' : 's'} in Quizly
-            to unlock today's withdrawal ({quizTodayAnswered}/{DAILY_QUIZ_GATE} done).{' '}
+            <strong>Earn ₱{QUIZ_EARN_GATE} in Quizly today to unlock withdrawal.</strong>{' '}
+            You've earned ₱{quizTodayEarned.toFixed(2)} so far — ₱{Math.max(0, QUIZ_EARN_GATE - quizTodayEarned).toFixed(2)} more to go.{' '}
             <Link to="/tasks">Open Quizly →</Link>
           </div>
         </div>

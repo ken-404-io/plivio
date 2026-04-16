@@ -10,11 +10,10 @@ const ELITE_DAILY_WITHDRAWAL_MAX    = 500;  // ₱500 total per day for Elite
 // SQL snippet: start of "today" in Philippine Standard Time (UTC+8)
 const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila')`;
 
-// Minimum questions a user must answer today before they can withdraw.
-// Matches the frontend streak goal (STREAK_QUIZ_GOAL = 15).
+// Minimum quiz earnings (₱) a user must accumulate today before they can withdraw.
 // Free plan users who have exhausted their 100-question lifetime bank are exempt.
-const DAILY_QUIZ_GATE            = 15;
-const FREE_PLAN_LIFETIME_CAP     = 100;
+const QUIZ_EARN_GATE         = 20;
+const FREE_PLAN_LIFETIME_CAP = 100;
 
 const MIN_WITHDRAWAL  = 50;
 const MAX_WITHDRAWAL  = 5000;
@@ -110,18 +109,17 @@ export async function requestWithdrawal(
       throw new ForbiddenError('Identity verification required before withdrawing');
     }
 
-    // Daily quiz gate — must answer at least 15 questions today before withdrawing.
-    // Free users who've used all 100 lifetime questions are exempt (they can no
-    // longer earn from the quiz and shouldn't be permanently locked out).
+    // Quiz earn gate — must earn at least ₱20 from Quizly today before withdrawing.
+    // Free users who've exhausted their 100-question lifetime bank are exempt.
     {
       const { rows: quizRows } = await client.query(
-        `SELECT COUNT(*) AS today_answered FROM user_question_answers
+        `SELECT COALESCE(SUM(reward_earned), 0) AS today_earned FROM user_question_answers
          WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
         [userId],
       );
-      const todayAnswered = Number((quizRows[0] as { today_answered: string }).today_answered);
+      const todayEarned = Number((quizRows[0] as { today_earned: string }).today_earned);
 
-      if (todayAnswered < DAILY_QUIZ_GATE) {
+      if (todayEarned < QUIZ_EARN_GATE) {
         let exempt = false;
         if (user.plan === 'free') {
           const { rows: lifeRows } = await client.query(
@@ -131,9 +129,9 @@ export async function requestWithdrawal(
           if (Number((lifeRows[0] as { total: string }).total) >= FREE_PLAN_LIFETIME_CAP) exempt = true;
         }
         if (!exempt) {
-          const needed = DAILY_QUIZ_GATE - todayAnswered;
+          const remaining = (QUIZ_EARN_GATE - todayEarned).toFixed(2);
           throw new ForbiddenError(
-            `Complete today's quiz session first. Answer ${needed} more question${needed === 1 ? '' : 's'} in Quizly to unlock your withdrawal.`,
+            `Earn ₱${QUIZ_EARN_GATE} in Quizly today to unlock your withdrawal. You need ₱${remaining} more.`,
             'quiz_gate_not_met',
           );
         }
@@ -244,10 +242,10 @@ export async function getWithdrawalCooldown(
 
     const plan = (userRows[0] as { plan: string }).plan;
 
-    // Quiz gate status — shared across all plans
+    // Quiz earn gate status — shared across all plans
     const [quizTodayRes, quizLifetimeRes] = await Promise.all([
       pool.query(
-        `SELECT COUNT(*) AS today_answered FROM user_question_answers
+        `SELECT COALESCE(SUM(reward_earned), 0) AS today_earned FROM user_question_answers
          WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
         [userId],
       ),
@@ -255,16 +253,16 @@ export async function getWithdrawalCooldown(
         ? pool.query(`SELECT COUNT(*) AS total FROM user_question_answers WHERE user_id = $1`, [userId])
         : Promise.resolve({ rows: [{ total: '0' }] }),
     ]);
-    const quizTodayAnswered = Number((quizTodayRes.rows[0] as { today_answered: string }).today_answered);
+    const quizTodayEarned   = Number((quizTodayRes.rows[0] as { today_earned: string }).today_earned);
     const quizLifetimeTotal = Number((quizLifetimeRes.rows[0] as { total: string }).total);
 
-    const freeExempt   = plan === 'free' && quizLifetimeTotal >= FREE_PLAN_LIFETIME_CAP;
-    const quizGatePassed = quizTodayAnswered >= DAILY_QUIZ_GATE || freeExempt;
+    const freeExempt     = plan === 'free' && quizLifetimeTotal >= FREE_PLAN_LIFETIME_CAP;
+    const quizGatePassed = quizTodayEarned >= QUIZ_EARN_GATE || freeExempt;
 
     const quizInfo = {
-      quiz_gate_required:   DAILY_QUIZ_GATE,
-      quiz_today_answered:  quizTodayAnswered,
-      quiz_gate_passed:     quizGatePassed,
+      quiz_earn_gate:      QUIZ_EARN_GATE,
+      quiz_today_earned:   quizTodayEarned,
+      quiz_gate_passed:    quizGatePassed,
     };
 
     // Premium: return today's used and remaining daily withdrawal allowance
