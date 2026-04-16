@@ -72,8 +72,8 @@ const CERTS = [
 const FEATURES = [
   {
     icon:  Smartphone,
-    title: 'Mobile-First',
-    desc:  'Built for Filipinos on the go. Complete tasks from any phone, anywhere in PH.',
+    title: 'Mobile-First Experience',
+    desc:  'Designed for Filipinos on the go. Answer quizzes from any phone, anywhere in the country.',
     delay: 0,
   },
   {
@@ -85,7 +85,7 @@ const FEATURES = [
   {
     icon:  Flame,
     title: 'Daily Streak Bonuses',
-    desc:  'Log in every day to build your streak and unlock bigger earning multipliers.',
+    desc:  'Log in every day to build your streak and unlock higher earning multipliers.',
     delay: 120,
   },
   {
@@ -96,14 +96,14 @@ const FEATURES = [
   },
   {
     icon:  RefreshCw,
-    title: 'Fresh Tasks Daily',
-    desc:  'New surveys, videos, ad tasks, and offers added every day without fail.',
+    title: 'New Quizzes Daily',
+    desc:  'Fresh quiz categories added every day across finance, tech, culture, science, and more.',
     delay: 60,
   },
   {
     icon:  ShieldCheck,
     title: 'SEC & DTI Registered',
-    desc:  'Fully registered and compliant. Your money and personal data are protected.',
+    desc:  'Fully registered and compliant. Your earnings and personal data are protected.',
     delay: 120,
   },
 ] as const;
@@ -115,7 +115,7 @@ const TESTIMONIALS = [
     initials: 'MS',
     color:    '#1877f2',
     stars:    5,
-    text:     'I\'ve been using Plivio for 3 months and already earned over ₱4,000. It\'s legit — money hits my GCash within 24 hours every time!',
+    text:     'I\'ve been answering quizzes on Plivio for 3 months and already earned over ₱4,000. Verified payouts — my GCash balance grows within 24 hours every time.',
   },
   {
     name:     'Renz Dela Cruz',
@@ -123,7 +123,7 @@ const TESTIMONIALS = [
     initials: 'RD',
     color:    '#3b82f6',
     stars:    5,
-    text:     'As a student, this is perfect for extra income. I do tasks during breaks and the streak system keeps me motivated every day.',
+    text:     'As a student, this is ideal for consistent income. I answer a few quizzes between classes and the streak system keeps me motivated every day.',
   },
   {
     name:     'Anna Reyes',
@@ -131,7 +131,7 @@ const TESTIMONIALS = [
     initials: 'AR',
     color:    '#22c55e',
     stars:    5,
-    text:     'I was skeptical at first but the SEC registration badge gave me confidence. I upgraded to Premium and now I earn up to ₱100 a day!',
+    text:     'I was cautious at first, but the SEC registration gave me confidence. I upgraded to Premium and now earn up to ₱100 a day from quizzes I genuinely enjoy.',
   },
   {
     name:     'Jerome Bautista',
@@ -139,7 +139,7 @@ const TESTIMONIALS = [
     initials: 'JB',
     color:    '#f97316',
     stars:    4,
-    text:     'Super easy to use. Tasks are straightforward and the referral bonus is great — I invited my 3 friends and we all earn together.',
+    text:     'Straightforward platform. The quizzes are well-written and the referral bonus is generous — I invited three friends and we all grow our GCash balances together.',
   },
   {
     name:     'Liza Fernandez',
@@ -147,7 +147,7 @@ const TESTIMONIALS = [
     initials: 'LF',
     color:    '#14b8a6',
     stars:    5,
-    text:     'Nasubok ko na ang maraming GPT sites pero si Plivio talaga ang pinaka-legit. Mabilis ang payout at maganda ang support.',
+    text:     'Nasubok ko na ang maraming earning sites, pero si Plivio talaga ang pinaka-legit. Mabilis ang payout at maganda ang quality ng quizzes.',
   },
   {
     name:     'Carlo Mendoza',
@@ -155,7 +155,7 @@ const TESTIMONIALS = [
     initials: 'CM',
     color:    '#eab308',
     stars:    5,
-    text:     'I love the coin streak feature. It gamifies earning and makes me want to log in every single day. Already withdrew ₱2,500 this month!',
+    text:     'The coin streak feature turned quiz-answering into part of my daily routine. Already withdrew ₱2,500 to my GCash this month — consistent income from knowledge I already have.',
   },
 ] as const;
 
@@ -244,13 +244,14 @@ export default function LandingPage() {
           </div>
 
           <h1 className="lp-hero-title">
-            Earn Real Money<br />
+            Earn Legitimate Income<br />
             <span className="lp-hero-highlight">Online in PH</span>
           </h1>
 
           <p className="lp-hero-subtitle">
-            Complete simple tasks — watch videos, answer surveys, click ads —
-            and get paid directly to your GCash or PayPal. No experience needed.
+            Answer quick quizzes on topics you already know and receive verified
+            payouts directly to your GCash or PayPal. No experience required —
+            just your knowledge.
           </p>
 
           <form className="lp-hero-form" onSubmit={handleCTA}>
@@ -263,7 +264,7 @@ export default function LandingPage() {
               aria-label="Email address"
             />
             <button type="submit" className="lp-hero-btn">
-              Start Earning Free
+              Start Earning Today
             </button>
           </form>
 
@@ -306,17 +307,17 @@ export default function LandingPage() {
             <div className="lp-ec-tasks">
               <div className="lp-ec-task lp-ec-task--done">
                 <CheckCircle2 size={14} />
-                <span>Watch Video</span>
+                <span>General Knowledge</span>
                 <span className="lp-ec-earn">+₱2.50</span>
               </div>
               <div className="lp-ec-task lp-ec-task--done">
                 <CheckCircle2 size={14} />
-                <span>Survey Complete</span>
+                <span>Finance Basics</span>
                 <span className="lp-ec-earn">+₱15.00</span>
               </div>
               <div className="lp-ec-task lp-ec-task--active">
                 <span className="lp-ec-dot" />
-                <span>Click Ads</span>
+                <span>Daily Challenge</span>
                 <span className="lp-ec-earn lp-ec-earn--live">Live</span>
               </div>
             </div>
@@ -336,7 +337,7 @@ export default function LandingPage() {
         <div className="lp-section-inner">
           <div className="lp-section-header reveal">
             <h2 className="lp-section-title">Why Filipinos Choose Plivio</h2>
-            <p className="lp-section-subtitle">Everything you need to earn real money online — in one platform</p>
+            <p className="lp-section-subtitle">Everything you need to earn legitimate income online — in one trusted platform</p>
           </div>
 
           <div className="lp-features-grid">
@@ -355,9 +356,9 @@ export default function LandingPage() {
       <section className="lp-section lp-testimonials-section" id="testimonials" ref={testimonialsRef}>
         <div className="lp-section-inner">
           <div className="lp-section-header reveal">
-            <h2 className="lp-section-title">What Earners Are Saying</h2>
+            <h2 className="lp-section-title">What Our Earners Are Saying</h2>
             <p className="lp-section-subtitle">
-              Real reviews from our verified Filipino community members
+              Honest reviews from verified members of our Filipino community
             </p>
           </div>
 
@@ -391,7 +392,7 @@ export default function LandingPage() {
           <div className="lp-trust-row reveal">
             <div className="lp-trust-item">
               <CheckCircle2 size={18} className="lp-trust-icon" />
-              <span>100% Legit Payouts</span>
+              <span>Verified Payouts</span>
             </div>
             <div className="lp-trust-item">
               <CheckCircle2 size={18} className="lp-trust-icon" />
@@ -399,7 +400,7 @@ export default function LandingPage() {
             </div>
             <div className="lp-trust-item">
               <CheckCircle2 size={18} className="lp-trust-icon" />
-              <span>24hr Processing</span>
+              <span>24-Hour Processing</span>
             </div>
             <div className="lp-trust-item">
               <CheckCircle2 size={18} className="lp-trust-icon" />
@@ -413,9 +414,9 @@ export default function LandingPage() {
       <section className="lp-section lp-plans-section" id="plans" ref={plansRef}>
         <div className="lp-section-inner">
           <div className="lp-section-header reveal">
-            <h2 className="lp-section-title">Earning Plans</h2>
+            <h2 className="lp-section-title">Membership Plans</h2>
             <p className="lp-section-subtitle">
-              Start free or upgrade to unlock higher daily limits
+              Start free or upgrade to unlock higher daily earning limits
             </p>
           </div>
 
@@ -427,7 +428,7 @@ export default function LandingPage() {
                 <span className="lp-price-period">/month</span>
               </div>
               <ul className="lp-plan-features">
-                <li><span className="lp-check"><Check size={14} /></span> Basic tasks access</li>
+                <li><span className="lp-check"><Check size={14} /></span> Access to daily quizzes</li>
                 <li><span className="lp-check"><Check size={14} /></span> ₱20/day earning limit</li>
                 <li><span className="lp-check"><Check size={14} /></span> GCash &amp; PayPal withdrawal</li>
                 <li><span className="lp-check"><Check size={14} /></span> Referral bonuses</li>
@@ -446,10 +447,10 @@ export default function LandingPage() {
                 <span className="lp-price-period">/month</span>
               </div>
               <ul className="lp-plan-features">
-                <li><span className="lp-check"><Check size={14} /></span> All task types</li>
+                <li><span className="lp-check"><Check size={14} /></span> All quiz categories</li>
                 <li><span className="lp-check"><Check size={14} /></span> ₱100/day earning limit</li>
-                <li><span className="lp-check"><Check size={14} /></span> Exclusive premium tasks</li>
-                <li><span className="lp-check"><Check size={14} /></span> No ads</li>
+                <li><span className="lp-check"><Check size={14} /></span> Exclusive premium quizzes</li>
+                <li><span className="lp-check"><Check size={14} /></span> Distraction-free experience</li>
                 <li><span className="lp-check"><Check size={14} /></span> Priority support</li>
               </ul>
               <Link to="/register" className="lp-plan-btn lp-plan-btn--primary">
@@ -465,11 +466,11 @@ export default function LandingPage() {
                 <span className="lp-price-period">/month</span>
               </div>
               <ul className="lp-plan-features">
-                <li><span className="lp-check"><Check size={14} /></span> All task types</li>
+                <li><span className="lp-check"><Check size={14} /></span> All quiz categories</li>
                 <li><span className="lp-check lp-check--gold"><Check size={14} /></span> <strong>Unlimited</strong> daily earnings</li>
-                <li><span className="lp-check"><Check size={14} /></span> Exclusive elite tasks</li>
-                <li><span className="lp-check"><Check size={14} /></span> No ads</li>
-                <li><span className="lp-check"><Check size={14} /></span> Early access to new tasks</li>
+                <li><span className="lp-check"><Check size={14} /></span> Exclusive elite quizzes</li>
+                <li><span className="lp-check"><Check size={14} /></span> Distraction-free experience</li>
+                <li><span className="lp-check"><Check size={14} /></span> Early access to new quizzes</li>
                 <li><span className="lp-check"><Check size={14} /></span> VIP support</li>
               </ul>
               <Link to="/register" className="lp-plan-btn lp-plan-btn--outline">
@@ -508,9 +509,10 @@ export default function LandingPage() {
 
           <div className="lp-legal-notice reveal">
             <p>
-              Plivio (operated by <strong>Halvex Digital Inc.</strong>) is a legitimate online earning platform.
-              We are committed to transparency, data privacy, and consumer protection under Philippine law.
-              Earnings from Plivio may be subject to income tax — please consult your local BIR RDO for guidance.
+              Plivio (operated by <strong>Halvex Digital Inc.</strong>) is a legitimate online earning platform
+              committed to transparency, data privacy, and consumer protection under Philippine law.
+              Your actual earnings from Plivio may be subject to income tax — please consult your local BIR RDO
+              for personalized tax guidance.
             </p>
           </div>
         </div>
@@ -519,10 +521,10 @@ export default function LandingPage() {
       {/* ─── CTA Banner ─────────────────────────────────────────────────── */}
       <section className="lp-cta-banner">
         <div className="lp-cta-inner">
-          <h2 className="lp-cta-title">Ready to Start Earning?</h2>
+          <h2 className="lp-cta-title">Ready to Grow Your GCash Balance?</h2>
           <p className="lp-cta-sub">
-            Join thousands of Filipinos already earning with Plivio.
-            Free to join, no hidden fees.
+            Join thousands of Filipinos already earning consistent income with Plivio.
+            Free to join — no hidden fees, no obligations.
           </p>
           <Link to="/register" className="lp-cta-btn">
             Create Free Account →
@@ -536,7 +538,7 @@ export default function LandingPage() {
           <div className="lp-footer-brand">
             <img src="/logo-mark.svg" alt="" className="lp-logo-mark" aria-hidden="true" />
             <span className="lp-logo-text">Plivio</span>
-            <p className="lp-footer-tagline">Get Paid To · Philippines</p>
+            <p className="lp-footer-tagline">Quiz-Based Earning · Philippines</p>
           </div>
 
           <div className="lp-footer-links">
