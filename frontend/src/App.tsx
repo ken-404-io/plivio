@@ -3,6 +3,7 @@ import { AuthProvider }  from './store/authStore.tsx';
 import { ToastProvider } from './components/common/Toast.tsx';
 import ErrorBoundary     from './components/common/ErrorBoundary.tsx';
 import AdBlockerModal    from './components/common/AdBlockerModal.tsx';
+import { useVersionCheck } from './hooks/useVersionCheck.ts';
 
 import ProtectedRoute from './components/common/ProtectedRoute.tsx';
 import Layout         from './components/layout/Layout.tsx';
@@ -33,6 +34,9 @@ import AdminUserDetail from './pages/admin/AdminUserDetail.tsx';
 import Settings       from './pages/settings/Settings.tsx';
 
 export default function App() {
+  // Auto-reload every open tab when a new deployment goes live.
+  useVersionCheck();
+
   return (
     <ErrorBoundary>
       {/* Global ad-blocker gate — rendered outside the router so it
