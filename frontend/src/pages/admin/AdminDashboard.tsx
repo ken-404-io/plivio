@@ -392,6 +392,88 @@ function ChangePlanModal({ username, currentPlan, onConfirm, onCancel }: {
   );
 }
 
+// ─── Suspend modal ────────────────────────────────────────────────────────────
+function SuspendModal({ username, onConfirm, onCancel }: {
+  username:  string;
+  onConfirm: (duration_days: number) => void;
+  onCancel:  () => void;
+}) {
+  const PRESETS = [
+    { label: '1 day',    days: 1   },
+    { label: '3 days',   days: 3   },
+    { label: '7 days',   days: 7   },
+    { label: '14 days',  days: 14  },
+    { label: '30 days',  days: 30  },
+    { label: 'Custom…',  days: 0   },
+  ];
+  const [selected, setSelected] = useState(7);
+  const [custom,   setCustom]   = useState('');
+  const isCustom  = selected === 0;
+  const finalDays = isCustom ? Math.max(1, Math.min(365, Number(custom) || 1)) : selected;
+
+  return (
+    <div className="adm-modal-overlay" onClick={onCancel}>
+      <div className="adm-modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title">
+          <Clock size={15} style={{ marginRight: 6 }} />
+          Suspend — {username}
+        </h3>
+        <p style={{ margin: '-4px 0 12px', fontSize: 12, color: 'var(--text-muted)' }}>
+          The user will be blocked from logging in until the suspension expires. They will receive an in-app notification.
+        </p>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {PRESETS.map((p) => (
+            <button
+              key={p.days}
+              className={`btn btn-sm ${selected === p.days ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setSelected(p.days)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {isCustom && (
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              Duration (days, 1–365)
+            </label>
+            <input
+              type="number"
+              className="form-input"
+              min={1}
+              max={365}
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              autoFocus
+            />
+          </div>
+        )}
+
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+          Expires: <strong>
+            {new Date(Date.now() + finalDays * 86_400_000).toLocaleDateString('en-PH', {
+              month: 'long', day: 'numeric', year: 'numeric',
+            })}
+          </strong>
+        </p>
+
+        <div className="adm-modal-actions">
+          <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+          <button
+            className="btn btn-danger btn-sm"
+            disabled={isCustom && (!custom || Number(custom) < 1)}
+            onClick={() => onConfirm(finalDays)}
+          >
+            <Clock size={13} /> Suspend {finalDays}d
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── KYC auto-approval countdown ─────────────────────────────────────────────
 const AUTO_APPROVE_HOURS = 32;
 
@@ -554,6 +636,7 @@ export default function AdminDashboard() {
   const [notifyTarget,     setNotifyTarget]     = useState<{ id: string; username: string } | null>(null);
   const [emailTarget,      setEmailTarget]      = useState<{ id: string; username: string } | null>(null);
   const [changePlanTarget, setChangePlanTarget] = useState<{ id: string; username: string; currentPlan: string } | null>(null);
+  const [suspendTarget,    setSuspendTarget]    = useState<{ id: string; username: string } | null>(null);
   const [broadcasting,  setBroadcasting]  = useState(false);
   const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '' });
   const [emailBroadcasting,  setEmailBroadcasting]  = useState(false);
@@ -832,6 +915,37 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleSuspend(userId: string, duration_days: number) {
+    try {
+      const { data } = await api.post<{ is_suspended: boolean; suspended_until: string | null }>(
+        `/admin/users/${userId}/suspend`,
+        { action: 'suspend', duration_days },
+      );
+      setUsers((prev) => prev.map((u) =>
+        u.id === userId ? { ...u, is_suspended: data.is_suspended, suspended_until: data.suspended_until } : u,
+      ));
+      setSuspendTarget(null);
+      const until = data.suspended_until
+        ? new Date(data.suspended_until).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
+      toast.success(`User suspended until ${until}.`);
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
+    }
+  }
+
+  async function handleUnsuspend(userId: string) {
+    try {
+      await api.post(`/admin/users/${userId}/suspend`, { action: 'unsuspend' });
+      setUsers((prev) => prev.map((u) =>
+        u.id === userId ? { ...u, is_suspended: false, suspended_until: null } : u,
+      ));
+      toast.success('Suspension lifted.');
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
+    }
+  }
+
   async function applyUserAdjustment(userId: string) {
     const draft = adjustDraft[userId];
     if (!draft) return;
@@ -1018,6 +1132,13 @@ export default function AdminDashboard() {
           onCancel={() => setChangePlanTarget(null)}
         />
       )}
+      {suspendTarget && (
+        <SuspendModal
+          username={suspendTarget.username}
+          onConfirm={(days) => void handleSuspend(suspendTarget.id, days)}
+          onCancel={() => setSuspendTarget(null)}
+        />
+      )}
 
       {/* Header + tab bar + KYC batch toolbar — sticky */}
       <div className="adm-sticky-top">
@@ -1201,6 +1322,7 @@ export default function AdminDashboard() {
                 <option value="">All Status</option>
                 <option value="active">Active</option>
                 <option value="banned">Banned</option>
+                <option value="suspended">Suspended</option>
               </select>
               <select className="form-input adm-wd-filter-select" value={userDeviceFilter} onChange={(e) => { setUserDeviceFilter(e.target.value); setUserPage(1); }}>
                 <option value="">All Devices</option>
@@ -1244,10 +1366,19 @@ export default function AdminDashboard() {
                     </div>
                     <div className="adm-user-badges">
                       <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan}</span>
-                      <span className={`adm-status-chip ${u.is_banned ? 'adm-status-chip--banned' : 'adm-status-chip--active'}`}>
-                        {u.is_banned ? <Ban size={10} /> : <CheckCircle2 size={10} />}
-                        {u.is_banned ? 'Banned' : 'Active'}
-                      </span>
+                      {u.is_banned ? (
+                        <span className="adm-status-chip adm-status-chip--banned">
+                          <Ban size={10} /> Banned
+                        </span>
+                      ) : u.is_suspended && u.suspended_until && new Date(u.suspended_until) > new Date() ? (
+                        <span className="adm-status-chip adm-status-chip--suspended">
+                          <Clock size={10} /> Suspended
+                        </span>
+                      ) : (
+                        <span className="adm-status-chip adm-status-chip--active">
+                          <CheckCircle2 size={10} /> Active
+                        </span>
+                      )}
                     </div>
                     <span className="adm-user-balance">₱{Number(u.balance).toFixed(2)}</span>
                     <div className="adm-user-actions">
@@ -1279,6 +1410,23 @@ export default function AdminDashboard() {
                       >
                         <ChevronRight size={14} style={{ transform: isExpanded ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s' }} />
                       </button>
+                      {u.is_suspended && u.suspended_until && new Date(u.suspended_until) > new Date() ? (
+                        <button
+                          className="adm-action-btn adm-action-btn--unban"
+                          onClick={() => { void handleUnsuspend(u.id); }}
+                          title="Lift suspension"
+                        >
+                          Unsuspend
+                        </button>
+                      ) : (
+                        <button
+                          className="adm-action-btn adm-action-btn--suspend"
+                          onClick={() => setSuspendTarget({ id: u.id, username: u.username })}
+                          title="Suspend account temporarily"
+                        >
+                          Suspend
+                        </button>
+                      )}
                       <button
                         className={`adm-action-btn ${u.is_banned ? 'adm-action-btn--unban' : 'adm-action-btn--ban'}`}
                         onClick={() => { void toggleBan(u.id, u.is_banned); }}

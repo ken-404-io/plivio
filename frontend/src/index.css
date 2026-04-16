@@ -2537,8 +2537,9 @@ a, button, [role="button"], [tabindex] {
   font-size: 10px;
   font-weight: 600;
 }
-.adm-status-chip--active { background: rgba(34,197,94,0.12); color: #22c55e; }
-.adm-status-chip--banned { background: rgba(239,68,68,0.12);  color: #ef4444; }
+.adm-status-chip--active    { background: rgba(34,197,94,0.12);  color: #22c55e; }
+.adm-status-chip--banned    { background: rgba(239,68,68,0.12);  color: #ef4444; }
+.adm-status-chip--suspended { background: rgba(234,179,8,0.12);  color: #eab308; }
 .adm-user-balance { font-size: 13px; font-weight: 700; color: var(--text-heading); flex-shrink: 0; }
 .adm-user-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
 .adm-icon-btn {
@@ -2564,9 +2565,10 @@ a, button, [role="button"], [tabindex] {
   cursor: pointer;
   transition: opacity 0.12s;
 }
-.adm-action-btn--ban   { background: rgba(239,68,68,0.12); color: #ef4444; }
-.adm-action-btn--unban { background: rgba(34,197,94,0.12);  color: #22c55e; }
-.adm-action-btn:hover  { opacity: 0.75; }
+.adm-action-btn--ban     { background: rgba(239,68,68,0.12); color: #ef4444; }
+.adm-action-btn--unban   { background: rgba(34,197,94,0.12);  color: #22c55e; }
+.adm-action-btn--suspend { background: rgba(234,179,8,0.12);  color: #eab308; }
+.adm-action-btn:hover    { opacity: 0.75; }
 
 /* Expanded user manage */
 .adm-user-manage {

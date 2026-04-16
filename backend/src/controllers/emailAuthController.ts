@@ -255,10 +255,12 @@ export async function verifyEmail(
         username: string;
         is_admin: boolean;
         is_banned: boolean;
+        is_suspended: boolean;
+        suspended_until: string | null;
         referred_by: string | null;
         is_email_verified: boolean;
       }>(
-        `SELECT id, username, is_admin, is_banned, referred_by, is_email_verified
+        `SELECT id, username, is_admin, is_banned, is_suspended, suspended_until, referred_by, is_email_verified
          FROM users WHERE id = $1 FOR UPDATE`,
         [row.user_id],
       );
@@ -266,7 +268,11 @@ export async function verifyEmail(
 
       if (userRow?.is_banned) {
         await client.query('ROLLBACK');
-        throw new AuthenticationError('This account has been suspended');
+        throw new AuthenticationError('This account has been permanently banned');
+      }
+      if (userRow?.is_suspended && userRow.suspended_until && new Date(userRow.suspended_until) > new Date()) {
+        await client.query('ROLLBACK');
+        throw new AuthenticationError('This account is currently suspended');
       }
 
       // Idempotency guard — do nothing if already verified, but still issue
