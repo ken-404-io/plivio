@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Check, CheckCircle, Copy, Share2, DollarSign } from 'lucide-react';
+import { Users, Check, Copy, Share2, DollarSign } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
@@ -15,16 +15,13 @@ interface ReferredUser {
 }
 
 interface ReferralsResponse {
-  success:                   boolean;
-  referrals:                 ReferredUser[];
-  total_earned:              number;
-  referral_batches_credited: number;
-  released_credits:          number;
+  success:          boolean;
+  referrals:        ReferredUser[];
+  total_earned:     number;
+  released_credits: number;
 }
 
-const INVITE_VALUE = 10;  // ₱10 per invite
-const BATCH_SIZE   = 10;  // invites per batch
-const BATCH_VALUE  = INVITE_VALUE * BATCH_SIZE; // ₱100 per batch
+const INVITE_VALUE = 10; // ₱10 per verified signup
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,11 +32,10 @@ const HAS_SHARE_API = typeof navigator !== 'undefined' && 'share' in navigator;
 export default function Referrals() {
   const { user } = useAuth();
 
-  const [referrals,          setReferrals]          = useState<ReferredUser[]>([]);
-  const [batchesCredited,    setBatchesCredited]    = useState(0);
-  const [releasedCredits,    setReleasedCredits]    = useState(0);
-  const [loading,            setLoading]            = useState(true);
-  const [copied,             setCopied]             = useState<'code' | 'link' | null>(null);
+  const [referrals,       setReferrals]       = useState<ReferredUser[]>([]);
+  const [releasedCredits, setReleasedCredits] = useState(0);
+  const [loading,         setLoading]         = useState(true);
+  const [copied,          setCopied]          = useState<'code' | 'link' | null>(null);
 
   const referralCode = user?.referral_code ?? '';
   const referralLink = `${window.location.origin}/register?ref=${referralCode}`;
@@ -48,7 +44,6 @@ export default function Referrals() {
     api.get<ReferralsResponse>('/users/me/referrals')
       .then(({ data }) => {
         setReferrals(data.referrals);
-        setBatchesCredited(data.referral_batches_credited ?? 0);
         setReleasedCredits(data.released_credits ?? 0);
       })
       .catch(() => {})
@@ -81,19 +76,7 @@ export default function Referrals() {
     window.open(`https://wa.me/?text=${msg}`, '_blank', 'noopener,noreferrer');
   }
 
-  const totalInvites  = referrals.length;
-  const creditedCount = batchesCredited * BATCH_SIZE; // how many invites are in completed batches
-  const pendingInBatch = totalInvites - creditedCount; // invites in the current partial batch
-
-  // Batch progress toward the next ₱100 release
-  const batchProgress = Math.round((pendingInBatch / BATCH_SIZE) * 100);
-
-  // Referrals list — sorted oldest first (oldest are credited first)
-  // referrals are already sorted oldest-first from the API
-  const referralsWithStatus = referrals.map((r, i) => ({
-    ...r,
-    isCredited: i < creditedCount,
-  }));
+  const totalInvites = referrals.length;
 
   if (loading) return (
     <div className="page">
@@ -160,30 +143,15 @@ export default function Referrals() {
         </div>
       </div>
 
-      {/* Batch progress card */}
-      <div className="card" style={{ padding: '14px 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <DollarSign size={14} style={{ color: 'var(--accent)' }} />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>
-              ₱{BATCH_VALUE} credit every {BATCH_SIZE} invites
-            </span>
-          </div>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {pendingInBatch}/{BATCH_SIZE} this batch
+      {/* How-you-earn card */}
+      <div className="card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <DollarSign size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+        <div style={{ fontSize: 13 }}>
+          <strong>Earn ₱{INVITE_VALUE} per verified signup.</strong>
+          <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>
+            Credited to your balance the moment your friend verifies their email.
           </span>
         </div>
-        <div className="tier-progress-bar">
-          <div className="tier-progress-fill" style={{ width: `${batchProgress}%` }} />
-        </div>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-          {pendingInBatch === 0 && totalInvites === 0
-            ? 'Invite friends to start earning. Every 10 verified invites releases ₱100.'
-            : pendingInBatch === 0
-            ? `${batchesCredited} batch${batchesCredited !== 1 ? 'es' : ''} released — ₱${releasedCredits} credited to your account.`
-            : `${BATCH_SIZE - pendingInBatch} more invite${BATCH_SIZE - pendingInBatch !== 1 ? 's' : ''} needed to release ₱${BATCH_VALUE}.`
-          }
-        </p>
       </div>
 
       {/* Share card */}
@@ -275,7 +243,7 @@ export default function Referrals() {
           </h2>
         </div>
 
-        {referralsWithStatus.length === 0 ? (
+        {referrals.length === 0 ? (
           <div className="empty-state">
             <p>No referrals yet.</p>
             <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
@@ -285,7 +253,7 @@ export default function Referrals() {
           </div>
         ) : (
           <div className="earnings-list">
-            {referralsWithStatus.map((r) => (
+            {referrals.map((r) => (
               <div key={r.username} className="earning-row">
                 <div className="earning-row-icon ref-user-avatar">
                   {r.username[0]?.toUpperCase()}
@@ -303,17 +271,7 @@ export default function Referrals() {
                     </span>
                   </div>
                 </div>
-                <div className="ref-user-reward" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
-                  <span className="earning-row-amount">+₱{INVITE_VALUE}</span>
-                  {r.isCredited && (
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, color: 'var(--success)',
-                      display: 'flex', alignItems: 'center', gap: 3,
-                    }}>
-                      <CheckCircle size={11} /> Credited
-                    </span>
-                  )}
-                </div>
+                <span className="earning-row-amount">+₱{INVITE_VALUE}</span>
               </div>
             ))}
           </div>
