@@ -3808,62 +3808,129 @@ a, button, [role="button"], [tabindex] {
 .dash-kyc-sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .dash-kyc-chevron { color: var(--warning); flex-shrink: 0; }
 
-/* ── Join community banner (Facebook group) ── */
+/* ── Join community banner (Facebook group) — hero card ── */
 .dash-community-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background: linear-gradient(135deg, rgba(24,119,242,0.14), rgba(24,119,242,0.06));
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-surface);
   border: 1px solid var(--accent-border);
-  border-radius: var(--radius);
+  border-radius: 14px;
   text-decoration: none;
   color: inherit;
-  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
 }
 .dash-community-banner:hover {
-  background: linear-gradient(135deg, rgba(24,119,242,0.22), rgba(24,119,242,0.10));
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(24,119,242,0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(24,119,242,0.25);
+  border-color: var(--accent);
 }
-.dash-community-icon {
+
+/* Cover / hero image area — Facebook-blue gradient with the FB glyph watermark */
+.dash-community-cover {
+  position: relative;
+  height: 130px;
+  background:
+    radial-gradient(120% 90% at 85% 20%, rgba(255,255,255,0.22), transparent 55%),
+    linear-gradient(135deg, #1877f2 0%, #0d5abf 50%, #0a3f8a 100%);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 24px;
+  color: rgba(255,255,255,0.18);
+}
+.dash-community-cover > svg {
+  position: relative;
+  z-index: 1;
+  transform: rotate(-8deg);
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25));
+}
+.dash-community-cover-glow {
+  position: absolute;
+  inset: -40% -20% auto auto;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 65%);
+  pointer-events: none;
+}
+
+/* Content row below the cover */
+.dash-community-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px 16px;
+}
+
+/* Avatar — circular FB mark that overlaps the cover visually */
+.dash-community-avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
   background: var(--accent);
   color: #fff;
   flex-shrink: 0;
+  margin-top: -36px;
+  border: 3px solid var(--bg-surface);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
-.dash-community-body  { flex: 1; min-width: 0; }
+
+.dash-community-text { flex: 1; min-width: 0; }
 .dash-community-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--text-heading, #f1f0f5);
+  line-height: 1.2;
 }
 .dash-community-sub {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-top: 3px;
+  line-height: 1.4;
 }
+.dash-community-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.dash-community-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dash-community-meta-dot { opacity: 0.6; }
+
 .dash-community-cta {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 6px 10px 6px 12px;
+  gap: 3px;
+  padding: 9px 14px 9px 16px;
   border-radius: 99px;
   background: var(--accent);
   color: #fff;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   flex-shrink: 0;
+  transition: background 0.15s;
 }
 .dash-community-banner:hover .dash-community-cta { background: var(--accent-dark); }
+
+@media (max-width: 380px) {
+  .dash-community-cover { height: 110px; }
+  .dash-community-avatar { width: 48px; height: 48px; margin-top: -30px; }
+  .dash-community-title { font-size: 15px; }
+  .dash-community-sub { font-size: 12px; }
+  .dash-community-cta { padding: 8px 12px; font-size: 12px; }
+}
 
 /* ─── Dashboard — greeting ───────────────────────────────────────────────────── */
 .dash-greeting {
