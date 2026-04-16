@@ -443,23 +443,42 @@ export async function adminActivateSubscription(
  * Verify PayMongo webhook signature.
  * Header format: "t=<timestamp>,te=<test_sig>,li=<live_sig>"
  * Signed payload: "<timestamp>.<rawBody>"
+ *
+ * PayMongo always includes BOTH te (test) and li (live) HMAC values.
+ * The correct one to compare against depends on whether the webhook secret
+ * is a test secret (whsk_test_…) or a live secret (whsk_live_…).
+ * We check both so the code works correctly in either environment.
  */
 function verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean {
   const secret = process.env.PAYMONGO_WEBHOOK_SECRET;
   if (!secret) return true; // Skip verification if not configured (dev mode)
 
-  const parts     = Object.fromEntries(signatureHeader.split(',').map((p) => p.split('=')));
-  const timestamp = parts['t'] ?? '';
-  const signature = parts['te'] ?? parts['li'] ?? '';
+  const parts     = Object.fromEntries(signatureHeader.split(',').map((p) => {
+    const idx = p.indexOf('=');
+    return idx === -1 ? [p, ''] : [p.slice(0, idx), p.slice(idx + 1)];
+  }));
+  const timestamp  = parts['t'] ?? '';
+  const teSignature = parts['te'] ?? '';
+  const liSignature = parts['li'] ?? '';
 
-  if (!timestamp || !signature) return false;
+  if (!timestamp || (!teSignature && !liSignature)) return false;
 
   const payload  = `${timestamp}.${rawBody}`;
   const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
 
-  // Constant-time comparison to prevent timing attacks
-  if (expected.length !== signature.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  // Accept if either the test-mode or live-mode signature matches.
+  // This ensures the webhook works regardless of whether a test or live
+  // webhook secret is configured in PAYMONGO_WEBHOOK_SECRET.
+  const checkSig = (sig: string): boolean => {
+    if (!sig || sig.length !== expected.length) return false;
+    try {
+      return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
+    } catch {
+      return false;
+    }
+  };
+
+  return checkSig(teSignature) || checkSig(liSignature);
 }
 
 export async function handleWebhook(
@@ -552,6 +571,54 @@ export async function handleWebhook(
     // Log but still acknowledge — prevents PayMongo from disabling the webhook
     logger.error({ err: (err as Error).message }, '❌ Webhook: processing error (still acknowledged 200)');
     res.json({ received: true });
+  }
+}
+
+// ─── Background reconciliation: activate any pending checkout that PayMongo ───
+// already marked as paid but whose webhook was missed or rejected. ─────────────
+
+export async function reconcilePendingCheckouts(): Promise<void> {
+  if (!process.env.PAYMONGO_SECRET_KEY) return; // nothing to do without API key
+
+  try {
+    // Find pending checkouts that are still within their 2-hour window
+    const { rows } = await pool.query(
+      `SELECT sc.id, sc.user_id, sc.plan, sc.duration_days, sc.paymongo_ref,
+              u.email, u.username
+       FROM subscription_checkouts sc
+       JOIN users u ON u.id = sc.user_id
+       WHERE sc.status = 'pending'
+         AND sc.paymongo_ref IS NOT NULL
+         AND sc.created_at >= NOW() - INTERVAL '2 hours'`,
+    );
+
+    if (rows.length === 0) return;
+
+    logger.info({ count: rows.length }, '🔄 reconcile: checking pending checkouts against PayMongo');
+
+    for (const row of rows as Array<{
+      id: string; user_id: string; plan: string;
+      duration_days: number; paymongo_ref: string;
+      email: string; username: string;
+    }>) {
+      try {
+        const linkRes  = await paymongoGet(`/links/${row.paymongo_ref}`);
+        const linkData = linkRes.data as Record<string, unknown>;
+        const attrs    = (linkData?.attributes as Record<string, unknown>) ?? {};
+        const status   = attrs.status as string;
+
+        if (status !== 'paid') continue;
+
+        logger.info({ checkoutId: row.id, userId: row.user_id, plan: row.plan },
+          '✅ reconcile: activating subscription from pending checkout');
+        await activateSubscription(row);
+      } catch (inner) {
+        logger.error({ checkoutId: row.id, err: (inner as Error).message },
+          '⚠️ reconcile: error checking checkout');
+      }
+    }
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, '❌ reconcile: unexpected error');
   }
 }
 
