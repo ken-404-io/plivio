@@ -20,12 +20,27 @@ import {
   Trophy,
   Coins,
   TrendingUp,
-  Facebook,
 } from 'lucide-react';
 
 // Official Plivio community on Facebook. Opens in a new tab so the user
 // doesn't lose their session / current page.
 const COMMUNITY_URL = 'https://www.facebook.com/share/g/1azcCLjCTc/';
+
+// Inline Facebook glyph — lucide-react v1.x doesn't ship brand icons, so we
+// draw the "f" ourselves. Kept small and self-contained on purpose.
+function FacebookGlyph({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M13.5 22v-8h2.7l.4-3.1h-3.1V8.9c0-.9.25-1.5 1.55-1.5H17V4.6c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3v2.1H7.6V14h2.7v8h3.2z" />
+    </svg>
+  );
+}
 
 // ─── Quizly (daily quiz) status shape ────────────────────────────────────────
 interface QuizlyStatus {
@@ -307,7 +322,7 @@ export default function Dashboard() {
         className="dash-community-banner"
       >
         <span className="dash-community-icon">
-          <Facebook size={20} />
+          <FacebookGlyph size={20} />
         </span>
         <div className="dash-community-body">
           <p className="dash-community-title">Join our community</p>
