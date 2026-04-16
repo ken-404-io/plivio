@@ -7687,3 +7687,218 @@ a, button, [role="button"], [tabindex] {
   to   { transform: rotate(360deg); }
 }
 
+
+/* ─── Account Blocked Screen ──────────────────────────────────────────────── */
+.blocked-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--bg-base);
+  overflow-y: auto;
+  animation: blockedFadeIn 0.35s ease;
+}
+
+@keyframes blockedFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.blocked-screen-bg {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,102,241,0.08), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(99,102,241,0.05), transparent 60%);
+  pointer-events: none;
+}
+
+.blocked-screen-brand {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.blocked-screen-brand-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-heading);
+  letter-spacing: -0.02em;
+}
+
+.blocked-screen-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 20px;
+  padding: 36px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+  margin: 60px 0 20px;
+}
+.blocked-screen-card--banned {
+  border-color: rgba(239,68,68,0.2);
+  box-shadow: 0 24px 60px rgba(239,68,68,0.08);
+}
+.blocked-screen-card--suspended {
+  border-color: rgba(234,179,8,0.2);
+  box-shadow: 0 24px 60px rgba(234,179,8,0.06);
+}
+
+.blocked-screen-icon {
+  margin-bottom: 16px;
+}
+
+.blocked-screen-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.blocked-screen-badge--banned {
+  background: rgba(239,68,68,0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.2);
+}
+.blocked-screen-badge--suspended {
+  background: rgba(234,179,8,0.12);
+  color: #eab308;
+  border: 1px solid rgba(234,179,8,0.2);
+}
+
+.blocked-screen-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-heading);
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+  line-height: 1.25;
+}
+
+.blocked-screen-sub {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+.blocked-screen-sub strong { color: var(--text-body); }
+
+.blocked-screen-reason {
+  width: 100%;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+.blocked-screen-reason--banned {
+  background: rgba(239,68,68,0.07);
+  border: 1px solid rgba(239,68,68,0.18);
+}
+.blocked-screen-reason--suspended {
+  background: rgba(234,179,8,0.07);
+  border: 1px solid rgba(234,179,8,0.18);
+}
+.blocked-screen-reason-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.blocked-screen-reason-text {
+  font-size: 14px;
+  color: var(--text-body);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.blocked-screen-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+  margin-bottom: 18px;
+}
+
+.blocked-screen-info {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+.blocked-screen-info-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+.blocked-screen-info-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-top: 6px;
+}
+.blocked-screen-info-dot--red    { background: #ef4444; }
+.blocked-screen-info-dot--yellow { background: #eab308; }
+
+.blocked-screen-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 28px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.blocked-screen-cta:hover { opacity: 0.85; transform: translateY(-1px); }
+.blocked-screen-cta--banned {
+  background: rgba(239,68,68,0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.25);
+}
+.blocked-screen-cta--suspended {
+  background: rgba(234,179,8,0.12);
+  color: #eab308;
+  border: 1px solid rgba(234,179,8,0.25);
+}
+
+.blocked-screen-footer {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  opacity: 0.6;
+}
+
+@media (max-width: 520px) {
+  .blocked-screen-card { padding: 28px 20px 24px; border-radius: 16px; }
+  .blocked-screen-title { font-size: 19px; }
+}

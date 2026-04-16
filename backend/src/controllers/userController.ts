@@ -22,6 +22,7 @@ export async function getMe(req: Request, res: Response, next: NextFunction): Pr
               is_verified, is_email_verified, is_admin, kyc_status,
               avatar_url, created_at,
               coins, streak_count, last_streak_date, streak_broken_at, streak_before_break,
+              is_banned, ban_reason, is_suspended, suspended_until, suspend_reason,
               (totp_secret IS NOT NULL) AS has_2fa,
               (SELECT plan FROM subscriptions
                WHERE user_id = users.id AND is_active = TRUE AND expires_at > NOW()
