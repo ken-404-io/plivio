@@ -5916,6 +5916,20 @@ a, button, [role="button"], [tabindex] {
     max-width: 100%;
     padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
   }
+
+  /* Force any overlay that should stay centered (e.g. small alert modals on
+     the Withdraw page) to remain in the middle of the screen on all sizes.
+     Overrides the bottom-sheet default above. */
+  .modal-overlay--center {
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay--center .modal {
+    border-radius: var(--radius);
+    max-width: min(400px, calc(100vw - 40px));
+    padding: 20px 16px;
+  }
 }
 
 /* Admin withdrawal amounts */

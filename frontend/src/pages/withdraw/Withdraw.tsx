@@ -23,7 +23,7 @@ import type { Withdrawal } from '../../types/index.ts';
 
 function FreePlanUpgradeModal({ onClose }: { onClose: () => void }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay modal-overlay--center" onClick={onClose}>
       <div className="modal wd-confirm" onClick={(e) => e.stopPropagation()}>
         <div className="wd-confirm-hero" style={{ background: 'var(--bg-card)' }}>
           <AlertCircle size={32} style={{ color: 'var(--warning)', marginBottom: 8 }} />
@@ -56,7 +56,7 @@ function FreePlanUpgradeModal({ onClose }: { onClose: () => void }) {
 
 function ValidationModal({ message, onClose }: { message: string; onClose: () => void }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay modal-overlay--center" onClick={onClose}>
       <div className="modal wd-confirm" onClick={(e) => e.stopPropagation()}>
         <div className="wd-confirm-hero" style={{ background: 'var(--bg-card)' }}>
           <AlertCircle size={32} style={{ color: 'var(--error)', marginBottom: 8 }} />
@@ -122,7 +122,7 @@ function ConfirmModal({ form, onConfirm, onCancel, loading }: ConfirmProps) {
   const acctLabel   = form.method === 'gcash' ? 'GCash Number' : 'PayPal Email';
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    <div className="modal-overlay modal-overlay--center" onClick={onCancel}>
       <div className="modal wd-confirm" onClick={(e) => e.stopPropagation()}>
         {/* Big net amount hero */}
         <div className="wd-confirm-hero">
