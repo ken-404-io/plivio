@@ -321,10 +321,13 @@ export default function Dashboard() {
         rel="noopener noreferrer"
         className="dash-community-banner"
       >
-        {/* Cover — Facebook-style hero header */}
+        {/* Cover — Plivio Community banner image */}
         <div className="dash-community-cover" aria-hidden="true">
-          <div className="dash-community-cover-glow" />
-          <FacebookGlyph size={96} />
+          <img
+            src="/community-banner.png"
+            alt="Plivio Community"
+            className="dash-community-cover-img"
+          />
         </div>
 
         {/* Content */}
