@@ -6792,28 +6792,21 @@ a, button, [role="button"], [tabindex] {
   background: rgba(0,0,0,0.6);
   z-index: 1000;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-}
-@media (min-width: 480px) {
-  .cq-overlay { align-items: center; padding: 20px; }
+  padding: 16px;
 }
 
 .cq-screen {
   background: var(--bg-surface);
   width: 100%;
   max-width: 480px;
-  height: 92vh;
-  height: 92dvh;
-  max-height: 680px;
-  border-radius: 24px 24px 0 0;
+  max-height: calc(100dvh - 32px);
+  border-radius: 20px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 -12px 60px rgba(0,0,0,0.4);
-}
-@media (min-width: 480px) {
-  .cq-screen { border-radius: 20px; height: auto; }
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
 }
 
 /* Header */
