@@ -273,35 +273,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ── Quizly CTA — the one primary action ── */}
-      <button
-        type="button"
-        className="dash-quizly-cta"
-        onClick={() => setShowQuizly(true)}
-        disabled={quizLocked}
-      >
-        <span className="dash-quizly-cta-icon">
-          <MessageCircle size={22} />
-        </span>
-        <div className="dash-quizly-cta-body">
-          <span className="dash-quizly-cta-title">
-            Open <strong>Quizly</strong>
-          </span>
-          <span className="dash-quizly-cta-sub">
-            {quizLocked
-              ? (quizly?.free_lifetime_exhausted
-                  ? 'Free questions used — upgrade to keep earning'
-                  : "Daily limit reached — come back tomorrow")
-              : quizSubline}
-          </span>
-        </div>
-        <div className="dash-quizly-cta-reward">
-          <span className="dash-quizly-cta-reward-amt">₱0.35</span>
-          <span className="dash-quizly-cta-reward-lbl">per answer</span>
-        </div>
-        <ChevronRight size={18} className="dash-quizly-cta-arrow" />
-      </button>
-
       {/* ── KYC banner ── */}
       {user?.kyc_status === 'none' && (
         <Link to="/kyc" className="dash-kyc-banner">
