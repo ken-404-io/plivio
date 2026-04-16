@@ -16,6 +16,7 @@ import { sendPushToUser }    from './controllers/pushController.ts';
 import { sendKycStatusEmail } from './services/email.ts';
 // Cloudinary serves avatars/KYC images — no local AVATARS_DIR needed
 
+import { reconcilePendingCheckouts } from './controllers/subscriptionController.ts';
 import authRoutes         from './routes/auth.ts';
 import taskRoutes         from './routes/tasks.ts';
 import userRoutes         from './routes/users.ts';
@@ -226,6 +227,12 @@ async function bootstrap() {
   // Start KYC auto-approval scheduler — runs every hour
   void runKycAutoApproval();
   setInterval(() => { void runKycAutoApproval(); }, 60 * 60 * 1000);
+
+  // Reconcile pending PayMongo checkouts — runs every 2 minutes.
+  // Catches payments whose webhook was missed or rejected so that
+  // subscriptions are activated even if the user closed the browser.
+  void reconcilePendingCheckouts();
+  setInterval(() => { void reconcilePendingCheckouts(); }, 2 * 60 * 1000);
 
   app.listen(PORT, () => {
     logger.info({ port: PORT }, `Plivio API running → http://localhost:${PORT}`);
