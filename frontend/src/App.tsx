@@ -3,6 +3,7 @@ import { AuthProvider }  from './store/authStore.tsx';
 import { ToastProvider } from './components/common/Toast.tsx';
 import ErrorBoundary     from './components/common/ErrorBoundary.tsx';
 import AdBlockerModal    from './components/common/AdBlockerModal.tsx';
+import UpdateBanner      from './components/common/UpdateBanner.tsx';
 import { useVersionCheck } from './hooks/useVersionCheck.ts';
 
 import ProtectedRoute from './components/common/ProtectedRoute.tsx';
@@ -34,11 +35,13 @@ import AdminUserDetail from './pages/admin/AdminUserDetail.tsx';
 import Settings       from './pages/settings/Settings.tsx';
 
 export default function App() {
-  // Auto-reload every open tab when a new deployment goes live.
-  useVersionCheck();
+  const { updateAvailable } = useVersionCheck();
 
   return (
     <ErrorBoundary>
+      {/* Sticky update bar — shown when a new deployment is detected.
+          Counts down 10 s then hard-reloads to apply the new version. */}
+      <UpdateBanner show={updateAvailable} />
       {/* Global ad-blocker gate — rendered outside the router so it
           covers every page, including landing / auth flows */}
       <AdBlockerModal />
