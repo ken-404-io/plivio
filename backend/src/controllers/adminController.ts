@@ -5,6 +5,7 @@ import { sendWithdrawalStatusEmail, broadcastEmailToAll, sendAdminEmail } from '
 import { createNotification } from '../utils/notify.ts';
 import { sendPushToUser }    from '../controllers/pushController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
+import { logger } from '../utils/logger.ts';
 
 interface AdNetworkInput {
   name: string;
