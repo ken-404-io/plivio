@@ -10,6 +10,12 @@ const ELITE_DAILY_WITHDRAWAL_MAX    = 500;  // ₱500 total per day for Elite
 // SQL snippet: start of "today" in Philippine Standard Time (UTC+8)
 const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila')`;
 
+// Minimum questions a user must answer today before they can withdraw.
+// Matches the frontend streak goal (STREAK_QUIZ_GOAL = 15).
+// Free plan users who have exhausted their 100-question lifetime bank are exempt.
+const DAILY_QUIZ_GATE            = 15;
+const FREE_PLAN_LIFETIME_CAP     = 100;
+
 const MIN_WITHDRAWAL  = 50;
 const MAX_WITHDRAWAL  = 5000;
 const FEE_RATE        = 0.05;   // 5% total (1% document + 4% handling)
@@ -103,6 +109,37 @@ export async function requestWithdrawal(
     if (user.kyc_status !== 'approved') {
       throw new ForbiddenError('Identity verification required before withdrawing');
     }
+
+    // Daily quiz gate — must answer at least 15 questions today before withdrawing.
+    // Free users who've used all 100 lifetime questions are exempt (they can no
+    // longer earn from the quiz and shouldn't be permanently locked out).
+    {
+      const { rows: quizRows } = await client.query(
+        `SELECT COUNT(*) AS today_answered FROM user_question_answers
+         WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
+        [userId],
+      );
+      const todayAnswered = Number((quizRows[0] as { today_answered: string }).today_answered);
+
+      if (todayAnswered < DAILY_QUIZ_GATE) {
+        let exempt = false;
+        if (user.plan === 'free') {
+          const { rows: lifeRows } = await client.query(
+            `SELECT COUNT(*) AS total FROM user_question_answers WHERE user_id = $1`,
+            [userId],
+          );
+          if (Number((lifeRows[0] as { total: string }).total) >= FREE_PLAN_LIFETIME_CAP) exempt = true;
+        }
+        if (!exempt) {
+          const needed = DAILY_QUIZ_GATE - todayAnswered;
+          throw new ForbiddenError(
+            `Complete today's quiz session first. Answer ${needed} more question${needed === 1 ? '' : 's'} in Quizly to unlock your withdrawal.`,
+            'quiz_gate_not_met',
+          );
+        }
+      }
+    }
+
     if (Number(user.balance) < amount) {
       throw new ValidationError(`Insufficient balance. Available: ₱${Number(user.balance).toFixed(2)}`);
     }
@@ -207,6 +244,29 @@ export async function getWithdrawalCooldown(
 
     const plan = (userRows[0] as { plan: string }).plan;
 
+    // Quiz gate status — shared across all plans
+    const [quizTodayRes, quizLifetimeRes] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) AS today_answered FROM user_question_answers
+         WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
+        [userId],
+      ),
+      plan === 'free'
+        ? pool.query(`SELECT COUNT(*) AS total FROM user_question_answers WHERE user_id = $1`, [userId])
+        : Promise.resolve({ rows: [{ total: '0' }] }),
+    ]);
+    const quizTodayAnswered = Number((quizTodayRes.rows[0] as { today_answered: string }).today_answered);
+    const quizLifetimeTotal = Number((quizLifetimeRes.rows[0] as { total: string }).total);
+
+    const freeExempt   = plan === 'free' && quizLifetimeTotal >= FREE_PLAN_LIFETIME_CAP;
+    const quizGatePassed = quizTodayAnswered >= DAILY_QUIZ_GATE || freeExempt;
+
+    const quizInfo = {
+      quiz_gate_required:   DAILY_QUIZ_GATE,
+      quiz_today_answered:  quizTodayAnswered,
+      quiz_gate_passed:     quizGatePassed,
+    };
+
     // Premium: return today's used and remaining daily withdrawal allowance
     if (plan === 'premium') {
       const { rows: todayRows } = await pool.query(
@@ -225,6 +285,7 @@ export async function getWithdrawalCooldown(
         daily_limit:      PREMIUM_DAILY_WITHDRAWAL_MAX,
         today_withdrawn:  todayTotal,
         daily_remaining:  remaining,
+        ...quizInfo,
       });
       return;
     }
@@ -247,12 +308,13 @@ export async function getWithdrawalCooldown(
         daily_limit:      ELITE_DAILY_WITHDRAWAL_MAX,
         today_withdrawn:  todayTotal,
         daily_remaining:  remaining,
+        ...quizInfo,
       });
       return;
     }
 
-    // Other plans: no restrictions
-    res.json({ success: true, on_cooldown: false });
+    // Free plan (and any other plan): no withdrawal daily cap, but quiz gate still applies
+    res.json({ success: true, on_cooldown: false, ...quizInfo });
   } catch (err) { next(err); }
 }
 

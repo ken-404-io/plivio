@@ -15,6 +15,7 @@ import {
   Plus,
   Trash2,
   Star,
+  BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
@@ -85,6 +86,7 @@ function ValidationModal({ message, onClose }: { message: string; onClose: () =>
 const MIN_AMOUNT            = 50;
 const MAX_AMOUNT            = 5000;
 const FREE_PLAN_MAX_AMOUNT  = 100;
+const DAILY_QUIZ_GATE       = 15;
 const DOC_FEE_RATE      = 0.01;
 const HANDLING_FEE_RATE  = 0.04;
 const TOTAL_FEE_RATE    = DOC_FEE_RATE + HANDLING_FEE_RATE;
@@ -347,6 +349,8 @@ export default function Withdraw() {
   const [historyOpen,       setHistoryOpen]       = useState(true);
   const [cooldownEnd,       setCooldownEnd]       = useState<Date | null>(null);
   const [cooldownRemaining, setCooldownRemaining] = useState('');
+  const [quizGatePassed,    setQuizGatePassed]    = useState<boolean | null>(null);
+  const [quizTodayAnswered, setQuizTodayAnswered] = useState(0);
 
   async function loadHistory() {
     try {
@@ -358,12 +362,19 @@ export default function Withdraw() {
 
   async function loadCooldown() {
     try {
-      const { data } = await api.get<{ on_cooldown: boolean; cooldown_end?: string }>('/withdrawals/cooldown');
+      const { data } = await api.get<{
+        on_cooldown: boolean;
+        cooldown_end?: string;
+        quiz_gate_passed?: boolean;
+        quiz_today_answered?: number;
+      }>('/withdrawals/cooldown');
       if (data.on_cooldown && data.cooldown_end) {
         setCooldownEnd(new Date(data.cooldown_end));
       } else {
         setCooldownEnd(null);
       }
+      setQuizGatePassed(data.quiz_gate_passed ?? true);
+      setQuizTodayAnswered(data.quiz_today_answered ?? 0);
     } catch { /* silent */ }
   }
 
@@ -473,6 +484,12 @@ export default function Withdraw() {
         setShowConfirm(false);
         void loadCooldown();
         setValidationError(errData.error ?? 'Withdrawal cooldown active. Please try again later.');
+        return;
+      }
+      if (errData?.code === 'quiz_gate_not_met') {
+        setShowConfirm(false);
+        void loadCooldown();
+        setValidationError(errData.error ?? 'Complete today\'s quiz session first.');
         return;
       }
       setShowConfirm(false);
@@ -591,6 +608,19 @@ export default function Withdraw() {
             {kycStatus === 'pending'  && <><strong>KYC under review.</strong> Withdrawals unlock once verified.</>}
             {kycStatus === 'rejected' && <><strong>KYC rejected.</strong> <Link to="/kyc">Resubmit documents →</Link></>}
             {kycStatus === 'none'     && <><strong>Verification required.</strong> <Link to="/kyc">Complete KYC to withdraw →</Link></>}
+          </div>
+        </div>
+      )}
+
+      {/* Quiz gate */}
+      {quizGatePassed === false && (
+        <div className="alert alert--warning">
+          <BookOpen size={18} style={{ flexShrink: 0 }} />
+          <div>
+            <strong>Daily quiz session required.</strong>{' '}
+            Answer {Math.max(0, DAILY_QUIZ_GATE - quizTodayAnswered)} more question{Math.max(0, DAILY_QUIZ_GATE - quizTodayAnswered) === 1 ? '' : 's'} in Quizly
+            to unlock today's withdrawal ({quizTodayAnswered}/{DAILY_QUIZ_GATE} done).{' '}
+            <Link to="/tasks">Open Quizly →</Link>
           </div>
         </div>
       )}
@@ -806,7 +836,7 @@ export default function Withdraw() {
         <button
           type="submit"
           className="btn btn-primary wd-submit"
-          disabled={kycBlocked || paymentMethods.length === 0}
+          disabled={kycBlocked || paymentMethods.length === 0 || quizGatePassed === false}
         >
           Review Withdrawal
           <ArrowRight size={16} />
