@@ -25,6 +25,7 @@ import {
   exportCsv,
   changePlan,
   suspendUser,
+  banUser,
 } from '../controllers/adminController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
@@ -77,11 +78,20 @@ router.post('/users/:id/change-plan',
   }),
   changePlan,
 );
+router.post('/users/:id/ban',
+  validateParam('id'),
+  validateBody({
+    action: { required: true, enum: ['ban', 'unban'] },
+    reason: {},
+  }),
+  banUser,
+);
 router.post('/users/:id/suspend',
   validateParam('id'),
   validateBody({
-    action:       { required: true, enum: ['suspend', 'unsuspend'] },
+    action:        { required: true, enum: ['suspend', 'unsuspend'] },
     duration_days: { type: 'number', min: 1 },
+    reason:        {},
   }),
   suspendUser,
 );

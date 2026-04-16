@@ -76,6 +76,11 @@ export default function Login() {
   const [resending,       setResending]       = useState(false);
   const [resent,          setResent]          = useState(false);
   const [deviceBlocked,   setDeviceBlocked]   = useState(false);
+  const [accountStatus,   setAccountStatus]   = useState<{
+    code: 'account_banned' | 'account_suspended';
+    reason: string | null;
+    suspended_until?: string;
+  } | null>(null);
 
   function clearFieldError(name: string) {
     setFieldError((prev) => {
@@ -106,6 +111,7 @@ export default function Login() {
     setFieldError({});
     setUnverifiedEmail(null);
     setDeviceBlocked(false);
+    setAccountStatus(null);
     setResent(false);
     setLoading(true);
     try {
@@ -114,15 +120,17 @@ export default function Login() {
       else if (result.is_admin) { navigate('/admin'); }
       else                      { navigate('/dashboard'); }
     } catch (err) {
-      const axErr = err as AxiosError<{ error: string; code?: string; email?: string }>;
+      const axErr = err as AxiosError<{ error: string; code?: string; email?: string; reason?: string; suspended_until?: string }>;
       const data  = axErr.response?.data;
       if (data?.code === 'email_not_verified') {
         setUnverifiedEmail(data.email ?? form.email);
       } else if (data?.code === 'device_mismatch') {
         setDeviceBlocked(true);
+      } else if (data?.code === 'account_banned') {
+        setAccountStatus({ code: 'account_banned', reason: data.reason ?? null });
+      } else if (data?.code === 'account_suspended') {
+        setAccountStatus({ code: 'account_suspended', reason: data.reason ?? null, suspended_until: data.suspended_until });
       } else {
-        // Inline error shown under the password field — matches the
-        // "Invalid credentials." pattern requested by design.
         setFieldError({ password: data?.error || 'Invalid credentials. Please check your email and password and try again.' });
       }
     } finally {
@@ -176,6 +184,70 @@ export default function Login() {
             </p>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
               If you lost access to your device or got a new one, please contact support to request a device change.
+            </p>
+          </div>
+        )}
+
+        {accountStatus?.code === 'account_banned' && (
+          <div className="alert alert--error" role="alert" style={{ marginBottom: 16 }}>
+            <strong style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              Account Permanently Banned
+            </strong>
+            <p style={{ margin: '8px 0 4px', fontSize: 13 }}>
+              Your account has been permanently banned and you can no longer access Plivio.
+            </p>
+            {accountStatus.reason && (
+              <div style={{
+                margin: '8px 0 0',
+                padding: '8px 12px',
+                background: 'rgba(239,68,68,0.08)',
+                borderLeft: '3px solid var(--error)',
+                borderRadius: 4,
+                fontSize: 13,
+              }}>
+                <span style={{ fontWeight: 600, display: 'block', marginBottom: 2, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>Reason</span>
+                {accountStatus.reason}
+              </div>
+            )}
+            <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+              If you believe this is a mistake, please contact support.
+            </p>
+          </div>
+        )}
+
+        {accountStatus?.code === 'account_suspended' && (
+          <div className="alert alert--warning" role="alert" style={{ marginBottom: 16 }}>
+            <strong style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Account Temporarily Suspended
+            </strong>
+            {accountStatus.suspended_until && (
+              <p style={{ margin: '6px 0 0', fontSize: 13 }}>
+                Your access has been suspended until{' '}
+                <strong>
+                  {new Date(accountStatus.suspended_until).toLocaleDateString('en-PH', {
+                    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  })}
+                </strong>.
+              </p>
+            )}
+            {accountStatus.reason && (
+              <div style={{
+                margin: '8px 0 0',
+                padding: '8px 12px',
+                background: 'rgba(234,179,8,0.08)',
+                borderLeft: '3px solid #eab308',
+                borderRadius: 4,
+                fontSize: 13,
+              }}>
+                <span style={{ fontWeight: 600, display: 'block', marginBottom: 2, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>Reason</span>
+                {accountStatus.reason}
+              </div>
+            )}
+            <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+              After the suspension expires you can log in normally. Contact support if you have questions.
             </p>
           </div>
         )}
