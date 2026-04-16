@@ -70,13 +70,24 @@
       }
     }
     </script>
-    <!-- Google AdSense -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3074015723192395"
-        crossorigin="anonymous"></script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!--
+      Google AdSense is loaded at the END of <body>, NOT in <head>. It carries
+      a `crossorigin="anonymous"` attribute that Vite's (and any downstream
+      HTML-transformer's) attribute stripper can trip on. If the strip is ever
+      imperfect, the malformed <script> terminates <head> parsing early and
+      the Vite-injected <link rel="stylesheet"> gets placed in <body> instead
+      of <head> — which Chrome refuses to apply, leaving the page completely
+      unstyled. Keeping AdSense out of <head> removes that whole class of bug
+      as a possibility, regardless of future build-plugin changes.
+      AdSense is `async`, so loading it later has no behavioural impact.
+    -->
+    <script async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3074015723192395"
+        crossorigin="anonymous"></script>
     <!--
       Monetag ad tags (zones 10868149 and 229428).
       Proxied through /js/p1.js and /js/p2.js via Vercel rewrites

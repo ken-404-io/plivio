@@ -81,7 +81,37 @@ function removeCrossOriginPlugin(): Plugin {
     transformIndexHtml: {
       order: 'post',
       handler(html) {
-        return html.replace(CROSSORIGIN_ATTR, '');
+        const cleaned = html.replace(CROSSORIGIN_ATTR, '');
+
+        // ── Sanity check (fail the build on regressions) ────────────────
+        // If any of these show up in the final HTML, the "unstyled page"
+        // bug is back. Fail loudly now instead of letting it ship.
+        const headEnd = cleaned.indexOf('</head>');
+        const headHtml = headEnd >= 0 ? cleaned.slice(0, headEnd) : cleaned;
+        const bodyHtml = headEnd >= 0 ? cleaned.slice(headEnd) : '';
+
+        // 1. No orphaned ="..."  tokens (previous regression signature).
+        const orphan = /<script[^>]*\s=(?:"[^"]*"|'[^']*'|[^\s>]+)/i;
+        if (orphan.test(cleaned)) {
+          throw new Error(
+            '[remove-crossorigin] orphaned attribute value detected in ' +
+            'built index.html — CSS would fail to apply. See vite.config.ts.',
+          );
+        }
+
+        // 2. The Vite-injected stylesheet MUST live inside <head>. If it
+        //    lands in <body>, Chrome's strict parsing drops it silently.
+        if (!/<link\s[^>]*rel=["']stylesheet["'][^>]*>/i.test(headHtml)) {
+          // Only enforce if Vite actually emitted a stylesheet link at all.
+          if (/<link\s[^>]*rel=["']stylesheet["']/i.test(bodyHtml)) {
+            throw new Error(
+              '[remove-crossorigin] stylesheet <link> ended up in <body>, ' +
+              'not <head>. Page would render unstyled.',
+            );
+          }
+        }
+
+        return cleaned;
       },
     },
   };
