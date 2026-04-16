@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Check, CheckCircle, Copy, Share2, DollarSign, Clock } from 'lucide-react';
+import { Users, Check, CheckCircle, Copy, Share2, DollarSign } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
@@ -19,7 +19,6 @@ interface ReferralsResponse {
   referrals:                 ReferredUser[];
   total_earned:              number;
   referral_batches_credited: number;
-  pending_credits:           number;
   released_credits:          number;
 }
 
@@ -38,7 +37,6 @@ export default function Referrals() {
 
   const [referrals,          setReferrals]          = useState<ReferredUser[]>([]);
   const [batchesCredited,    setBatchesCredited]    = useState(0);
-  const [pendingCredits,     setPendingCredits]     = useState(0);
   const [releasedCredits,    setReleasedCredits]    = useState(0);
   const [loading,            setLoading]            = useState(true);
   const [copied,             setCopied]             = useState<'code' | 'link' | null>(null);
@@ -51,7 +49,6 @@ export default function Referrals() {
       .then(({ data }) => {
         setReferrals(data.referrals);
         setBatchesCredited(data.referral_batches_credited ?? 0);
-        setPendingCredits(data.pending_credits ?? 0);
         setReleasedCredits(data.released_credits ?? 0);
       })
       .catch(() => {})
@@ -153,13 +150,6 @@ export default function Referrals() {
         <div className="ref-stat">
           <span className="ref-stat-num">{totalInvites}</span>
           <span className="ref-stat-lbl">Invites</span>
-        </div>
-        <div className="ref-stat-divider" />
-        <div className="ref-stat">
-          <span className="ref-stat-num" style={{ color: 'var(--warning)' }}>
-            ₱{pendingCredits.toFixed(2)}
-          </span>
-          <span className="ref-stat-lbl">Pending</span>
         </div>
         <div className="ref-stat-divider" />
         <div className="ref-stat">
@@ -315,19 +305,12 @@ export default function Referrals() {
                 </div>
                 <div className="ref-user-reward" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
                   <span className="earning-row-amount">+₱{INVITE_VALUE}</span>
-                  {r.isCredited ? (
+                  {r.isCredited && (
                     <span style={{
                       fontSize: 11, fontWeight: 600, color: 'var(--success)',
                       display: 'flex', alignItems: 'center', gap: 3,
                     }}>
                       <CheckCircle size={11} /> Credited
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, color: 'var(--warning)',
-                      display: 'flex', alignItems: 'center', gap: 3,
-                    }}>
-                      <Clock size={11} /> Pending
                     </span>
                   )}
                 </div>
