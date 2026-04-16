@@ -38,7 +38,7 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
       `SELECT u.plan,
               CASE WHEN s.id IS NOT NULL THEN s.plan ELSE u.plan END AS effective_plan
        FROM users u
-       LEFT JOIN subscriptions s ON s.user_id = u.id AND s.expires_at > NOW()
+       LEFT JOIN subscriptions s ON s.user_id = u.id AND s.is_active = TRUE AND s.expires_at > NOW()
        WHERE u.id = $1 LIMIT 1`,
       [userId],
     );
@@ -127,7 +127,7 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
     const planRes = await pool.query(
       `SELECT CASE WHEN s.id IS NOT NULL THEN s.plan ELSE u.plan END AS effective_plan
        FROM users u
-       LEFT JOIN subscriptions s ON s.user_id = u.id AND s.expires_at > NOW()
+       LEFT JOIN subscriptions s ON s.user_id = u.id AND s.is_active = TRUE AND s.expires_at > NOW()
        WHERE u.id = $1 LIMIT 1`,
       [userId],
     );
@@ -284,7 +284,7 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
     const planRes = await pool.query(
       `SELECT CASE WHEN s.id IS NOT NULL THEN s.plan ELSE u.plan END AS effective_plan
        FROM users u
-       LEFT JOIN subscriptions s ON s.user_id = u.id AND s.expires_at > NOW()
+       LEFT JOIN subscriptions s ON s.user_id = u.id AND s.is_active = TRUE AND s.expires_at > NOW()
        WHERE u.id = $1 LIMIT 1`,
       [userId],
     );
