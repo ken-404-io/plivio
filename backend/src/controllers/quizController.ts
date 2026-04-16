@@ -8,6 +8,20 @@ const REWARD_PER_CORRECT = 0.35;
 // are daily (reset at 00:00 Philippine Standard Time).
 const FREE_LIFETIME_QUESTIONS = 100;
 
+// Cooldown window before a previously-answered question becomes eligible
+// again for the same user. Without this, heavy users — especially Elite,
+// who have no daily cap — burn through the entire question bank and hit
+// a permanent "No more questions available" dead end. With the window,
+// a question the user hasn't seen in this many days can be served again.
+// Enforced here in the application layer; the DB's UNIQUE(user_id,
+// question_id) constraint was dropped in migration 017.
+//
+// This is a trusted compile-time constant, so it's string-interpolated
+// into the SQL interval literal (node-postgres can't parameterise
+// INTERVAL values cleanly across integer/text type boundaries).
+const QUESTION_RECYCLE_DAYS = 7;
+const RECYCLE_INTERVAL_SQL  = `INTERVAL '${QUESTION_RECYCLE_DAYS} days'`;
+
 // Daily question cap (resets 00:00 PST / Asia/Manila). null = unlimited.
 const DAILY_QUESTION_LIMITS: Record<string, number | null> = {
   free:    null,     // Free uses the lifetime cap above
@@ -189,13 +203,19 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
       }
     }
 
-    // Get next unanswered question (with its correct answer for generating choices).
-    // The UNIQUE(user_id, question_id) constraint guarantees no repetition.
+    // Get next eligible question. A question is eligible if the user either
+    // has never answered it, or last answered it more than
+    // QUESTION_RECYCLE_DAYS ago. Recently-answered questions are excluded so
+    // the user doesn't see the same item twice in a row, but aren't locked
+    // out forever — see migration 017 for the rationale.
     const questionRes = await pool.query(
       `SELECT q.id, q.question, q.answer, q.category
        FROM chat_questions q
-       WHERE q.id NOT IN (
-         SELECT question_id FROM user_question_answers WHERE user_id = $1
+       WHERE NOT EXISTS (
+         SELECT 1 FROM user_question_answers a
+         WHERE a.user_id = $1
+           AND a.question_id = q.id
+           AND a.answered_at > NOW() - ${RECYCLE_INTERVAL_SQL}
        )
        ORDER BY RANDOM()
        LIMIT 1`,
@@ -269,14 +289,18 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    // Check not already answered (the UNIQUE constraint also guarantees this
-    // at the DB level — this early check just gives a cleaner error message)
+    // Check not already answered within the recycle window. Outside the
+    // window (migration 017), repeats are fine — the question has
+    // legitimately cycled back into the eligible pool for this user.
     const alreadyRes = await pool.query(
-      `SELECT id FROM user_question_answers WHERE user_id = $1 AND question_id = $2`,
+      `SELECT id FROM user_question_answers
+       WHERE user_id = $1
+         AND question_id = $2
+         AND answered_at > NOW() - ${RECYCLE_INTERVAL_SQL}`,
       [userId, question_id],
     );
     if (alreadyRes.rowCount && alreadyRes.rowCount > 0) {
-      res.status(400).json({ success: false, error: 'Already answered this question.' });
+      res.status(400).json({ success: false, error: 'Already answered this question recently.' });
       return;
     }
 
