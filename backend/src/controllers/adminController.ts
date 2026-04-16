@@ -828,27 +828,86 @@ export async function changePlan(req: Request, res: Response, next: NextFunction
   }
 }
 
+// ─── POST /admin/users/:id/ban ────────────────────────────────────────────────
+
+export async function banUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params as Record<string, string>;
+    const { action, reason } = req.body as { action: 'ban' | 'unban'; reason?: string };
+
+    if (!['ban', 'unban'].includes(action)) {
+      throw new ValidationError('action must be ban or unban');
+    }
+
+    if (action === 'ban') {
+      if (!reason?.trim()) throw new ValidationError('A reason is required when banning an account');
+
+      const { rows } = await pool.query(
+        `UPDATE users
+         SET is_banned = TRUE, ban_reason = $1
+         WHERE id = $2 AND is_admin = FALSE
+         RETURNING id, username`,
+        [reason.trim(), id],
+      );
+      if (rows.length === 0) throw new NotFoundError('User not found or user is an admin');
+
+      const u = rows[0] as { id: string; username: string };
+      void createNotification(
+        u.id,
+        'admin_message',
+        'Account Banned',
+        `Your account has been permanently banned. Reason: ${reason.trim()}`,
+      );
+
+      logger.info({ user_id: id, reason: reason.trim(), by: req.user?.id }, '🚫 Admin banned user');
+      res.json({ success: true, is_banned: true });
+    } else {
+      const { rows } = await pool.query(
+        `UPDATE users
+         SET is_banned = FALSE, ban_reason = NULL
+         WHERE id = $1
+         RETURNING id, username`,
+        [id],
+      );
+      if (rows.length === 0) throw new NotFoundError('User not found');
+
+      const u = rows[0] as { id: string; username: string };
+      void createNotification(
+        u.id,
+        'admin_message',
+        'Account Reinstated',
+        'Your account ban has been lifted. You can now log in and use Plivio normally.',
+      );
+
+      logger.info({ user_id: id, by: req.user?.id }, '✅ Admin unbanned user');
+      res.json({ success: true, is_banned: false });
+    }
+  } catch (err) { next(err); }
+}
+
 // ─── POST /admin/users/:id/suspend ───────────────────────────────────────────
 
 export async function suspendUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params as Record<string, string>;
-    const { action, duration_days } = req.body as { action: 'suspend' | 'unsuspend'; duration_days?: number };
+    const { action, duration_days, reason } = req.body as { action: 'suspend' | 'unsuspend'; duration_days?: number; reason?: string };
 
     if (!['suspend', 'unsuspend'].includes(action)) {
       throw new ValidationError('action must be suspend or unsuspend');
     }
 
     if (action === 'suspend') {
+      if (!reason?.trim()) throw new ValidationError('A reason is required when suspending an account');
       const days = Math.max(1, Math.min(365, Number(duration_days) || 1));
 
       const { rows } = await pool.query(
         `UPDATE users
          SET is_suspended = TRUE,
-             suspended_until = NOW() + ($1 || ' days')::INTERVAL
-         WHERE id = $2 AND is_admin = FALSE
+             suspended_until = NOW() + ($1 || ' days')::INTERVAL,
+             suspend_reason = $2
+         WHERE id = $3 AND is_admin = FALSE
          RETURNING id, username, is_suspended, suspended_until`,
-        [days, id],
+        [days, reason.trim(), id],
       );
       if (rows.length === 0) throw new NotFoundError('User not found or user is an admin');
 
@@ -862,15 +921,15 @@ export async function suspendUser(req: Request, res: Response, next: NextFunctio
         u.id,
         'admin_message',
         'Account Suspended',
-        `Your account has been temporarily suspended until ${untilStr}. If you believe this is a mistake, please contact support.`,
+        `Your account has been temporarily suspended until ${untilStr}. Reason: ${reason.trim()}`,
       );
 
-      logger.info({ user_id: id, days, by: req.user?.id }, '🚫 Admin suspended user');
+      logger.info({ user_id: id, days, reason: reason.trim(), by: req.user?.id }, '🚫 Admin suspended user');
       res.json({ success: true, is_suspended: true, suspended_until: u.suspended_until });
     } else {
       const { rows } = await pool.query(
         `UPDATE users
-         SET is_suspended = FALSE, suspended_until = NULL
+         SET is_suspended = FALSE, suspended_until = NULL, suspend_reason = NULL
          WHERE id = $1
          RETURNING id, username`,
         [id],

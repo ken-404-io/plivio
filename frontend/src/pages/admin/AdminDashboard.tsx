@@ -392,38 +392,129 @@ function ChangePlanModal({ username, currentPlan, onConfirm, onCancel }: {
   );
 }
 
-// ─── Suspend modal ────────────────────────────────────────────────────────────
-function SuspendModal({ username, onConfirm, onCancel }: {
+// ─── Ban modal ────────────────────────────────────────────────────────────────
+function BanModal({ username, onConfirm, onCancel }: {
   username:  string;
-  onConfirm: (duration_days: number) => void;
+  onConfirm: (reason: string) => void;
   onCancel:  () => void;
 }) {
   const PRESETS = [
-    { label: '1 day',    days: 1   },
-    { label: '3 days',   days: 3   },
-    { label: '7 days',   days: 7   },
-    { label: '14 days',  days: 14  },
-    { label: '30 days',  days: 30  },
-    { label: 'Custom…',  days: 0   },
+    'Violating Terms of Service',
+    'Fraudulent activity or cheating',
+    'Creating multiple accounts',
+    'Abuse or harassment of other users',
+    'Attempting to manipulate the earning system',
+    'Custom reason…',
   ];
-  const [selected, setSelected] = useState(7);
+  const [selected, setSelected] = useState('');
   const [custom,   setCustom]   = useState('');
-  const isCustom  = selected === 0;
-  const finalDays = isCustom ? Math.max(1, Math.min(365, Number(custom) || 1)) : selected;
+  const isCustom   = selected === 'Custom reason…';
+  const finalReason = isCustom ? custom.trim() : selected;
 
   return (
     <div className="adm-modal-overlay" onClick={onCancel}>
-      <div className="adm-modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
-        <h3 className="adm-modal-title">
-          <Clock size={15} style={{ marginRight: 6 }} />
-          Suspend — {username}
+      <div className="adm-modal adm-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title" style={{ color: 'var(--error)' }}>
+          <Ban size={15} style={{ marginRight: 6 }} />
+          Ban Account — {username}
         </h3>
         <p style={{ margin: '-4px 0 12px', fontSize: 12, color: 'var(--text-muted)' }}>
-          The user will be blocked from logging in until the suspension expires. They will receive an in-app notification.
+          This is a <strong>permanent</strong> ban. The user will be blocked immediately and shown this reason when they try to log in.
         </p>
 
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '10px 0' }}>
+          {PRESETS.map((r) => (
+            <label
+              key={r}
+              className={`adm-reject-option${selected === r ? ' adm-reject-option--selected' : ''}`}
+            >
+              <input
+                type="radio"
+                name="ban-reason"
+                value={r}
+                checked={selected === r}
+                onChange={() => setSelected(r)}
+                className="adm-reject-radio"
+              />
+              <span>{r}</span>
+            </label>
+          ))}
+        </div>
+
+        {isCustom && (
+          <textarea
+            className="form-input adm-modal-textarea"
+            placeholder="Describe the reason for the ban…"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            rows={3}
+            autoFocus
+          />
+        )}
+
+        <div className="adm-modal-actions">
+          <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+          <button
+            className="btn btn-danger btn-sm"
+            disabled={!finalReason}
+            onClick={() => { if (finalReason) onConfirm(finalReason); }}
+          >
+            <Ban size={13} /> Confirm Ban
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Suspend modal ────────────────────────────────────────────────────────────
+function SuspendModal({ username, onConfirm, onCancel }: {
+  username:  string;
+  onConfirm: (duration_days: number, reason: string) => void;
+  onCancel:  () => void;
+}) {
+  const DURATION_PRESETS = [
+    { label: '1 day',   days: 1  },
+    { label: '3 days',  days: 3  },
+    { label: '7 days',  days: 7  },
+    { label: '14 days', days: 14 },
+    { label: '30 days', days: 30 },
+    { label: 'Custom…', days: 0  },
+  ];
+  const REASON_PRESETS = [
+    'Suspicious account activity',
+    'Violation of community guidelines',
+    'Pending fraud investigation',
+    'Unusual earning pattern detected',
+    'Custom reason…',
+  ];
+
+  const [selected,       setSelected]       = useState(7);
+  const [custom,         setCustom]         = useState('');
+  const [selectedReason, setSelectedReason] = useState('');
+  const [customReason,   setCustomReason]   = useState('');
+
+  const isCustomDuration = selected === 0;
+  const isCustomReason   = selectedReason === 'Custom reason…';
+  const finalDays        = isCustomDuration ? Math.max(1, Math.min(365, Number(custom) || 1)) : selected;
+  const finalReason      = isCustomReason ? customReason.trim() : selectedReason;
+
+  return (
+    <div className="adm-modal-overlay" onClick={onCancel}>
+      <div className="adm-modal adm-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title">
+          <Clock size={15} style={{ marginRight: 6 }} />
+          Suspend Account — {username}
+        </h3>
+        <p style={{ margin: '-4px 0 12px', fontSize: 12, color: 'var(--text-muted)' }}>
+          The user will be blocked from logging in until the suspension expires. They will see the reason when they try to log in.
+        </p>
+
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+          Duration
+        </label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-          {PRESETS.map((p) => (
+          {DURATION_PRESETS.map((p) => (
             <button
               key={p.days}
               className={`btn btn-sm ${selected === p.days ? 'btn-primary' : 'btn-ghost'}`}
@@ -434,10 +525,10 @@ function SuspendModal({ username, onConfirm, onCancel }: {
           ))}
         </div>
 
-        {isCustom && (
+        {isCustomDuration && (
           <div style={{ marginBottom: 10 }}>
             <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-              Duration (days, 1–365)
+              Days (1–365)
             </label>
             <input
               type="number"
@@ -446,12 +537,11 @@ function SuspendModal({ username, onConfirm, onCancel }: {
               max={365}
               value={custom}
               onChange={(e) => setCustom(e.target.value)}
-              autoFocus
             />
           </div>
         )}
 
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
           Expires: <strong>
             {new Date(Date.now() + finalDays * 86_400_000).toLocaleDateString('en-PH', {
               month: 'long', day: 'numeric', year: 'numeric',
@@ -459,12 +549,45 @@ function SuspendModal({ username, onConfirm, onCancel }: {
           </strong>
         </p>
 
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+          Reason <span style={{ color: 'var(--error)' }}>*</span>
+        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+          {REASON_PRESETS.map((r) => (
+            <label
+              key={r}
+              className={`adm-reject-option${selectedReason === r ? ' adm-reject-option--selected' : ''}`}
+            >
+              <input
+                type="radio"
+                name="suspend-reason"
+                value={r}
+                checked={selectedReason === r}
+                onChange={() => setSelectedReason(r)}
+                className="adm-reject-radio"
+              />
+              <span>{r}</span>
+            </label>
+          ))}
+        </div>
+
+        {isCustomReason && (
+          <textarea
+            className="form-input adm-modal-textarea"
+            placeholder="Describe the reason for the suspension…"
+            value={customReason}
+            onChange={(e) => setCustomReason(e.target.value)}
+            rows={3}
+            autoFocus
+          />
+        )}
+
         <div className="adm-modal-actions">
           <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
           <button
             className="btn btn-danger btn-sm"
-            disabled={isCustom && (!custom || Number(custom) < 1)}
-            onClick={() => onConfirm(finalDays)}
+            disabled={!finalReason || (isCustomDuration && (!custom || Number(custom) < 1))}
+            onClick={() => { if (finalReason) onConfirm(finalDays, finalReason); }}
           >
             <Clock size={13} /> Suspend {finalDays}d
           </button>
@@ -637,6 +760,7 @@ export default function AdminDashboard() {
   const [emailTarget,      setEmailTarget]      = useState<{ id: string; username: string } | null>(null);
   const [changePlanTarget, setChangePlanTarget] = useState<{ id: string; username: string; currentPlan: string } | null>(null);
   const [suspendTarget,    setSuspendTarget]    = useState<{ id: string; username: string } | null>(null);
+  const [banTarget,        setBanTarget]        = useState<{ id: string; username: string } | null>(null);
   const [broadcasting,  setBroadcasting]  = useState(false);
   const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '' });
   const [emailBroadcasting,  setEmailBroadcasting]  = useState(false);
@@ -905,21 +1029,32 @@ export default function AdminDashboard() {
     // loadUsers will re-fire via the useEffect dependency on userPlanFilter
   }
 
-  async function toggleBan(userId: string, isBanned: boolean) {
+  async function handleBan(userId: string, reason: string) {
     try {
-      await api.put(`/admin/users/${userId}`, { is_banned: String(!isBanned) });
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: !isBanned } : u));
-      toast.success(`User ${isBanned ? 'unbanned' : 'banned'}.`);
+      await api.post(`/admin/users/${userId}/ban`, { action: 'ban', reason });
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: true } : u));
+      setBanTarget(null);
+      toast.success('Account banned.');
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
     }
   }
 
-  async function handleSuspend(userId: string, duration_days: number) {
+  async function handleUnban(userId: string) {
+    try {
+      await api.post(`/admin/users/${userId}/ban`, { action: 'unban' });
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: false } : u));
+      toast.success('Account unbanned.');
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
+    }
+  }
+
+  async function handleSuspend(userId: string, duration_days: number, reason: string) {
     try {
       const { data } = await api.post<{ is_suspended: boolean; suspended_until: string | null }>(
         `/admin/users/${userId}/suspend`,
-        { action: 'suspend', duration_days },
+        { action: 'suspend', duration_days, reason },
       );
       setUsers((prev) => prev.map((u) =>
         u.id === userId ? { ...u, is_suspended: data.is_suspended, suspended_until: data.suspended_until } : u,
@@ -928,7 +1063,7 @@ export default function AdminDashboard() {
       const until = data.suspended_until
         ? new Date(data.suspended_until).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
         : '';
-      toast.success(`User suspended until ${until}.`);
+      toast.success(`Account suspended until ${until}.`);
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
     }
@@ -1135,8 +1270,15 @@ export default function AdminDashboard() {
       {suspendTarget && (
         <SuspendModal
           username={suspendTarget.username}
-          onConfirm={(days) => void handleSuspend(suspendTarget.id, days)}
+          onConfirm={(days, reason) => void handleSuspend(suspendTarget.id, days, reason)}
           onCancel={() => setSuspendTarget(null)}
+        />
+      )}
+      {banTarget && (
+        <BanModal
+          username={banTarget.username}
+          onConfirm={(reason) => void handleBan(banTarget.id, reason)}
+          onCancel={() => setBanTarget(null)}
         />
       )}
 
@@ -1427,12 +1569,23 @@ export default function AdminDashboard() {
                           Suspend
                         </button>
                       )}
-                      <button
-                        className={`adm-action-btn ${u.is_banned ? 'adm-action-btn--unban' : 'adm-action-btn--ban'}`}
-                        onClick={() => { void toggleBan(u.id, u.is_banned); }}
-                      >
-                        {u.is_banned ? 'Unban' : 'Ban'}
-                      </button>
+                      {u.is_banned ? (
+                        <button
+                          className="adm-action-btn adm-action-btn--unban"
+                          onClick={() => { void handleUnban(u.id); }}
+                          title="Lift permanent ban"
+                        >
+                          Unban
+                        </button>
+                      ) : (
+                        <button
+                          className="adm-action-btn adm-action-btn--ban"
+                          onClick={() => setBanTarget({ id: u.id, username: u.username })}
+                          title="Permanently ban this account"
+                        >
+                          Ban
+                        </button>
+                      )}
                     </div>
                   </div>
 

@@ -210,8 +210,9 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
     const { rows } = await pool.query(
       `SELECT id, username, email, password_hash, totp_secret, plan,
-              balance, referral_code, is_admin, is_banned, is_verified,
-              is_email_verified, is_suspended, suspended_until, device_fingerprint
+              balance, referral_code, is_admin, is_banned, ban_reason,
+              is_verified, is_email_verified,
+              is_suspended, suspended_until, suspend_reason, device_fingerprint
        FROM users WHERE email = $1 LIMIT 1`,
       [email.toLowerCase()]
     );
@@ -219,12 +220,25 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     if (rows.length === 0) throw new AuthenticationError('Invalid credentials. Please check your email and password and try again.');
 
     const user = rows[0] as Record<string, unknown>;
-    if (user.is_banned) throw new AuthenticationError('This account has been permanently banned');
-    if (user.is_suspended && new Date(user.suspended_until as string) > new Date()) {
-      const until = new Date(user.suspended_until as string).toLocaleDateString('en-PH', {
-        month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+
+    if (user.is_banned) {
+      res.status(403).json({
+        success: false,
+        code:    'account_banned',
+        reason:  user.ban_reason ?? null,
+        error:   'This account has been permanently banned.',
       });
-      throw new AuthenticationError(`This account is suspended until ${until}`);
+      return;
+    }
+    if (user.is_suspended && new Date(user.suspended_until as string) > new Date()) {
+      res.status(403).json({
+        success:         false,
+        code:            'account_suspended',
+        reason:          user.suspend_reason ?? null,
+        suspended_until: user.suspended_until,
+        error:           'This account is temporarily suspended.',
+      });
+      return;
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash as string);
@@ -348,15 +362,19 @@ export async function verify2FALogin(req: Request, res: Response, next: NextFunc
     if (!decoded.pending_2fa) throw new AuthenticationError('Invalid 2FA session');
 
     const { rows } = await pool.query(
-      'SELECT id, username, totp_secret, is_admin, is_banned, is_suspended, suspended_until FROM users WHERE id = $1',
+      'SELECT id, username, totp_secret, is_admin, is_banned, ban_reason, is_suspended, suspended_until, suspend_reason FROM users WHERE id = $1',
       [decoded.id]
     );
     if (rows.length === 0) throw new AuthenticationError('User not found');
 
     const user = rows[0] as Record<string, unknown>;
-    if (user.is_banned) throw new AuthenticationError('Account has been permanently banned');
+    if (user.is_banned) {
+      res.status(403).json({ success: false, code: 'account_banned', reason: user.ban_reason ?? null, error: 'This account has been permanently banned.' });
+      return;
+    }
     if (user.is_suspended && new Date(user.suspended_until as string) > new Date()) {
-      throw new AuthenticationError('Account is currently suspended');
+      res.status(403).json({ success: false, code: 'account_suspended', reason: user.suspend_reason ?? null, suspended_until: user.suspended_until, error: 'This account is temporarily suspended.' });
+      return;
     }
 
     const valid = speakeasy.totp.verify({
