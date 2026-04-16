@@ -224,6 +224,8 @@ export interface AdminUser {
   balance: string | number;
   is_verified: boolean;
   is_banned: boolean;
+  is_suspended: boolean;
+  suspended_until: string | null;
   is_admin: boolean;
   created_at: string;
 }
@@ -273,6 +275,8 @@ export interface AdminUserProfile {
   last_streak_date: string | null;
   is_verified: boolean;
   is_banned: boolean;
+  is_suspended: boolean;
+  suspended_until: string | null;
   is_admin: boolean;
   is_email_verified: boolean;
   kyc_status: 'none' | 'pending' | 'approved' | 'rejected';

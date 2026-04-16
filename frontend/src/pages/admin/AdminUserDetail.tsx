@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Users, CreditCard, UserCheck, ArrowUpCircle,
   Smartphone, RotateCcw, ShieldCheck, ShieldX, Ban, CheckCircle2,
-  Coins, Star, Mail, Key,
+  Coins, Star, Mail, Key, Clock,
 } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
@@ -106,10 +106,22 @@ export default function AdminUserDetail() {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span className={`plan-badge plan-badge--${user.plan}`}>{user.plan}</span>
-          <span className={`adm-status-chip ${user.is_banned ? 'adm-status-chip--banned' : 'adm-status-chip--active'}`}>
-            {user.is_banned ? <Ban size={10} /> : <CheckCircle2 size={10} />}
-            {user.is_banned ? 'Banned' : 'Active'}
-          </span>
+          {user.is_banned ? (
+            <span className="adm-status-chip adm-status-chip--banned">
+              <Ban size={10} /> Banned
+            </span>
+          ) : user.is_suspended && user.suspended_until && new Date(user.suspended_until) > new Date() ? (
+            <span className="adm-status-chip adm-status-chip--suspended">
+              <Clock size={10} /> Suspended until{' '}
+              {new Date(user.suspended_until).toLocaleDateString('en-PH', {
+                month: 'short', day: 'numeric', year: 'numeric',
+              })}
+            </span>
+          ) : (
+            <span className="adm-status-chip adm-status-chip--active">
+              <CheckCircle2 size={10} /> Active
+            </span>
+          )}
         </div>
       </header>
 

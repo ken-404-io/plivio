@@ -52,7 +52,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const search = req.query.search ? `%${req.query.search as string}%` : null;
     const planFilter = ['free', 'premium', 'elite'].includes(req.query.plan as string)
       ? (req.query.plan as string) : null;
-    const statusFilter = ['active', 'banned'].includes(req.query.status as string)
+    const statusFilter = ['active', 'banned', 'suspended'].includes(req.query.status as string)
       ? (req.query.status as string) : null;
     const deviceFilter = ['registered', 'unregistered'].includes(req.query.device as string)
       ? (req.query.device as string) : null;
@@ -61,11 +61,14 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
 
     const { rows } = await pool.query(
       `SELECT id, username, email, plan, balance, is_verified, is_banned, is_admin,
-              device_fingerprint, created_at
+              is_suspended, suspended_until, device_fingerprint, created_at
        FROM users
        WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
          AND ($3::plan_type IS NULL OR plan = $3::plan_type)
-         AND ($5::text IS NULL OR ($5 = 'banned' AND is_banned = TRUE) OR ($5 = 'active' AND is_banned = FALSE))
+         AND ($5::text IS NULL
+               OR ($5 = 'banned'     AND is_banned = TRUE)
+               OR ($5 = 'active'     AND is_banned = FALSE AND (is_suspended = FALSE OR suspended_until <= NOW()))
+               OR ($5 = 'suspended'  AND is_suspended = TRUE AND suspended_until > NOW()))
          AND ($6::text IS NULL OR ($6 = 'registered' AND device_fingerprint IS NOT NULL) OR ($6 = 'unregistered' AND device_fingerprint IS NULL))
          AND ($7::timestamptz IS NULL OR created_at >= $7::timestamptz)
          AND ($8::timestamptz IS NULL OR created_at <= ($8::timestamptz + INTERVAL '1 day'))
@@ -77,7 +80,10 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
       `SELECT COUNT(*) FROM users
        WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
          AND ($2::plan_type IS NULL OR plan = $2::plan_type)
-         AND ($3::text IS NULL OR ($3 = 'banned' AND is_banned = TRUE) OR ($3 = 'active' AND is_banned = FALSE))
+         AND ($3::text IS NULL
+               OR ($3 = 'banned'     AND is_banned = TRUE)
+               OR ($3 = 'active'     AND is_banned = FALSE AND (is_suspended = FALSE OR suspended_until <= NOW()))
+               OR ($3 = 'suspended'  AND is_suspended = TRUE AND suspended_until > NOW()))
          AND ($4::text IS NULL OR ($4 = 'registered' AND device_fingerprint IS NOT NULL) OR ($4 = 'unregistered' AND device_fingerprint IS NULL))
          AND ($5::timestamptz IS NULL OR created_at >= $5::timestamptz)
          AND ($6::timestamptz IS NULL OR created_at <= ($6::timestamptz + INTERVAL '1 day'))`,
@@ -487,7 +493,7 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
       pool.query(
         `SELECT id, username, email, plan, balance, coins, streak_count, last_streak_date,
                 is_verified, is_banned, is_admin, is_email_verified, kyc_status, referral_code,
-                device_fingerprint, created_at
+                is_suspended, suspended_until, device_fingerprint, created_at
          FROM users WHERE id = $1`,
         [id],
       ),
@@ -820,6 +826,69 @@ export async function changePlan(req: Request, res: Response, next: NextFunction
   } finally {
     client.release();
   }
+}
+
+// ─── POST /admin/users/:id/suspend ───────────────────────────────────────────
+
+export async function suspendUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params as Record<string, string>;
+    const { action, duration_days } = req.body as { action: 'suspend' | 'unsuspend'; duration_days?: number };
+
+    if (!['suspend', 'unsuspend'].includes(action)) {
+      throw new ValidationError('action must be suspend or unsuspend');
+    }
+
+    if (action === 'suspend') {
+      const days = Math.max(1, Math.min(365, Number(duration_days) || 1));
+
+      const { rows } = await pool.query(
+        `UPDATE users
+         SET is_suspended = TRUE,
+             suspended_until = NOW() + ($1 || ' days')::INTERVAL
+         WHERE id = $2 AND is_admin = FALSE
+         RETURNING id, username, is_suspended, suspended_until`,
+        [days, id],
+      );
+      if (rows.length === 0) throw new NotFoundError('User not found or user is an admin');
+
+      const u = rows[0] as { id: string; username: string; suspended_until: string };
+      const untilStr = new Date(u.suspended_until).toLocaleDateString('en-PH', {
+        month: 'long', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+
+      void createNotification(
+        u.id,
+        'admin_message',
+        'Account Suspended',
+        `Your account has been temporarily suspended until ${untilStr}. If you believe this is a mistake, please contact support.`,
+      );
+
+      logger.info({ user_id: id, days, by: req.user?.id }, '🚫 Admin suspended user');
+      res.json({ success: true, is_suspended: true, suspended_until: u.suspended_until });
+    } else {
+      const { rows } = await pool.query(
+        `UPDATE users
+         SET is_suspended = FALSE, suspended_until = NULL
+         WHERE id = $1
+         RETURNING id, username`,
+        [id],
+      );
+      if (rows.length === 0) throw new NotFoundError('User not found');
+
+      const u = rows[0] as { id: string; username: string };
+      void createNotification(
+        u.id,
+        'admin_message',
+        'Suspension Lifted',
+        'Your account suspension has been lifted. You can now log in and use Plivio normally.',
+      );
+
+      logger.info({ user_id: id, by: req.user?.id }, '✅ Admin unsuspended user');
+      res.json({ success: true, is_suspended: false, suspended_until: null });
+    }
+  } catch (err) { next(err); }
 }
 
 // ─── Update ad networks for a video/ad task ───────────────────────────────

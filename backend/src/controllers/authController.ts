@@ -211,7 +211,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     const { rows } = await pool.query(
       `SELECT id, username, email, password_hash, totp_secret, plan,
               balance, referral_code, is_admin, is_banned, is_verified,
-              is_email_verified, device_fingerprint
+              is_email_verified, is_suspended, suspended_until, device_fingerprint
        FROM users WHERE email = $1 LIMIT 1`,
       [email.toLowerCase()]
     );
@@ -219,7 +219,13 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     if (rows.length === 0) throw new AuthenticationError('Invalid credentials. Please check your email and password and try again.');
 
     const user = rows[0] as Record<string, unknown>;
-    if (user.is_banned) throw new AuthenticationError('This account has been suspended');
+    if (user.is_banned) throw new AuthenticationError('This account has been permanently banned');
+    if (user.is_suspended && new Date(user.suspended_until as string) > new Date()) {
+      const until = new Date(user.suspended_until as string).toLocaleDateString('en-PH', {
+        month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+      throw new AuthenticationError(`This account is suspended until ${until}`);
+    }
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash as string);
     if (!passwordMatch) throw new AuthenticationError('Invalid credentials. Please check your email and password and try again.');
@@ -342,13 +348,16 @@ export async function verify2FALogin(req: Request, res: Response, next: NextFunc
     if (!decoded.pending_2fa) throw new AuthenticationError('Invalid 2FA session');
 
     const { rows } = await pool.query(
-      'SELECT id, username, totp_secret, is_admin, is_banned FROM users WHERE id = $1',
+      'SELECT id, username, totp_secret, is_admin, is_banned, is_suspended, suspended_until FROM users WHERE id = $1',
       [decoded.id]
     );
     if (rows.length === 0) throw new AuthenticationError('User not found');
 
     const user = rows[0] as Record<string, unknown>;
-    if (user.is_banned) throw new AuthenticationError('Account suspended');
+    if (user.is_banned) throw new AuthenticationError('Account has been permanently banned');
+    if (user.is_suspended && new Date(user.suspended_until as string) > new Date()) {
+      throw new AuthenticationError('Account is currently suspended');
+    }
 
     const valid = speakeasy.totp.verify({
       secret:   user.totp_secret as string,
@@ -383,11 +392,15 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
     const decoded = verifyRefreshToken(token);
 
     const { rows } = await pool.query(
-      'SELECT id, username, is_admin, is_banned FROM users WHERE id = $1',
+      'SELECT id, username, is_admin, is_banned, is_suspended, suspended_until FROM users WHERE id = $1',
       [decoded.id]
     );
-    if (rows.length === 0 || (rows[0] as Record<string, unknown>).is_banned) {
-      throw new AuthenticationError('User not found or suspended');
+    const refreshedUser = rows[0] as Record<string, unknown> | undefined;
+    if (!refreshedUser || refreshedUser.is_banned) {
+      throw new AuthenticationError('User not found or banned');
+    }
+    if (refreshedUser.is_suspended && new Date(refreshedUser.suspended_until as string) > new Date()) {
+      throw new AuthenticationError('Account is currently suspended');
     }
 
     const user = rows[0] as Record<string, unknown>;

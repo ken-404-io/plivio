@@ -160,25 +160,32 @@ async function upsertOAuthUser(
   const idCol = `${provider}_id`;
 
   // 1. Look up by provider ID (fastest path)
+  function checkAccountStatus(u: Record<string, unknown>) {
+    if (u.is_banned) throw new Error('This account has been permanently banned');
+    if (u.is_suspended && new Date(u.suspended_until as string) > new Date()) {
+      throw new Error('This account is currently suspended');
+    }
+  }
+
   const byProvider = await pool.query(
-    `SELECT id, username, is_admin, is_banned FROM users WHERE ${idCol} = $1 LIMIT 1`,
+    `SELECT id, username, is_admin, is_banned, is_suspended, suspended_until FROM users WHERE ${idCol} = $1 LIMIT 1`,
     [profile.providerUserId],
   );
   if (byProvider.rowCount && byProvider.rowCount > 0) {
     const u = byProvider.rows[0] as Record<string, unknown>;
-    if (u.is_banned) throw new Error('This account has been suspended');
+    checkAccountStatus(u);
     return { id: u.id as string, username: u.username as string, is_admin: u.is_admin as boolean };
   }
 
   // 2. Email match → link provider to existing account
   if (profile.email) {
     const byEmail = await pool.query(
-      `SELECT id, username, is_admin, is_banned FROM users WHERE email = $1 LIMIT 1`,
+      `SELECT id, username, is_admin, is_banned, is_suspended, suspended_until FROM users WHERE email = $1 LIMIT 1`,
       [profile.email.toLowerCase()],
     );
     if (byEmail.rowCount && byEmail.rowCount > 0) {
       const u = byEmail.rows[0] as Record<string, unknown>;
-      if (u.is_banned) throw new Error('This account has been suspended');
+      checkAccountStatus(u);
       // Link this provider to the existing account
       await pool.query(
         `UPDATE users SET ${idCol} = $1, avatar_url = COALESCE(avatar_url, $2) WHERE id = $3`,
