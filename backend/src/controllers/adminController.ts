@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { NotFoundError, ValidationError } from '../utils/errors.ts';
-import { sendWithdrawalStatusEmail, broadcastEmailToAll, sendAdminEmail } from '../services/email.ts';
+import { sendWithdrawalStatusEmail, broadcastEmailToAll, sendAdminEmail, sendSubscriptionConfirmEmail } from '../services/email.ts';
 import { createNotification } from '../utils/notify.ts';
 import { sendPushToUser }    from '../controllers/pushController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
@@ -709,6 +709,76 @@ export async function exportCsv(req: Request, res: Response, next: NextFunction)
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csvLines.join('\n'));
   } catch (err) { next(err); }
+}
+
+// ─── POST /admin/users/:id/change-plan ───────────────────────────────────────
+
+export async function changePlan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params as Record<string, string>;
+    const { plan, duration_days = 30 } = req.body as { plan: string; duration_days?: number };
+
+    const VALID_PLAN_VALUES = ['free', 'premium', 'elite'] as const;
+    if (!VALID_PLAN_VALUES.includes(plan as typeof VALID_PLAN_VALUES[number])) {
+      throw new ValidationError('Invalid plan. Must be free, premium, or elite.');
+    }
+
+    const days = Math.max(1, Math.min(365, Number(duration_days)));
+
+    const { rows: userRows } = await pool.query(
+      'SELECT id, email, username FROM users WHERE id = $1',
+      [id],
+    );
+    if (!userRows.length) throw new NotFoundError('User not found');
+
+    const user = userRows[0] as { id: string; email: string; username: string };
+
+    let expiresAt: Date | null = null;
+
+    await client.query('BEGIN');
+
+    // Deactivate any existing active subscription
+    await client.query(
+      `UPDATE subscriptions SET is_active = FALSE WHERE user_id = $1 AND is_active = TRUE`,
+      [id],
+    );
+
+    if (plan !== 'free') {
+      const { rows: subRows } = await client.query(
+        `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at)
+         VALUES ($1, $2::plan_type, NOW(), NOW() + ($3 || ' days')::INTERVAL)
+         RETURNING expires_at`,
+        [id, plan, days],
+      );
+      expiresAt = new Date((subRows[0] as { expires_at: string }).expires_at);
+    }
+
+    await client.query(`UPDATE users SET plan = $1::plan_type WHERE id = $2`, [plan, id]);
+    await client.query('COMMIT');
+
+    const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
+
+    // Send confirmation email (non-fatal)
+    if (plan !== 'free' && expiresAt) {
+      void sendSubscriptionConfirmEmail(user.email, user.username, planName, expiresAt);
+    }
+
+    // In-app notification
+    const notifBody = expiresAt
+      ? `Your ${planName} plan is now active until ${expiresAt.toLocaleDateString('en-PH', { dateStyle: 'long' })}.`
+      : `Your plan has been set to Free.`;
+
+    void createNotification(id, 'admin_message', `Plan changed to ${planName}`, notifBody, '/plans');
+
+    logger.info({ user_id: id, plan, days, by: req.user?.id }, '✅ Admin changed user plan');
+    res.json({ success: true, plan, expires_at: expiresAt });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
 }
 
 // ─── Update ad networks for a video/ad task ───────────────────────────────

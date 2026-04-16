@@ -309,6 +309,89 @@ function EmailUserModal({ username, onSend, onCancel }: {
   );
 }
 
+// ─── Change Plan modal ────────────────────────────────────────────────────────
+function ChangePlanModal({ username, currentPlan, onConfirm, onCancel }: {
+  username:    string;
+  currentPlan: string;
+  onConfirm:   (plan: string, duration_days: number) => void;
+  onCancel:    () => void;
+}) {
+  const [plan,     setPlan]     = useState(currentPlan === 'free' ? 'premium' : currentPlan);
+  const [days,     setDays]     = useState(30);
+  const [busy,     setBusy]     = useState(false);
+
+  async function handle(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    onConfirm(plan, days);
+    setBusy(false);
+  }
+
+  const isPaid = plan !== 'free';
+
+  return (
+    <div className="adm-modal-overlay" onClick={onCancel}>
+      <div className="adm-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title">
+          <CreditCard size={15} style={{ marginRight: 6 }} />
+          Change Plan — {username}
+        </h3>
+        <p style={{ margin: '-4px 0 12px', fontSize: 12, color: 'var(--text-muted)' }}>
+          Current plan: <strong style={{ textTransform: 'capitalize' }}>{currentPlan}</strong>.
+          A confirmation email will be sent to the user.
+        </p>
+        <form onSubmit={(e) => { void handle(e); }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              New Plan
+            </label>
+            <select
+              className="form-input"
+              value={plan}
+              onChange={(e) => setPlan(e.target.value)}
+            >
+              <option value="free">Free</option>
+              <option value="premium">Premium</option>
+              <option value="elite">Elite</option>
+            </select>
+          </div>
+
+          {isPaid && (
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                Duration (days)
+              </label>
+              <input
+                type="number"
+                className="form-input"
+                min={1}
+                max={365}
+                value={days}
+                onChange={(e) => setDays(Math.max(1, Math.min(365, Number(e.target.value))))}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, display: 'block' }}>
+                Expires ~{new Date(Date.now() + days * 86_400_000).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            </div>
+          )}
+
+          <div className="adm-modal-actions" style={{ marginTop: 4 }}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              disabled={busy || plan === currentPlan}
+            >
+              <CreditCard size={13} />
+              {busy ? 'Applying…' : 'Apply & Notify'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── KYC auto-approval countdown ─────────────────────────────────────────────
 const AUTO_APPROVE_HOURS = 32;
 
@@ -468,8 +551,9 @@ export default function AdminDashboard() {
   const [kycList,       setKycList]       = useState<AdminKycSubmission[]>([]);
   const [loading,       setLoading]       = useState(true);
 
-  const [notifyTarget,  setNotifyTarget]  = useState<{ id: string; username: string } | null>(null);
-  const [emailTarget,   setEmailTarget]   = useState<{ id: string; username: string } | null>(null);
+  const [notifyTarget,     setNotifyTarget]     = useState<{ id: string; username: string } | null>(null);
+  const [emailTarget,      setEmailTarget]      = useState<{ id: string; username: string } | null>(null);
+  const [changePlanTarget, setChangePlanTarget] = useState<{ id: string; username: string; currentPlan: string } | null>(null);
   const [broadcasting,  setBroadcasting]  = useState(false);
   const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '' });
   const [emailBroadcasting,  setEmailBroadcasting]  = useState(false);
@@ -754,7 +838,6 @@ export default function AdminDashboard() {
     const payload: Record<string, unknown> = {};
     const delta = parseFloat(draft.delta);
     if (draft.delta.trim() !== '' && !isNaN(delta)) payload.balance_adjustment = delta;
-    if (draft.plan) payload.plan = draft.plan;
     if (Object.keys(payload).length === 0) { toast.error('No changes to apply.'); return; }
     try {
       const { data } = await api.put<{ user: AdminUser }>(`/admin/users/${userId}`, payload);
@@ -784,6 +867,27 @@ export default function AdminDashboard() {
       setEmailTarget(null);
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Failed to send email.');
+    }
+  }
+
+  async function handleChangePlan(userId: string, plan: string, duration_days: number) {
+    try {
+      const { data } = await api.post<{ success: boolean; plan: string; expires_at: string | null }>(
+        `/admin/users/${userId}/change-plan`,
+        { plan, duration_days },
+      );
+      setUsers((prev) => prev.map((u) =>
+        u.id === userId ? { ...u, plan: data.plan as AdminUser['plan'] } : u,
+      ));
+      // Also clear cached details so they reload fresh
+      setUserDetails((prev) => { const n = { ...prev }; delete n[userId]; return n; });
+      const expiryMsg = data.expires_at
+        ? ` · expires ${new Date(data.expires_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`
+        : '';
+      toast.success(`Plan changed to ${data.plan}${expiryMsg}. Confirmation email sent.`);
+      setChangePlanTarget(null);
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Failed to change plan.');
     }
   }
 
@@ -904,6 +1008,14 @@ export default function AdminDashboard() {
           username={emailTarget.username}
           onSend={(subject, message) => sendUserEmail(emailTarget.id, subject, message)}
           onCancel={() => setEmailTarget(null)}
+        />
+      )}
+      {changePlanTarget && (
+        <ChangePlanModal
+          username={changePlanTarget.username}
+          currentPlan={changePlanTarget.currentPlan}
+          onConfirm={(plan, days) => void handleChangePlan(changePlanTarget.id, plan, days)}
+          onCancel={() => setChangePlanTarget(null)}
         />
       )}
 
@@ -1224,17 +1336,19 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                             <div className="adm-manage-field">
-                              <label className="adm-manage-label">Set plan</label>
-                              <select
-                                className="form-input adm-manage-select"
-                                value={draft.plan}
-                                onChange={(e) => setAdjustDraft((prev) => ({ ...prev, [u.id]: { ...draft, plan: e.target.value } }))}
-                              >
-                                <option value="">— no change —</option>
-                                <option value="free">Free</option>
-                                <option value="premium">Premium</option>
-                                <option value="elite">Elite</option>
-                              </select>
+                              <label className="adm-manage-label">Plan</label>
+                              <div className="adm-manage-input-row">
+                                <span className="adm-manage-hint" style={{ marginLeft: 0 }}>
+                                  Current: <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan}</span>
+                                </span>
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  style={{ marginLeft: 'auto' }}
+                                  onClick={() => setChangePlanTarget({ id: u.id, username: u.username, currentPlan: u.plan })}
+                                >
+                                  <CreditCard size={13} /> Change Plan
+                                </button>
+                              </div>
                             </div>
                             <div className="adm-manage-actions">
                               <button
@@ -1246,7 +1360,7 @@ export default function AdminDashboard() {
                               <button
                                 className="btn btn-primary btn-sm"
                                 onClick={() => { void applyUserAdjustment(u.id); }}
-                                disabled={!draft.delta && !draft.plan}
+                                disabled={!draft.delta}
                               >
                                 Apply changes
                               </button>
