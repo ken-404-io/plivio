@@ -321,19 +321,35 @@ export default function Dashboard() {
         rel="noopener noreferrer"
         className="dash-community-banner"
       >
-        <span className="dash-community-icon">
-          <FacebookGlyph size={20} />
-        </span>
-        <div className="dash-community-body">
-          <p className="dash-community-title">Join our community</p>
-          <p className="dash-community-sub">
-            Connect with fellow Plivio earners · tips, giveaways, support
-          </p>
+        {/* Cover — Facebook-style hero header */}
+        <div className="dash-community-cover" aria-hidden="true">
+          <div className="dash-community-cover-glow" />
+          <FacebookGlyph size={96} />
         </div>
-        <span className="dash-community-cta">
-          Join
-          <ChevronRight size={14} />
-        </span>
+
+        {/* Content */}
+        <div className="dash-community-content">
+          <div className="dash-community-avatar">
+            <FacebookGlyph size={28} />
+          </div>
+          <div className="dash-community-text">
+            <p className="dash-community-title">Join our community</p>
+            <p className="dash-community-sub">
+              Connect with fellow Plivio earners · tips, giveaways, support
+            </p>
+            <div className="dash-community-meta">
+              <span className="dash-community-meta-item">
+                <Users size={12} /> Public group
+              </span>
+              <span className="dash-community-meta-dot">·</span>
+              <span className="dash-community-meta-item">Facebook</span>
+            </div>
+          </div>
+          <span className="dash-community-cta">
+            Join
+            <ChevronRight size={14} />
+          </span>
+        </div>
       </a>
 
       {/* ── Quizly daily progress (replaces the old Today's Goal card) ── */}
