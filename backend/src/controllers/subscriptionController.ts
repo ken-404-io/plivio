@@ -63,6 +63,7 @@ export const PLANS: Record<string, PlanInfo> = {
     features:    [
       'Unlimited quiz questions',
       'No daily earning cap',
+      '₱500/day withdrawal limit',
       'Ad-free experience',
       'Early access to new features',
       'VIP dedicated support',
