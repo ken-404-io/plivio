@@ -1,30 +1,29 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
- * Polls `/version.json` and hard-reloads the page when a newer deployment is
- * detected, so every open tab picks up the latest build without the user
- * having to press refresh themselves.
+ * Polls `/version.json` and signals when a newer deployment is detected so
+ * the UI can show an update banner and trigger a hard reload.
  *
  * Lifecycle:
- *   - On mount: fetch /version.json once.
+ *   - On mount: fetch /version.json once (after a short delay).
  *   - Every {@link POLL_INTERVAL_MS}: fetch again.
  *   - Whenever the tab regains visibility / window focus: fetch again.
- *   - On mismatch: `window.location.reload()` — a hard reload that bypasses
- *     the in-memory cache and pulls the fresh index.html + hashed bundles.
+ *   - On mismatch: sets `updateAvailable = true` — the caller controls when
+ *     to reload (e.g. after showing a banner with a countdown).
  *
  * The baked-in `__APP_VERSION__` comes from `vite.config.ts` and matches the
  * `version` field of `/version.json` emitted during the same build.
  */
 
-const POLL_INTERVAL_MS = 60_000; // 1 minute — balances freshness vs. noise
+const POLL_INTERVAL_MS = 60_000; // 1 minute
 const VERSION_URL      = '/version.json';
 
 type VersionPayload = { version?: string };
 
 async function fetchRemoteVersion(): Promise<string | null> {
   try {
-    // `cache: 'no-store'` + cachebust query string together defeat any CDN or
-    // service-worker cache that might otherwise return a stale version file.
+    // `cache: 'no-store'` + cachebust query string defeat any CDN or
+    // service-worker cache that might return a stale version file.
     const res = await fetch(`${VERSION_URL}?t=${Date.now()}`, {
       cache: 'no-store',
       credentials: 'omit',
@@ -33,44 +32,39 @@ async function fetchRemoteVersion(): Promise<string | null> {
     const data = (await res.json()) as VersionPayload;
     return typeof data.version === 'string' ? data.version : null;
   } catch {
-    // Network blips, offline users, etc. — try again on the next tick.
     return null;
   }
 }
 
-export function useVersionCheck(): void {
-  // Prevents a reload-loop in the unlikely case the just-reloaded page still
-  // reports an old version (e.g. CDN propagation lag). We only trigger one
-  // reload per tab session.
-  const reloadedRef = useRef(false);
+export function useVersionCheck(): { updateAvailable: boolean } {
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  // Once we detect an update we stop polling — no point re-checking.
+  const detectedRef = useRef(false);
 
   useEffect(() => {
-    // In dev, __APP_VERSION__ is a fresh timestamp each `vite dev` start and
-    // there's no /version.json to compare against — skip the check entirely.
+    // In dev there is no /version.json — skip entirely.
     if (import.meta.env.DEV) return;
 
     let cancelled = false;
 
     async function check() {
-      if (cancelled || reloadedRef.current) return;
+      if (cancelled || detectedRef.current) return;
       const remote = await fetchRemoteVersion();
       if (!remote) return;
       if (remote !== __APP_VERSION__) {
-        reloadedRef.current = true;
-        // Hard reload — the browser discards the in-memory bundle and pulls
-        // the fresh index.html, which in turn references the new hashed JS.
-        window.location.reload();
+        detectedRef.current = true;
+        setUpdateAvailable(true);
       }
     }
 
-    // Initial check a few seconds after mount so we don't race the page's
-    // own startup network traffic.
+    // Small initial delay so we don't race the page's own startup traffic.
     const initialTimer = window.setTimeout(check, 5_000);
 
-    // Periodic check.
+    // Periodic polling.
     const interval = window.setInterval(check, POLL_INTERVAL_MS);
 
-    // Check on tab re-focus — catches users who leave the app open overnight.
+    // Check when the tab regains focus — catches users who left the app open.
     const onVisible = () => {
       if (document.visibilityState === 'visible') void check();
     };
@@ -85,4 +79,6 @@ export function useVersionCheck(): void {
       window.removeEventListener('focus', onVisible);
     };
   }, []);
+
+  return { updateAvailable };
 }
