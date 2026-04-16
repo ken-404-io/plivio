@@ -3808,6 +3808,63 @@ a, button, [role="button"], [tabindex] {
 .dash-kyc-sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .dash-kyc-chevron { color: var(--warning); flex-shrink: 0; }
 
+/* ── Join community banner (Facebook group) ── */
+.dash-community-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(24,119,242,0.14), rgba(24,119,242,0.06));
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.dash-community-banner:hover {
+  background: linear-gradient(135deg, rgba(24,119,242,0.22), rgba(24,119,242,0.10));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(24,119,242,0.15);
+}
+.dash-community-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  flex-shrink: 0;
+}
+.dash-community-body  { flex: 1; min-width: 0; }
+.dash-community-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading, #f1f0f5);
+}
+.dash-community-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-community-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px 6px 12px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.dash-community-banner:hover .dash-community-cta { background: var(--accent-dark); }
+
 /* ─── Dashboard — greeting ───────────────────────────────────────────────────── */
 .dash-greeting {
   display: flex;

@@ -20,7 +20,12 @@ import {
   Trophy,
   Coins,
   TrendingUp,
+  Facebook,
 } from 'lucide-react';
+
+// Official Plivio community on Facebook. Opens in a new tab so the user
+// doesn't lose their session / current page.
+const COMMUNITY_URL = 'https://www.facebook.com/share/g/1azcCLjCTc/';
 
 // ─── Quizly (daily quiz) status shape ────────────────────────────────────────
 interface QuizlyStatus {
@@ -293,6 +298,28 @@ export default function Dashboard() {
           <ChevronRight size={15} className="dash-kyc-chevron" />
         </Link>
       )}
+
+      {/* ── Join Community banner ── */}
+      <a
+        href={COMMUNITY_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="dash-community-banner"
+      >
+        <span className="dash-community-icon">
+          <Facebook size={20} />
+        </span>
+        <div className="dash-community-body">
+          <p className="dash-community-title">Join our community</p>
+          <p className="dash-community-sub">
+            Connect with fellow Plivio earners · tips, giveaways, support
+          </p>
+        </div>
+        <span className="dash-community-cta">
+          Join
+          <ChevronRight size={14} />
+        </span>
+      </a>
 
       {/* ── Quizly daily progress (replaces the old Today's Goal card) ── */}
       <div className="dash-goal-card">
