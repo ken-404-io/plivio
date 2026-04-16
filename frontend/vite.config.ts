@@ -38,29 +38,51 @@ function emitVersionJsonPlugin(version: string): Plugin {
 }
 
 /**
- * Strip the `crossorigin` attribute from every <script> and <link> tag that
- * Vite injects into index.html at build time.
+ * Strip the `crossorigin` attribute from every <script> and <link> tag in
+ * index.html at build time.
  *
- * Without this, Vite emits:
+ * Why this matters: Vite injects
  *   <link rel="stylesheet" crossorigin href="/assets/index-xxx.css">
+ * When the page is served from a static host that does NOT return an
+ * Access-Control-Allow-Origin response header, the browser silently drops the
+ * stylesheet and the page renders completely unstyled. Vercel and similar CDNs
+ * add the header automatically, but the attribute is still unnecessary there —
+ * removing it is the safest universal default.
  *
- * When the page is served from a plain static-file host (nginx, Apache, etc.)
- * that does NOT return an Access-Control-Allow-Origin response header, the
- * browser silently drops the stylesheet, leaving the page completely unstyled.
- * Vercel and similar CDNs add that header automatically, but the attribute is
- * still unnecessary there — removing it is the safest universal default.
+ * Historical bug (fixed): the original regex used two capture groups to
+ * re-emit the tag minus the `crossorigin` keyword, which left an orphaned
+ * ="anonymous" token behind for valued attributes (e.g. the Google AdSense
+ * <script>). That malformed attribute caused Chrome to terminate the <head>
+ * early, pushing the subsequent stylesheet <link> into <body> — where it was
+ * silently ignored. Result: completely unstyled page.
+ *
+ * Current approach: a single targeted replacement that matches the whole
+ * attribute (name + optional value in double quotes, single quotes, or
+ * unquoted) and removes it cleanly, for every shape browsers accept.
+ *
+ * The `transformIndexHtml` hook is declared with `order: 'post'` so it runs
+ * after Vite's built-in HTML injection — guaranteeing we see (and can clean)
+ * every crossorigin attribute Vite adds.
  */
 function removeCrossOriginPlugin(): Plugin {
+  // Matches:
+  //   crossorigin                       (boolean)
+  //   crossorigin="anonymous"           (double-quoted)
+  //   crossorigin='anonymous'           (single-quoted)
+  //   crossorigin=anonymous             (unquoted, terminated by whitespace or '>')
+  // Leading \s+ anchors to an attribute boundary so we never match inside a
+  // URL or string literal.
+  const CROSSORIGIN_ATTR =
+    /\s+crossorigin(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/g;
+
   return {
     name: 'remove-crossorigin',
     enforce: 'post',
-    transformIndexHtml(html) {
-      // Remove ONLY the crossorigin attribute (boolean or with a value).
-      // Old approach captured everything after `crossorigin` into $2 and
-      // re-emitted it, which left orphaned  ="anonymous"  tokens when the
-      // attribute had a value (e.g. the Google AdSense <script> tag).
-      // A single targeted replacement avoids that entirely.
-      return html.replace(/\s+crossorigin(?:(?:=")(?:[^"]*)")?/g, '');
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        return html.replace(CROSSORIGIN_ATTR, '');
+      },
     },
   };
 }
