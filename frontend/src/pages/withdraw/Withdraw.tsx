@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Smartphone,
   CreditCard,
-  Banknote,
   XCircle,
   Clock,
   CheckCircle2,
@@ -186,7 +185,7 @@ export default function Withdraw() {
   const [validationError,   setValidationError]   = useState<string | null>(null);
   const [submitting,        setSubmitting]        = useState(false);
   const [cancelling,        setCancelling]        = useState<string | null>(null);
-  const [historyOpen,       setHistoryOpen]       = useState(false);
+  const [historyOpen,       setHistoryOpen]       = useState(true);
   const [cooldownEnd,       setCooldownEnd]       = useState<Date | null>(null);
   const [cooldownRemaining, setCooldownRemaining] = useState('');
 
@@ -414,6 +413,17 @@ export default function Withdraw() {
           <span>5% fee</span>
         </div>
       </div>
+
+      {/* ── Cooldown banner ──────────────────────────────────────────────── */}
+      {onCooldown && cooldownRemaining && (
+        <div className="wd-cooldown-banner">
+          <Clock size={16} className="wd-cooldown-icon" />
+          <div className="wd-cooldown-text">
+            <span className="wd-cooldown-label">Next withdrawal available in</span>
+            <span className="wd-cooldown-timer">{cooldownRemaining}</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Withdrawal form ───────────────────────────────────────────────── */}
       <form onSubmit={handleReview} noValidate className="wd-form">

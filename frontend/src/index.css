@@ -4998,6 +4998,35 @@ a, button, [role="button"], [tabindex] {
   .withdraw-balance-card { flex-direction: column; gap: 6px; align-items: flex-start; padding: 16px 18px; }
   .withdraw-balance-value { font-size: 26px; }
 
+  /* ── Withdraw page: reduce vertical footprint so all sections fit ── */
+
+  /* Hero card: tighter padding and smaller balance figure */
+  .wd-hero { padding: 14px 16px; gap: 10px; border-radius: 14px; }
+  .wd-hero-amount { font-size: 24px; }
+  .wd-hero-icon-wrap { width: 38px; height: 38px; border-radius: 10px; }
+  .wd-hero-limits { font-size: 10px; gap: 6px; padding-top: 8px; }
+
+  /* Form: closer gap between cards, tighter card padding */
+  .wd-form { gap: 10px; }
+  .wd-fieldset { padding: 12px; gap: 10px; border-radius: 12px; }
+  .wd-fieldset-legend { font-size: 12px; }
+
+  /* Method chips: shorter height */
+  .wd-method-chip { padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+
+  /* Amount input: slightly shorter */
+  .wd-amount-input { height: 46px; font-size: 20px; }
+
+  /* Submit button: matches reduced input height */
+  .wd-submit { height: 46px; }
+
+  /* Ensure the page has breathing room above the bottom nav */
+  .page { padding-bottom: 12px; }
+
+  /* Cooldown banner: compact on mobile */
+  .wd-cooldown-banner { padding: 10px 14px; gap: 10px; }
+  .wd-cooldown-timer { font-size: 16px; }
+
   /* Referrals stats compact */
   .ref-stats-row { padding: 12px 0; }
   .ref-stat-num { font-size: 18px; }
@@ -5494,8 +5523,38 @@ a, button, [role="button"], [tabindex] {
 
 /* ─── Withdrawal cooldown banner ───────────────────────────────────────────── */
 .wd-cooldown-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 12px;
   animation: wd-cooldown-pulse 2s ease-in-out infinite;
 }
+.wd-cooldown-icon {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+.wd-cooldown-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.wd-cooldown-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.wd-cooldown-timer {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--warning);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+/* legacy alias kept for any other usage */
 .wd-cooldown-time {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
