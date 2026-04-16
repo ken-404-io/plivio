@@ -367,7 +367,6 @@ export interface AdminKycSubmission {
 export interface AdminReferral {
   referrer_id: string;
   referrer_username: string;
-  referral_batches_credited: number;
   invited_username: string;
   invited_email: string;
   invited_plan: PlanType;

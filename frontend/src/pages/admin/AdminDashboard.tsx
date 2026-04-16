@@ -1823,7 +1823,7 @@ export default function AdminDashboard() {
               <div key={`${r.referrer_id}-${r.invited_username}-${i}`} className="adm-ref-card">
                 <div className="adm-ref-user">
                   <span className="adm-ref-username">{r.referrer_username}</span>
-                  <span className="adm-ref-email">Referrer · {r.referral_batches_credited} batches</span>
+                  <span className="adm-ref-email">Referrer</span>
                 </div>
                 <span className="adm-ref-arrow">→</span>
                 <div className="adm-ref-user" style={{ flex: 1 }}>

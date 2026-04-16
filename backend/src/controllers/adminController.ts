@@ -599,7 +599,6 @@ export async function listReferrals(req: Request, res: Response, next: NextFunct
     const { rows } = await pool.query(
       `SELECT
          referrer.id AS referrer_id, referrer.username AS referrer_username,
-         referrer.referral_batches_credited,
          invited.username AS invited_username, invited.email AS invited_email,
          invited.plan::text AS invited_plan, invited.is_email_verified,
          invited.created_at AS invited_at

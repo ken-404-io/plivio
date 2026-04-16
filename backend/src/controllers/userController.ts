@@ -338,44 +338,30 @@ export async function getReferrals(
   try {
     const userId = req.user!.id;
 
-    // Referred users list + batch tracking in parallel.
-    // Only show referred users who have completed email verification —
-    // unverified accounts should never appear in the "earned referrals"
-    // list (we also only grant the referral bonus after verification).
-    const [listResult, batchResult] = await Promise.all([
-      pool.query(
-        `SELECT u.username, u.plan, u.created_at
-         FROM users u
-         WHERE u.referred_by = $1
-           AND u.is_email_verified = TRUE
-         ORDER BY u.created_at ASC`,
-        [userId],
-      ),
-      pool.query(
-        `SELECT referral_batches_credited FROM users WHERE id = $1`,
-        [userId],
-      ),
-    ]);
-
-    const batchesCredited = Number(
-      (batchResult.rows[0] as { referral_batches_credited: string } | undefined)
-        ?.referral_batches_credited ?? 0,
+    // Referred users list. Only show referred users who have completed
+    // email verification — unverified accounts never receive a referral
+    // bonus, so they don't belong here either.
+    const listResult = await pool.query(
+      `SELECT u.username, u.plan, u.created_at
+       FROM users u
+       WHERE u.referred_by = $1
+         AND u.is_email_verified = TRUE
+       ORDER BY u.created_at ASC`,
+      [userId],
     );
 
-    // Compute display totals from batch state
+    // ₱10 is credited to the referrer for every verified signup — no more
+    // batching of 10 (see emailAuthController + migration 018). "Released"
+    // is therefore always exactly totalInvites × ₱10.
+    const INVITE_VALUE   = 10;
     const totalInvites   = listResult.rows.length;
-    const creditedCount  = batchesCredited * 10;        // invites in completed batches
-    const pendingCount   = totalInvites - creditedCount; // invites pending the next batch
-    const releasedAmount = batchesCredited * 100;        // ₱100 per batch
-    const pendingAmount  = pendingCount * 10;            // ₱10 per pending invite
+    const releasedAmount = totalInvites * INVITE_VALUE;
 
     res.json({
-      success:             true,
-      referrals:           listResult.rows,   // sorted oldest-first for status calc
-      total_earned:        releasedAmount,
-      referral_batches_credited: batchesCredited,
-      pending_credits:     pendingAmount,
-      released_credits:    releasedAmount,
+      success:          true,
+      referrals:        listResult.rows,
+      total_earned:     releasedAmount,
+      released_credits: releasedAmount,
     });
   } catch (err) { next(err); }
 }
