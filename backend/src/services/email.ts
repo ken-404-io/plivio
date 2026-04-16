@@ -339,3 +339,34 @@ export async function broadcastEmailToAll(
     }
   }
 }
+
+/**
+ * Sends a one-off custom email from an admin to a single user.
+ * The message is rendered inside the standard Plivio email template.
+ * Plain newlines are converted to <br> tags.
+ */
+export async function sendAdminEmail(
+  to: string,
+  username: string,
+  subject: string,
+  message: string,
+): Promise<void> {
+  const safeMessage = message
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+
+  const body = `
+    <p style="color:#c8d8f0;font-size:16px;font-weight:600;margin:0 0 12px;">
+      Hello, ${username}!
+    </p>
+    <div style="color:#a09db0;font-size:15px;line-height:1.7;white-space:pre-line;">
+      ${safeMessage}
+    </div>
+    <p style="margin:24px 0 0;font-size:13px;color:#6b6880;">
+      This message was sent to you by the Plivio team.
+    </p>`;
+
+  await send(to, subject, wrap(subject, body));
+}

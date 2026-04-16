@@ -241,6 +241,74 @@ function NotifyModal({ username, onSend, onCancel }: {
   );
 }
 
+// ─── Email individual user modal ──────────────────────────────────────────────
+
+function EmailUserModal({ username, onSend, onCancel }: {
+  username: string;
+  onSend:   (subject: string, message: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({ subject: '', message: '' });
+  const [busy, setBusy] = useState(false);
+
+  async function handle(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.subject.trim() || !form.message.trim()) return;
+    setBusy(true);
+    await onSend(form.subject, form.message);
+    setBusy(false);
+  }
+
+  return (
+    <div className="adm-modal-overlay" onClick={onCancel}>
+      <div className="adm-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title">
+          <Mail size={15} style={{ marginRight: 6 }} />
+          Email {username}
+        </h3>
+        <p style={{ margin: '-4px 0 8px', fontSize: 12, color: 'var(--text-muted)' }}>
+          This email will be sent directly to <strong>{username}</strong>'s inbox using the Plivio email template.
+        </p>
+        <form onSubmit={(e) => { void handle(e); }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input
+            className="form-input"
+            placeholder="Subject"
+            value={form.subject}
+            onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+            maxLength={200}
+            required
+            autoFocus
+          />
+          <textarea
+            className="form-input adm-modal-textarea"
+            placeholder="Message body — plain text, line breaks are preserved."
+            value={form.message}
+            onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+            maxLength={5000}
+            rows={6}
+            required
+            style={{ resize: 'vertical', minHeight: 120 }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'right' }}>
+            {form.message.length}/5000
+          </span>
+          <div className="adm-modal-actions">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              disabled={busy || !form.subject.trim() || !form.message.trim()}
+            >
+              <Send size={13} />
+              {busy ? 'Sending…' : 'Send Email'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── KYC auto-approval countdown ─────────────────────────────────────────────
 const AUTO_APPROVE_HOURS = 32;
 
@@ -399,6 +467,7 @@ export default function AdminDashboard() {
   const [loading,       setLoading]       = useState(true);
 
   const [notifyTarget,  setNotifyTarget]  = useState<{ id: string; username: string } | null>(null);
+  const [emailTarget,   setEmailTarget]   = useState<{ id: string; username: string } | null>(null);
   const [broadcasting,  setBroadcasting]  = useState(false);
   const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '' });
   const [emailBroadcasting,  setEmailBroadcasting]  = useState(false);
@@ -699,6 +768,16 @@ export default function AdminDashboard() {
     }
   }
 
+  async function sendUserEmail(userId: string, subject: string, message: string) {
+    try {
+      const { data } = await api.post<{ sent_to: string }>(`/admin/users/${userId}/email`, { subject, message });
+      toast.success(`Email sent to ${data.sent_to}`);
+      setEmailTarget(null);
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Failed to send email.');
+    }
+  }
+
   async function sendBroadcast(e: React.FormEvent) {
     e.preventDefault();
     if (!broadcastForm.title.trim() || !broadcastForm.message.trim()) return;
@@ -809,6 +888,13 @@ export default function AdminDashboard() {
           username={notifyTarget.username}
           onSend={(title, message, link) => sendNotification(notifyTarget.id, title, message, link)}
           onCancel={() => setNotifyTarget(null)}
+        />
+      )}
+      {emailTarget && (
+        <EmailUserModal
+          username={emailTarget.username}
+          onSend={(subject, message) => sendUserEmail(emailTarget.id, subject, message)}
+          onCancel={() => setEmailTarget(null)}
         />
       )}
 
@@ -1045,9 +1131,16 @@ export default function AdminDashboard() {
                       <button
                         className="adm-icon-btn"
                         onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
-                        title="Send notification"
+                        title="Send in-app notification"
                       >
                         <Bell size={14} />
+                      </button>
+                      <button
+                        className="adm-icon-btn"
+                        onClick={() => setEmailTarget({ id: u.id, username: u.username })}
+                        title="Send email"
+                      >
+                        <Mail size={14} />
                       </button>
                       <button
                         className={`adm-icon-btn${isExpanded ? ' adm-icon-btn--active' : ''}`}

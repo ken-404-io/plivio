@@ -8,6 +8,7 @@ import {
   updateUser,
   getUserDetails,
   notifyUser,
+  emailUser,
   broadcastNotification,
   broadcastEmail,
   listAllTasks,
@@ -66,6 +67,14 @@ router.post('/email-everyone',
 router.get('/users', listUsers);
 router.get('/users/:id/details', validateParam('id'), getUserDetails);
 router.put('/users/:id/reset-device', validateParam('id'), resetUserDevice);
+router.post('/users/:id/email',
+  validateParam('id'),
+  validateBody({
+    subject: { required: true, minLength: 1, maxLength: 200 },
+    message: { required: true, minLength: 1, maxLength: 5000 },
+  }),
+  emailUser,
+);
 router.put('/users/:id',
   validateParam('id'),
   validateBody({
