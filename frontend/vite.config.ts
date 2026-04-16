@@ -55,9 +55,12 @@ function removeCrossOriginPlugin(): Plugin {
     name: 'remove-crossorigin',
     enforce: 'post',
     transformIndexHtml(html) {
-      return html
-        .replace(/<script([^>]*)\scrossorigin([^>]*)>/g, '<script$1$2>')
-        .replace(/<link([^>]*)\scrossorigin([^>]*)>/g,   '<link$1$2>');
+      // Remove ONLY the crossorigin attribute (boolean or with a value).
+      // Old approach captured everything after `crossorigin` into $2 and
+      // re-emitted it, which left orphaned  ="anonymous"  tokens when the
+      // attribute had a value (e.g. the Google AdSense <script> tag).
+      // A single targeted replacement avoids that entirely.
+      return html.replace(/\s+crossorigin(?:(?:=")(?:[^"]*)")?/g, '');
     },
   };
 }
