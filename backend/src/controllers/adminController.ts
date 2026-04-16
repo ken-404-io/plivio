@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 import { NotFoundError, ValidationError } from '../utils/errors.ts';
-import { sendWithdrawalStatusEmail, broadcastEmailToAll } from '../services/email.ts';
+import { sendWithdrawalStatusEmail, broadcastEmailToAll, sendAdminEmail } from '../services/email.ts';
 import { createNotification } from '../utils/notify.ts';
 import { sendPushToUser }    from '../controllers/pushController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
@@ -151,6 +151,33 @@ export async function notifyUser(req: Request, res: Response, next: NextFunction
 
     await createNotification(user_id, 'admin_message', title.trim(), message.trim(), link ?? undefined);
     res.json({ success: true });
+  } catch (err) { next(err); }
+}
+
+/** POST /admin/users/:id/email — send a custom email to one specific user */
+export async function emailUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { subject, message } = req.body as { subject: string; message: string };
+
+    if (!subject?.trim() || !message?.trim()) {
+      throw new ValidationError('subject and message are required');
+    }
+
+    const { rows } = await pool.query<{ email: string; username: string; is_email_verified: boolean }>(
+      'SELECT email, username, is_email_verified FROM users WHERE id = $1',
+      [id],
+    );
+    if (rows.length === 0) throw new NotFoundError('User not found');
+
+    const { email, username, is_email_verified } = rows[0];
+    if (!is_email_verified) {
+      throw new ValidationError('This user has not verified their email address');
+    }
+
+    await sendAdminEmail(email, username, subject.trim(), message.trim());
+    logger.info({ userId: id, email, subject: subject.trim(), by: req.user?.id }, '📧 Admin emailed user');
+    res.json({ success: true, sent_to: email });
   } catch (err) { next(err); }
 }
 
