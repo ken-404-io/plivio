@@ -459,10 +459,12 @@ export default function AdminDashboard() {
   const [users,         setUsers]         = useState<AdminUser[]>([]);
   const [usersMeta,     setUsersMeta]     = useState({ page: 1, total: 0, limit: 25 });
   const [usersLoading,  setUsersLoading]  = useState(false);
-  const [userSearch,      setUserSearch]      = useState('');
-  const [userPlanFilter,  setUserPlanFilter]  = useState<'all' | 'premium' | 'elite'>('all');
-  const [userPage,        setUserPage]        = useState(1);
+  const [userSearch,           setUserSearch]           = useState('');
+  const [userSearchCommitted,  setUserSearchCommitted]  = useState('');
+  const [userPlanFilter,       setUserPlanFilter]       = useState<'all' | 'premium' | 'elite'>('all');
+  const [userPage,             setUserPage]             = useState(1);
   const [withdrawals,   setWithdrawals]   = useState<AdminWithdrawal[]>([]);
+  const [pendingPlanFilter, setPendingPlanFilter] = useState('');
   const [kycList,       setKycList]       = useState<AdminKycSubmission[]>([]);
   const [loading,       setLoading]       = useState(true);
 
@@ -553,7 +555,7 @@ export default function AdminDashboard() {
     setUsersLoading(true);
     try {
       const params: Record<string, string | number> = { page: userPage, limit: 25 };
-      if (userSearch)       params.search    = userSearch;
+      if (userSearchCommitted) params.search    = userSearchCommitted;
       if (userPlanFilter !== 'all') params.plan = userPlanFilter;
       if (userStatusFilter) params.status    = userStatusFilter;
       if (userDeviceFilter) params.device    = userDeviceFilter;
@@ -571,7 +573,7 @@ export default function AdminDashboard() {
       setUsersLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userPage, userPlanFilter, userStatusFilter, userDeviceFilter, userDateFrom, userDateTo]);
+  }, [userPage, userPlanFilter, userStatusFilter, userDeviceFilter, userDateFrom, userDateTo, userSearchCommitted]);
 
   useEffect(() => { void loadUsers(); }, [loadUsers]);
 
@@ -712,12 +714,19 @@ export default function AdminDashboard() {
     setUserSearch(value);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
+      setUserSearchCommitted(value);
       setUserPage(1);
     }, 400);
   }
 
+  function executeUserSearch() {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    setUserSearchCommitted(userSearch);
+    setUserPage(1);
+  }
+
   function resetUserFilters() {
-    setUserSearch(''); setUserPlanFilter('all'); setUserStatusFilter('');
+    setUserSearch(''); setUserSearchCommitted(''); setUserPlanFilter('all'); setUserStatusFilter('');
     setUserDeviceFilter(''); setUserDateFrom(''); setUserDateTo('');
     setUserPage(1);
   }
@@ -1059,8 +1068,17 @@ export default function AdminDashboard() {
             <div className="adm-wd-filter-row">
               <div className="adm-search-wrap" style={{ flex: 1 }}>
                 <Search size={15} className="adm-search-icon" />
-                <input className="form-input adm-search-input" placeholder="Search username or email…" value={userSearch} onChange={(e) => handleUserSearch(e.target.value)} />
+                <input
+                  className="form-input adm-search-input"
+                  placeholder="Search username or email…"
+                  value={userSearch}
+                  onChange={(e) => handleUserSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') executeUserSearch(); }}
+                />
               </div>
+              <button className="btn btn-primary btn-sm" onClick={executeUserSearch}>
+                <Search size={13} /> Search
+              </button>
               <select className="form-input adm-wd-filter-select" value={userPlanFilter} onChange={(e) => handlePlanFilter(e.target.value as 'all' | 'premium' | 'elite')}>
                 <option value="all">All Plans</option>
                 <option value="free">Free</option>
@@ -1433,10 +1451,28 @@ export default function AdminDashboard() {
 
           {/* Pending withdrawals */}
           {wdSubTab === 'pending' && (
+            <>
+              <div className="adm-wd-filters" style={{ marginBottom: 12 }}>
+                <div className="adm-wd-filter-row">
+                  <select
+                    className="form-input adm-wd-filter-select"
+                    value={pendingPlanFilter}
+                    onChange={(e) => setPendingPlanFilter(e.target.value)}
+                  >
+                    <option value="">All Plans</option>
+                    <option value="free">Free</option>
+                    <option value="premium">Premium</option>
+                    <option value="elite">Elite</option>
+                  </select>
+                  {pendingPlanFilter && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => setPendingPlanFilter('')}>Reset</button>
+                  )}
+                </div>
+              </div>
             <div className="adm-list">
-              {withdrawals.length === 0 ? (
+              {(pendingPlanFilter ? withdrawals.filter((w) => w.user_plan === pendingPlanFilter) : withdrawals).length === 0 ? (
                 <div className="empty-state"><p>No pending withdrawals.</p></div>
-              ) : withdrawals.map((w) => (
+              ) : (pendingPlanFilter ? withdrawals.filter((w) => w.user_plan === pendingPlanFilter) : withdrawals).map((w) => (
                 <div key={w.id} className="adm-wd-card">
                   <div className="adm-wd-top">
                     <div className="adm-wd-user">
@@ -1478,6 +1514,7 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
+            </>
           )}
 
           {/* Withdrawal history with filters */}
