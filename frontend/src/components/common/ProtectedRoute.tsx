@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
+import AccountBlockedScreen from './AccountBlockedScreen.tsx';
 
 interface ProtectedRouteProps {
   adminOnly?: boolean;
@@ -17,6 +18,16 @@ export default function ProtectedRoute({ adminOnly = false }: ProtectedRouteProp
   }
 
   if (!user) return <Navigate to="/login" replace />;
+
+  // Show full-screen blocked UI — no app access at all
+  const isSuspendedNow =
+    user.is_suspended &&
+    user.suspended_until != null &&
+    new Date(user.suspended_until) > new Date();
+
+  if (user.is_banned || isSuspendedNow) {
+    return <AccountBlockedScreen user={user} />;
+  }
 
   if (adminOnly && !user.is_admin) return <Navigate to="/dashboard" replace />;
 

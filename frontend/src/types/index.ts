@@ -26,6 +26,11 @@ export interface User {
   created_at: string;
   active_sub_plan?: PlanType;
   sub_expires_at?: string;
+  is_banned: boolean;
+  ban_reason: string | null;
+  is_suspended: boolean;
+  suspended_until: string | null;
+  suspend_reason: string | null;
 }
 
 export interface CoinTransaction {
