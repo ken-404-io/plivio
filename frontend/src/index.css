@@ -3829,34 +3829,19 @@ a, button, [role="button"], [tabindex] {
   border-color: var(--accent);
 }
 
-/* Cover / hero image area — Facebook-blue gradient with the FB glyph watermark */
+/* Cover / hero image area — Plivio Community banner */
 .dash-community-cover {
   position: relative;
   height: 130px;
-  background:
-    radial-gradient(120% 90% at 85% 20%, rgba(255,255,255,0.22), transparent 55%),
-    linear-gradient(135deg, #1877f2 0%, #0d5abf 50%, #0a3f8a 100%);
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 24px;
-  color: rgba(255,255,255,0.18);
+  background: #1877f2;
 }
-.dash-community-cover > svg {
-  position: relative;
-  z-index: 1;
-  transform: rotate(-8deg);
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25));
-}
-.dash-community-cover-glow {
-  position: absolute;
-  inset: -40% -20% auto auto;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 65%);
-  pointer-events: none;
+.dash-community-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 /* Content row below the cover */
