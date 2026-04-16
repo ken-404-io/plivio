@@ -23,6 +23,7 @@ import {
   listReferrals,
   listNotificationLogs,
   exportCsv,
+  changePlan,
 } from '../controllers/adminController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
@@ -67,6 +68,14 @@ router.post('/email-everyone',
 router.get('/users', listUsers);
 router.get('/users/:id/details', validateParam('id'), getUserDetails);
 router.put('/users/:id/reset-device', validateParam('id'), resetUserDevice);
+router.post('/users/:id/change-plan',
+  validateParam('id'),
+  validateBody({
+    plan:          { required: true, enum: ['free', 'premium', 'elite'] },
+    duration_days: { type: 'number', min: 1 },
+  }),
+  changePlan,
+);
 router.post('/users/:id/email',
   validateParam('id'),
   validateBody({
