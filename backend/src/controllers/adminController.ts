@@ -119,12 +119,55 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
     if (balance_adjustment !== undefined) {
       const delta = parseFloat(balance_adjustment);
       if (isNaN(delta) || Math.abs(delta) > 100_000) throw new ValidationError('Invalid balance adjustment');
-      // Use GREATEST to prevent balance going negative
       values.push(delta);
       setClauses.push(`balance = GREATEST(0, balance + $${values.length})`);
     }
 
     if (setClauses.length === 0) throw new ValidationError('No valid fields to update');
+
+    // When the plan changes we must deactivate any active subscription so that
+    // quiz / task controllers (which JOIN subscriptions for the effective plan)
+    // reflect the new plan immediately. Run everything in a transaction.
+    if (plan !== undefined) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        values.push(id);
+        const { rows } = await client.query(
+          `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${values.length}
+           RETURNING id, username, email, plan, balance, is_banned, is_verified`,
+          values,
+        );
+        if (rows.length === 0) { await client.query('ROLLBACK'); throw new NotFoundError('User not found'); }
+
+        // Invalidate active subscriptions so users.plan is the sole source of truth
+        await client.query(
+          `UPDATE subscriptions SET is_active = FALSE WHERE user_id = $1 AND is_active = TRUE`,
+          [id],
+        );
+
+        await client.query('COMMIT');
+
+        const updated = rows[0] as { id: string; username: string; plan: string };
+        const planLabel = updated.plan.charAt(0).toUpperCase() + updated.plan.slice(1);
+        void createNotification(
+          updated.id,
+          'admin_message',
+          'Plan Updated',
+          `Your plan has been set to ${planLabel}. All plan perks (quiz limits, withdrawal limits) are now active.`,
+          '/plans',
+        );
+
+        res.json({ success: true, user: rows[0] });
+      } catch (inner) {
+        await client.query('ROLLBACK');
+        throw inner;
+      } finally {
+        client.release();
+      }
+      return;
+    }
 
     values.push(id);
     const { rows } = await pool.query(
@@ -132,7 +175,6 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
        RETURNING id, username, email, plan, balance, is_banned, is_verified`,
       values,
     );
-
     if (rows.length === 0) throw new NotFoundError('User not found');
     res.json({ success: true, user: rows[0] });
   } catch (err) { next(err); }
