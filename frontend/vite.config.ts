@@ -1,42 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Minimal `process` declaration so we don't need @types/node just to read env.
-declare const process: { env: Record<string, string | undefined> };
-
-/**
- * Build version — identifies the current deployment. Used by the client-side
- * `useVersionCheck` hook to detect a new deploy and hard-reload every open tab.
- * Prefer the git SHA exposed by Vercel/CI so re-deploys of the same commit
- * are idempotent; fall back to a build timestamp for local builds.
- */
-function computeBuildVersion(): string {
-  const envSha =
-    process.env.VERCEL_GIT_COMMIT_SHA ??
-    process.env.GITHUB_SHA ??
-    process.env.COMMIT_SHA;
-  if (envSha) return envSha.slice(0, 12);
-  return String(Date.now());
-}
-
-/**
- * Emits `/version.json` into the build output so the running client can poll
- * it and detect a new deployment. The file is tiny and always served fresh.
- */
-function emitVersionJsonPlugin(version: string): Plugin {
-  return {
-    name: 'emit-version-json',
-    apply: 'build',
-    generateBundle() {
-      this.emitFile({
-        type: 'asset',
-        fileName: 'version.json',
-        source: JSON.stringify({ version, builtAt: new Date().toISOString() }) + '\n',
-      });
-    },
-  };
-}
-
 /**
  * Strip the `crossorigin` attribute from every <script> and <link> tag in
  * index.html at build time.
@@ -117,14 +81,9 @@ function removeCrossOriginPlugin(): Plugin {
   };
 }
 
-const BUILD_VERSION = computeBuildVersion();
-
 // https://vite.dev/config/
 export default defineConfig({
-  define: {
-    __APP_VERSION__: JSON.stringify(BUILD_VERSION),
-  },
-  plugins: [react(), removeCrossOriginPlugin(), emitVersionJsonPlugin(BUILD_VERSION)],
+  plugins: [react(), removeCrossOriginPlugin()],
 
   // In dev, proxy /api requests to the local backend so you don't need CORS.
   // Also mirror the Vercel rewrites for the Monetag ad tags so /js/p1.js
