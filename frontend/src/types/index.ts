@@ -157,6 +157,21 @@ export interface EarningsResponse {
   };
 }
 
+export interface PaymentMethod {
+  id: string;
+  method: WithdrawalMethod;
+  account_name: string;
+  account_number: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaymentMethodsResponse {
+  success: boolean;
+  data: PaymentMethod[];
+}
+
 export interface Withdrawal {
   id: string;
   amount: string | number;
