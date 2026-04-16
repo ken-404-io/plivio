@@ -19,7 +19,7 @@ const FREE_LIFETIME_QUESTIONS = 100;
 // This is a trusted compile-time constant, so it's string-interpolated
 // into the SQL interval literal (node-postgres can't parameterise
 // INTERVAL values cleanly across integer/text type boundaries).
-const QUESTION_RECYCLE_DAYS = 7;
+const QUESTION_RECYCLE_DAYS = 1;
 const RECYCLE_INTERVAL_SQL  = `INTERVAL '${QUESTION_RECYCLE_DAYS} days'`;
 
 // Daily question cap (resets 00:00 PST / Asia/Manila). null = unlimited.
