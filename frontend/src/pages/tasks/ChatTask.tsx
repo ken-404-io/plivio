@@ -13,7 +13,7 @@ const STREAK_QUIZ_GOAL = 15;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DoneMode = 'upgrade' | 'earnings-capped' | 'generic';
+type DoneMode = 'upgrade' | 'earnings-capped' | 'bank-empty' | 'generic';
 
 interface QuizStatus {
   success: boolean;
@@ -100,10 +100,15 @@ export default function ChatTask({ onClose }: Props) {
     setFeedback(null);
     try {
       const { data } = await api.get<{
-        success: boolean; question?: QuizQuestion; message?: string;
+        success: boolean; question?: QuizQuestion; message?: string; reason?: string;
       }>('/quiz/next');
       if (!data.success || !data.question) {
-        setLimitMsg(data.message ?? 'No more questions available.');
+        if (data.reason === 'no_questions') {
+          setDoneMode('bank-empty');
+          setLimitMsg(data.message ?? 'No more questions available right now.');
+        } else {
+          setLimitMsg(data.message ?? 'No more questions available.');
+        }
         setPhase('done');
         return;
       }
@@ -457,6 +462,37 @@ export default function ChatTask({ onClose }: Props) {
                   You can still earn referral bonuses — invite friends from the Referrals page.
                 </p>
               )}
+              <button className="cq-close-btn" onClick={onClose}>Close</button>
+            </div>
+          )}
+
+          {/* Done screen — question bank temporarily empty (recycled too recently) */}
+          {phase === 'done' && doneMode === 'bank-empty' && (
+            <div className="cq-done">
+              <div className="cq-done-icon">🔄</div>
+              <div className="cq-done-title">All caught up!</div>
+              <p className="cq-done-msg">
+                You've gone through all available questions. New ones will be ready shortly — check back in a bit or tap retry.
+              </p>
+              {sessionCount > 0 && (
+                <div className="cq-done-stats">
+                  <div className="cq-done-stat">
+                    <span className="cq-done-stat-val">{sessionCount}</span>
+                    <span className="cq-done-stat-lbl">Answered</span>
+                  </div>
+                  <div className="cq-done-stat">
+                    <span className="cq-done-stat-val">{sessionCorrect}</span>
+                    <span className="cq-done-stat-lbl">Correct</span>
+                  </div>
+                  <div className="cq-done-stat">
+                    <span className="cq-done-stat-val">₱{(sessionCorrect * 0.35).toFixed(2)}</span>
+                    <span className="cq-done-stat-lbl">Earned</span>
+                  </div>
+                </div>
+              )}
+              <button className="btn btn-primary btn-full" style={{ marginBottom: '8px' }} onClick={() => { void loadNextQuestion(); }}>
+                Retry
+              </button>
               <button className="cq-close-btn" onClick={onClose}>Close</button>
             </div>
           )}
