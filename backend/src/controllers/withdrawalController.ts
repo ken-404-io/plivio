@@ -6,6 +6,7 @@ const FREE_PLAN_WITHDRAWAL_LIMIT    = 1;
 const FREE_PLAN_MAX_AMOUNT          = 100;
 const FREE_PLAN_UPGRADE_CODE        = 'free_plan_limit_reached';
 const PREMIUM_DAILY_WITHDRAWAL_MAX  = 149;  // ₱149 total per day for Premium
+const ELITE_DAILY_WITHDRAWAL_MAX    = 500;  // ₱500 total per day for Elite
 // SQL snippet: start of "today" in Philippine Standard Time (UTC+8)
 const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila')`;
 
@@ -96,7 +97,7 @@ export async function requestWithdrawal(
       }
     }
 
-    // Premium: ₱149/day total withdrawal limit (Elite has no limit)
+    // Premium: ₱149/day total withdrawal limit
     if (user.plan === 'premium') {
       const { rows: todayRows } = await client.query(
         `SELECT COALESCE(SUM(amount), 0) AS today_total
@@ -111,7 +112,27 @@ export async function requestWithdrawal(
         const remaining = Math.max(0, PREMIUM_DAILY_WITHDRAWAL_MAX - todayTotal);
         throw new ForbiddenError(
           `Premium plan daily withdrawal limit is ₱${PREMIUM_DAILY_WITHDRAWAL_MAX}. ` +
-          `You have ₱${remaining.toFixed(2)} remaining today. Upgrade to Elite for no limit.`,
+          `You have ₱${remaining.toFixed(2)} remaining today.`,
+        );
+      }
+    }
+
+    // Elite: ₱500/day total withdrawal limit
+    if (user.plan === 'elite') {
+      const { rows: todayRows } = await client.query(
+        `SELECT COALESCE(SUM(amount), 0) AS today_total
+         FROM withdrawals
+         WHERE user_id = $1
+           AND status NOT IN ('cancelled')
+           AND requested_at >= ${SQL_PH_DAY_START}`,
+        [userId],
+      );
+      const todayTotal = Number((todayRows[0] as { today_total: string }).today_total);
+      if (todayTotal + amount > ELITE_DAILY_WITHDRAWAL_MAX) {
+        const remaining = Math.max(0, ELITE_DAILY_WITHDRAWAL_MAX - todayTotal);
+        throw new ForbiddenError(
+          `Elite plan daily withdrawal limit is ₱${ELITE_DAILY_WITHDRAWAL_MAX}. ` +
+          `You have ₱${remaining.toFixed(2)} remaining today.`,
         );
       }
     }
@@ -179,7 +200,29 @@ export async function getWithdrawalCooldown(
       return;
     }
 
-    // Elite and other plans: no restrictions
+    // Elite: return today's used and remaining daily withdrawal allowance
+    if (plan === 'elite') {
+      const { rows: todayRows } = await pool.query(
+        `SELECT COALESCE(SUM(amount), 0) AS today_total
+         FROM withdrawals
+         WHERE user_id = $1
+           AND status NOT IN ('cancelled')
+           AND requested_at >= ${SQL_PH_DAY_START}`,
+        [userId],
+      );
+      const todayTotal = Number((todayRows[0] as { today_total: string }).today_total);
+      const remaining  = Math.max(0, ELITE_DAILY_WITHDRAWAL_MAX - todayTotal);
+      res.json({
+        success:          true,
+        on_cooldown:      false,
+        daily_limit:      ELITE_DAILY_WITHDRAWAL_MAX,
+        today_withdrawn:  todayTotal,
+        daily_remaining:  remaining,
+      });
+      return;
+    }
+
+    // Other plans: no restrictions
     res.json({ success: true, on_cooldown: false });
   } catch (err) { next(err); }
 }
