@@ -12,12 +12,15 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowUpRight,
+  Plus,
+  Trash2,
+  Star,
 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
-import type { Withdrawal } from '../../types/index.ts';
+import type { Withdrawal, PaymentMethod } from '../../types/index.ts';
 
 // ─── Free Plan Upgrade Modal ──────────────────────────────────────────────────
 
@@ -99,27 +102,20 @@ const STATUS_META: Record<string, { label: string; icon: React.ReactNode; color:
   cancelled:  { label: 'Cancelled',  icon: <XCircle      size={13} />, color: 'var(--text-muted)' },
 };
 
-interface WithdrawForm {
-  amount:         string;
-  method:         'gcash' | 'paypal';
-  account_name:   string;
-  account_number: string;
-}
-
 // ─── Confirmation bottom-sheet ─────────────────────────────────────────────────
 
 interface ConfirmProps {
-  form:      WithdrawForm;
+  amount:   number;
+  pm:       PaymentMethod;
   onConfirm: () => void;
   onCancel:  () => void;
   loading:   boolean;
 }
 
-function ConfirmModal({ form, onConfirm, onCancel, loading }: ConfirmProps) {
-  const amount      = Number(form.amount);
+function ConfirmModal({ amount, pm, onConfirm, onCancel, loading }: ConfirmProps) {
   const totalFee    = Math.round(amount * TOTAL_FEE_RATE * 100) / 100;
   const netAmount   = Math.round((amount - totalFee)      * 100) / 100;
-  const acctLabel   = form.method === 'gcash' ? 'GCash Number' : 'PayPal Email';
+  const acctLabel   = pm.method === 'gcash' ? 'GCash Number' : 'PayPal Email';
 
   return (
     <div className="modal-overlay modal-overlay--center" onClick={onCancel}>
@@ -138,17 +134,17 @@ function ConfirmModal({ form, onConfirm, onCancel, loading }: ConfirmProps) {
           <div className="wd-confirm-row">
             <span className="wd-confirm-label">Method</span>
             <span className="wd-confirm-value">
-              {form.method === 'gcash' ? <Smartphone size={14} /> : <CreditCard size={14} />}
-              {form.method === 'gcash' ? 'GCash' : 'PayPal'}
+              {pm.method === 'gcash' ? <Smartphone size={14} /> : <CreditCard size={14} />}
+              {pm.method === 'gcash' ? 'GCash' : 'PayPal'}
             </span>
           </div>
           <div className="wd-confirm-row">
             <span className="wd-confirm-label">Name</span>
-            <span className="wd-confirm-value">{form.account_name}</span>
+            <span className="wd-confirm-value">{pm.account_name}</span>
           </div>
           <div className="wd-confirm-row">
             <span className="wd-confirm-label">{acctLabel}</span>
-            <span className="wd-confirm-value wd-confirm-value--mono">{form.account_number}</span>
+            <span className="wd-confirm-value wd-confirm-value--mono">{pm.account_number}</span>
           </div>
         </div>
 
@@ -169,15 +165,178 @@ function ConfirmModal({ form, onConfirm, onCancel, loading }: ConfirmProps) {
   );
 }
 
+// ─── Add Payment Method Modal ─────────────────────────────────────────────────
+
+interface AddPaymentMethodModalProps {
+  onClose:  () => void;
+  onAdded:  (pm: PaymentMethod) => void;
+}
+
+function AddPaymentMethodModal({ onClose, onAdded }: AddPaymentMethodModalProps) {
+  const toast = useToast();
+  const [method,         setMethod]         = useState<'gcash' | 'paypal'>('gcash');
+  const [accountName,    setAccountName]    = useState('');
+  const [accountNumber,  setAccountNumber]  = useState('');
+  const [makeDefault,    setMakeDefault]    = useState(true);
+  const [submitting,     setSubmitting]     = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+
+  function validate(): string | null {
+    if (!accountName.trim())                                       return 'Account name is required.';
+    if (accountName.trim().length < 2)                             return 'Account name is too short.';
+    if (method === 'gcash'  && !GCASH_RE.test(accountNumber))      return 'GCash number must be 09XXXXXXXXX.';
+    if (method === 'paypal' && !PAYPAL_EMAIL.test(accountNumber))  return 'Enter a valid PayPal email.';
+    return null;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const err = validate();
+    if (err) { setError(err); return; }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { data } = await api.post<{ data: PaymentMethod }>('/payment-methods', {
+        method,
+        account_name:   accountName.trim(),
+        account_number: accountNumber.trim(),
+        is_default:     makeDefault,
+      });
+      toast.success('Payment method saved.');
+      onAdded(data.data);
+    } catch (err: unknown) {
+      const errData = (err as { response?: { data?: { error?: string } }; response_status?: number })
+        .response?.data;
+      setError(errData?.error ?? 'Failed to save payment method.');
+    } finally { setSubmitting(false); }
+  }
+
+  return (
+    <div className="modal-overlay modal-overlay--center" onClick={onClose}>
+      <div className="modal wd-confirm" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+        <div className="wd-confirm-hero" style={{ background: 'var(--bg-card)' }}>
+          <CreditCard size={28} style={{ color: 'var(--accent)', marginBottom: 8 }} />
+          <span className="wd-confirm-hero-label">Add Payment Method</span>
+          <span className="wd-confirm-hero-amount" style={{ fontSize: 14, marginTop: 4, color: 'var(--text-muted)', fontWeight: 500 }}>
+            Save an account once — pick it on every withdrawal.
+          </span>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ padding: '0 20px 4px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <span className="wd-input-label" style={{ display: 'block', marginBottom: 6 }}>Payment method</span>
+            <div className="wd-method-row">
+              {(['gcash', 'paypal'] as const).map((m) => (
+                <label
+                  key={m}
+                  className={`wd-method-chip${method === m ? ' wd-method-chip--active' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="add-pm-method"
+                    value={m}
+                    checked={method === m}
+                    onChange={() => { setMethod(m); setAccountNumber(''); }}
+                    className="sr-only"
+                  />
+                  {m === 'gcash' ? <Smartphone size={18} /> : <CreditCard size={18} />}
+                  <span>{m === 'gcash' ? 'GCash' : 'PayPal'}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="wd-input-group">
+            <label className="wd-input-label" htmlFor="add-pm-name">Full name on account</label>
+            <input
+              id="add-pm-name"
+              type="text"
+              className="wd-input"
+              placeholder="Juan Dela Cruz"
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              maxLength={100}
+              autoComplete="name"
+            />
+          </div>
+
+          <div className="wd-input-group">
+            <label className="wd-input-label" htmlFor="add-pm-acct">
+              {method === 'gcash' ? 'GCash number' : 'PayPal email'}
+            </label>
+            <input
+              id="add-pm-acct"
+              type={method === 'paypal' ? 'email' : 'tel'}
+              inputMode={method === 'gcash' ? 'numeric' : 'email'}
+              className="wd-input"
+              placeholder={method === 'gcash' ? '09XXXXXXXXX' : 'email@example.com'}
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value.trim())}
+              maxLength={method === 'gcash' ? 11 : 254}
+              autoComplete={method === 'gcash' ? 'tel' : 'email'}
+            />
+            {method === 'gcash' && (
+              <span className="wd-input-hint">11 digits starting with 09</span>
+            )}
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+            <input
+              type="checkbox"
+              checked={makeDefault}
+              onChange={(e) => setMakeDefault(e.target.checked)}
+            />
+            Set as my default payment method
+          </label>
+
+          {error && (
+            <div style={{
+              display: 'flex', gap: 8, alignItems: 'flex-start',
+              padding: '8px 12px', borderRadius: 8,
+              background: 'var(--error-light, rgba(239,68,68,0.1))',
+              color: 'var(--error)', fontSize: 13,
+            }}>
+              <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="wd-confirm-actions" style={{ marginTop: 4 }}>
+            <button
+              type="button"
+              className="btn btn-ghost wd-confirm-back"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary wd-confirm-submit"
+              disabled={submitting}
+            >
+              {submitting ? 'Saving…' : 'Save payment method'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
 export default function Withdraw() {
   const { user, fetchMe } = useAuth();
   const toast = useToast();
 
-  const [form, setForm] = useState<WithdrawForm>({
-    amount: '', method: 'gcash', account_name: '', account_number: '',
-  });
+  const [amount,           setAmount]          = useState('');
+  const [selectedPmId,     setSelectedPmId]    = useState<string>('');
+  const [paymentMethods,   setPaymentMethods]  = useState<PaymentMethod[]>([]);
+  const [showAddPm,        setShowAddPm]       = useState(false);
+  const [deletingPmId,     setDeletingPmId]    = useState<string | null>(null);
+
   const [history,           setHistory]           = useState<Withdrawal[]>([]);
   const [loading,           setLoading]           = useState(true);
   const [showConfirm,       setShowConfirm]       = useState(false);
@@ -208,7 +367,17 @@ export default function Withdraw() {
     } catch { /* silent */ }
   }
 
-  useEffect(() => { void loadHistory(); void loadCooldown(); }, []);
+  async function loadPaymentMethods() {
+    try {
+      const { data } = await api.get<{ data: PaymentMethod[] }>('/payment-methods');
+      setPaymentMethods(data.data);
+      // Auto-select the default, or the first available method.
+      const defaultPm = data.data.find((pm) => pm.is_default) ?? data.data[0];
+      setSelectedPmId((current) => current || (defaultPm ? defaultPm.id : ''));
+    } catch { /* silent */ }
+  }
+
+  useEffect(() => { void loadHistory(); void loadCooldown(); void loadPaymentMethods(); }, []);
 
   // Countdown timer for cooldown
   useEffect(() => {
@@ -236,7 +405,7 @@ export default function Withdraw() {
   }, [cooldownEnd]);
 
   // ── Live fee preview ──────────────────────────────────────────────────────
-  const liveAmount = Number(form.amount) || 0;
+  const liveAmount = Number(amount) || 0;
   const liveFee    = Math.round(liveAmount * TOTAL_FEE_RATE * 100) / 100;
   const liveNet    = Math.round((liveAmount - liveFee) * 100) / 100;
 
@@ -251,19 +420,16 @@ export default function Withdraw() {
     [balance, effectiveMax],
   );
 
+  const selectedPm = paymentMethods.find((pm) => pm.id === selectedPmId) ?? null;
+
   // ── Validation ────────────────────────────────────────────────────────────
   function validate(): string | null {
-    if (!form.amount || isNaN(liveAmount))                    return 'Enter a valid amount.';
+    if (!amount || isNaN(liveAmount))                         return 'Enter a valid amount.';
     if (liveAmount < MIN_AMOUNT)                              return `Minimum withdrawal is ₱${MIN_AMOUNT}.`;
     if (liveAmount > MAX_AMOUNT)                              return `Maximum withdrawal is ₱${MAX_AMOUNT.toLocaleString()}.`;
     if (isFreePlan && liveAmount > FREE_PLAN_MAX_AMOUNT)      return `Free plan withdrawals are limited to ₱${FREE_PLAN_MAX_AMOUNT}. Upgrade to withdraw more.`;
     if (liveAmount > balance)                                 return 'Insufficient balance.';
-    if (!form.account_name.trim())                            return 'Account name is required.';
-    if (form.account_name.trim().length < 2)                  return 'Account name is too short.';
-    if (form.method === 'gcash'  && !GCASH_RE.test(form.account_number))
-      return 'GCash number must be 09XXXXXXXXX.';
-    if (form.method === 'paypal' && !PAYPAL_EMAIL.test(form.account_number))
-      return 'Enter a valid PayPal email.';
+    if (!selectedPm)                                          return 'Please add and select a payment method before withdrawing.';
     return null;
   }
 
@@ -285,16 +451,15 @@ export default function Withdraw() {
   }
 
   async function handleSubmit() {
+    if (!selectedPm) return;
     setSubmitting(true);
     try {
       await api.post('/withdrawals', {
-        amount:         liveAmount,
-        method:         form.method,
-        account_name:   form.account_name.trim(),
-        account_number: form.account_number.trim(),
+        amount:            liveAmount,
+        payment_method_id: selectedPm.id,
       });
       setShowConfirm(false);
-      setForm({ amount: '', method: 'gcash', account_name: '', account_number: '' });
+      setAmount('');
       toast.success('Withdrawal submitted — we\'ll process it within 24 hours.');
       await Promise.all([loadHistory(), fetchMe(), loadCooldown()]);
     } catch (err: unknown) {
@@ -325,6 +490,36 @@ export default function Withdraw() {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       toast.error(msg ?? 'Failed to cancel.');
     } finally { setCancelling(null); }
+  }
+
+  async function handleDeletePm(id: string) {
+    if (!confirm('Remove this saved payment method?')) return;
+    setDeletingPmId(id);
+    try {
+      await api.delete(`/payment-methods/${id}`);
+      if (selectedPmId === id) setSelectedPmId('');
+      toast.success('Payment method removed.');
+      await loadPaymentMethods();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      toast.error(msg ?? 'Failed to remove payment method.');
+    } finally { setDeletingPmId(null); }
+  }
+
+  async function handleSetDefaultPm(id: string) {
+    try {
+      await api.put(`/payment-methods/${id}`, { is_default: true });
+      await loadPaymentMethods();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      toast.error(msg ?? 'Failed to update default.');
+    }
+  }
+
+  function handlePmAdded(pm: PaymentMethod) {
+    setShowAddPm(false);
+    setSelectedPmId(pm.id);
+    void loadPaymentMethods();
   }
 
   const kycStatus  = user?.kyc_status ?? 'none';
@@ -358,9 +553,10 @@ export default function Withdraw() {
 
   return (
     <div className="page">
-      {showConfirm && (
+      {showConfirm && selectedPm && (
         <ConfirmModal
-          form={form}
+          amount={liveAmount}
+          pm={selectedPm}
           onConfirm={() => { void handleSubmit(); }}
           onCancel={() => setShowConfirm(false)}
           loading={submitting}
@@ -371,6 +567,12 @@ export default function Withdraw() {
       )}
       {validationError && (
         <ValidationModal message={validationError} onClose={() => setValidationError(null)} />
+      )}
+      {showAddPm && (
+        <AddPaymentMethodModal
+          onClose={() => setShowAddPm(false)}
+          onAdded={handlePmAdded}
+        />
       )}
 
       <header className="page-header">
@@ -428,66 +630,134 @@ export default function Withdraw() {
       {/* ── Withdrawal form ───────────────────────────────────────────────── */}
       <form onSubmit={handleReview} noValidate className="wd-form">
 
-        {/* 1 — Payment method */}
+        {/* 1 — Payment method picker (saved methods) */}
         <fieldset className="wd-fieldset">
-          <legend className="wd-fieldset-legend">Payment method</legend>
-          <div className="wd-method-row">
-            {(['gcash', 'paypal'] as const).map((m) => (
-              <label
-                key={m}
-                className={`wd-method-chip${form.method === m ? ' wd-method-chip--active' : ''}`}
+          <legend className="wd-fieldset-legend" style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
+          }}>
+            <span>Payment method</span>
+            <button
+              type="button"
+              onClick={() => setShowAddPm(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--accent)', fontWeight: 600, fontSize: 12,
+                padding: 0, fontFamily: 'inherit',
+              }}
+            >
+              <Plus size={13} />
+              Add payment method
+            </button>
+          </legend>
+
+          {paymentMethods.length === 0 ? (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+              padding: '18px 12px',
+              border: '1px dashed var(--border)', borderRadius: 10,
+              background: 'var(--bg-elevated)',
+              textAlign: 'center',
+            }}>
+              <CreditCard size={22} style={{ color: 'var(--text-muted)' }} />
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, maxWidth: 320 }}>
+                Save a GCash or PayPal account once so you don't have to re-enter the details on every withdrawal.
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setShowAddPm(true)}
+                style={{ height: 40, padding: '0 18px', fontSize: 13 }}
               >
-                <input
-                  type="radio" name="method" value={m}
-                  checked={form.method === m}
-                  onChange={() => setForm((f) => ({ ...f, method: m, account_number: '' }))}
-                  className="sr-only"
-                />
-                {m === 'gcash' ? <Smartphone size={18} /> : <CreditCard size={18} />}
-                <span>{m === 'gcash' ? 'GCash' : 'PayPal'}</span>
-              </label>
-            ))}
-          </div>
+                <Plus size={14} style={{ marginRight: 6 }} />
+                Add your first payment method
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {paymentMethods.map((pm) => {
+                const active = pm.id === selectedPmId;
+                return (
+                  <label
+                    key={pm.id}
+                    className={`wd-method-chip${active ? ' wd-method-chip--active' : ''}`}
+                    style={{
+                      flex: 'initial', justifyContent: 'flex-start', gap: 12,
+                      padding: '12px 14px', cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="saved-pm"
+                      value={pm.id}
+                      checked={active}
+                      onChange={() => setSelectedPmId(pm.id)}
+                      className="sr-only"
+                    />
+                    {pm.method === 'gcash'
+                      ? <Smartphone size={20} />
+                      : <CreditCard  size={20} />}
+                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        fontSize: 13, fontWeight: 700, color: 'var(--text-heading)',
+                      }}>
+                        <span>{pm.method === 'gcash' ? 'GCash' : 'PayPal'}</span>
+                        {pm.is_default && (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+                            color: 'var(--accent)',
+                            background: 'var(--accent-light)',
+                            padding: '2px 6px', borderRadius: 10,
+                          }}>
+                            <Star size={9} />
+                            DEFAULT
+                          </span>
+                        )}
+                      </div>
+                      <div style={{
+                        fontSize: 12, color: 'var(--text-muted)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {pm.account_name} · {pm.account_number}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {!pm.is_default && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); void handleSetDefaultPm(pm.id); }}
+                          title="Set as default"
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: 'var(--text-muted)', padding: 6, borderRadius: 6,
+                          }}
+                        >
+                          <Star size={14} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); void handleDeletePm(pm.id); }}
+                        disabled={deletingPmId === pm.id}
+                        title="Remove payment method"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--text-muted)', padding: 6, borderRadius: 6,
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </fieldset>
 
-        {/* 2 — Account details */}
-        <fieldset className="wd-fieldset">
-          <legend className="wd-fieldset-legend">Account details</legend>
-
-          <div className="wd-input-group">
-            <label className="wd-input-label" htmlFor="wd-name">Full name on account</label>
-            <input
-              id="wd-name" type="text" className="wd-input"
-              placeholder="Juan Dela Cruz"
-              value={form.account_name}
-              onChange={(e) => setForm((f) => ({ ...f, account_name: e.target.value }))}
-              maxLength={100}
-              autoComplete="name"
-            />
-          </div>
-
-          <div className="wd-input-group">
-            <label className="wd-input-label" htmlFor="wd-acct">
-              {form.method === 'gcash' ? 'GCash number' : 'PayPal email'}
-            </label>
-            <input
-              id="wd-acct"
-              type={form.method === 'paypal' ? 'email' : 'tel'}
-              inputMode={form.method === 'gcash' ? 'numeric' : 'email'}
-              className="wd-input"
-              placeholder={form.method === 'gcash' ? '09XXXXXXXXX' : 'email@example.com'}
-              value={form.account_number}
-              onChange={(e) => setForm((f) => ({ ...f, account_number: e.target.value.trim() }))}
-              maxLength={form.method === 'gcash' ? 11 : 254}
-              autoComplete={form.method === 'gcash' ? 'tel' : 'email'}
-            />
-            {form.method === 'gcash' && (
-              <span className="wd-input-hint">11 digits starting with 09</span>
-            )}
-          </div>
-        </fieldset>
-
-        {/* 3 — Amount */}
+        {/* 2 — Amount */}
         <fieldset className="wd-fieldset">
           <legend className="wd-fieldset-legend">Amount</legend>
 
@@ -497,8 +767,8 @@ export default function Withdraw() {
               {quickAmounts.map((a) => (
                 <button
                   key={a} type="button"
-                  className={`wd-quick-chip${form.amount === String(a) ? ' wd-quick-chip--active' : ''}`}
-                  onClick={() => setForm((f) => ({ ...f, amount: String(a) }))}
+                  className={`wd-quick-chip${amount === String(a) ? ' wd-quick-chip--active' : ''}`}
+                  onClick={() => setAmount(String(a))}
                 >
                   ₱{a.toLocaleString()}
                 </button>
@@ -511,8 +781,8 @@ export default function Withdraw() {
             <input
               id="wd-amount" type="number"
               className="wd-amount-input"
-              value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
               min={MIN_AMOUNT} max={MAX_AMOUNT} step={1}
               placeholder="0"
             />
@@ -536,7 +806,7 @@ export default function Withdraw() {
         <button
           type="submit"
           className="btn btn-primary wd-submit"
-          disabled={kycBlocked}
+          disabled={kycBlocked || paymentMethods.length === 0}
         >
           Review Withdrawal
           <ArrowRight size={16} />

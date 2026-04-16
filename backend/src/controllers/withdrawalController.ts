@@ -28,10 +28,14 @@ export async function requestWithdrawal(
     const userId = req.user!.id;
     const body   = req.body as Record<string, unknown>;
 
-    const amount         = Number(body.amount);
-    const method         = String(body.method ?? '').toLowerCase();
-    const accountName    = String(body.account_name   ?? '').trim();
-    const accountNumber  = String(body.account_number ?? '').trim();
+    const amount            = Number(body.amount);
+    const paymentMethodId   = typeof body.payment_method_id === 'string'
+      ? body.payment_method_id.trim()
+      : '';
+
+    let method        = String(body.method ?? '').toLowerCase();
+    let accountName   = String(body.account_name   ?? '').trim();
+    let accountNumber = String(body.account_number ?? '').trim();
 
     // ── Amount validation ───────────────────────────────────────────────────
     if (amount < MIN_WITHDRAWAL) {
@@ -39,6 +43,31 @@ export async function requestWithdrawal(
     }
     if (amount > MAX_WITHDRAWAL) {
       throw new ValidationError(`Maximum withdrawal per request is ₱${MAX_WITHDRAWAL}`);
+    }
+
+    // ── Resolve payment details from saved method if provided ──────────────
+    // Users who have saved a payment method can send just `payment_method_id`.
+    // We look up the stored (method, account_name, account_number) tuple and
+    // use that as the source of truth, so the account the user saved and
+    // verified is exactly what ends up on the withdrawal record.
+    if (paymentMethodId) {
+      const { rows: pmRows } = await pool.query(
+        `SELECT method, account_name, account_number
+         FROM payment_methods
+         WHERE id = $1 AND user_id = $2`,
+        [paymentMethodId, userId],
+      );
+      if (!pmRows.length) {
+        throw new ValidationError('Selected payment method not found. Please pick another.');
+      }
+      const pm = pmRows[0] as {
+        method: string;
+        account_name: string;
+        account_number: string;
+      };
+      method        = pm.method;
+      accountName   = pm.account_name;
+      accountNumber = pm.account_number;
     }
 
     // ── Method-specific account validation ──────────────────────────────────
