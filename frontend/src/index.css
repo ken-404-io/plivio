@@ -5677,15 +5677,27 @@ a, button, [role="button"], [tabindex] {
 }
 
 /* ─── Withdrawal release schedule full-screen banner ─────────────────────────── */
-.wd-release-overlay {
+.wd-release-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+}
+.wd-release-overlay {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  background: linear-gradient(160deg, #1e1b4b 0%, #312e81 40%, #1e3a5f 100%);
+  background: linear-gradient(160deg, #0a2764 0%, #1250b8 45%, #1877f2 100%);
+  border-radius: 24px;
   overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
 }
 .wd-release-overlay-bg {
   position: absolute;
@@ -5695,30 +5707,30 @@ a, button, [role="button"], [tabindex] {
 }
 .wd-release-overlay-circle1 {
   position: absolute;
-  top: -120px;
+  top: -100px;
   right: -80px;
-  width: 320px;
-  height: 320px;
+  width: 280px;
+  height: 280px;
   border-radius: 50%;
-  background: rgba(129,140,248,0.12);
+  background: rgba(255, 255, 255, 0.06);
 }
 .wd-release-overlay-circle2 {
   position: absolute;
-  bottom: 80px;
-  left: -100px;
-  width: 260px;
-  height: 260px;
+  bottom: 60px;
+  left: -80px;
+  width: 220px;
+  height: 220px;
   border-radius: 50%;
-  background: rgba(59,130,246,0.10);
+  background: rgba(255, 255, 255, 0.05);
 }
 .wd-release-overlay-circle3 {
   position: absolute;
-  top: 40%;
-  right: -60px;
-  width: 180px;
-  height: 180px;
+  top: 38%;
+  right: -50px;
+  width: 160px;
+  height: 160px;
   border-radius: 50%;
-  background: rgba(99,102,241,0.08);
+  background: rgba(255, 255, 255, 0.04);
 }
 .wd-release-content {
   position: relative;
@@ -5727,21 +5739,21 @@ a, button, [role="button"], [tabindex] {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 32px 20px;
+  padding: 36px 28px 16px;
   gap: 0;
   text-align: center;
 }
 .wd-release-icon-ring {
-  width: 88px;
-  height: 88px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
-  background: rgba(129,140,248,0.18);
-  border: 2px solid rgba(129,140,248,0.35);
+  background: rgba(255, 255, 255, 0.12);
+  border: 2px solid rgba(255, 255, 255, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #a5b4fc;
-  margin-bottom: 28px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 24px;
   flex-shrink: 0;
 }
 .wd-release-eyebrow {
@@ -5749,37 +5761,37 @@ a, button, [role="button"], [tabindex] {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #a5b4fc;
-  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 10px;
 }
 .wd-release-headline {
-  font-size: clamp(26px, 7vw, 36px);
+  font-size: clamp(24px, 6.5vw, 32px);
   font-weight: 800;
   color: #fff;
-  line-height: 1.15;
-  letter-spacing: -0.5px;
-  margin-bottom: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.4px;
+  margin-bottom: 24px;
 }
 .wd-release-dates-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 14px;
+  margin-bottom: 24px;
 }
 .wd-release-date-chip {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 80px;
-  height: 80px;
-  border-radius: 20px;
-  background: rgba(129,140,248,0.15);
-  border: 1px solid rgba(129,140,248,0.35);
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   gap: 0;
 }
 .wd-release-date-num {
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 900;
   color: #fff;
   line-height: 1;
@@ -5787,20 +5799,20 @@ a, button, [role="button"], [tabindex] {
 .wd-release-date-suffix {
   font-size: 11px;
   font-weight: 600;
-  color: #a5b4fc;
+  color: rgba(255, 255, 255, 0.6);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 .wd-release-date-sep {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255, 255, 255, 0.4);
 }
 .wd-release-sub {
   font-size: 14px;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255, 255, 255, 0.6);
   line-height: 1.6;
-  max-width: 300px;
+  max-width: 280px;
   margin: 0 auto;
 }
 .wd-release-footer {
@@ -5808,12 +5820,11 @@ a, button, [role="button"], [tabindex] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 20px 32px 36px;
+  gap: 10px;
+  padding: 20px 28px 28px;
 }
 .wd-release-cta {
   width: 100%;
-  max-width: 340px;
   height: 52px;
   border-radius: 14px;
   border: none;
@@ -5821,23 +5832,23 @@ a, button, [role="button"], [tabindex] {
   font-size: 16px;
   font-weight: 700;
   font-family: inherit;
-  background: linear-gradient(135deg, #6366f1, #818cf8);
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   color: #fff;
   letter-spacing: 0.01em;
-  box-shadow: 0 4px 20px rgba(99,102,241,0.4);
-  transition: opacity 0.15s, transform 0.1s;
+  transition: background 0.15s, transform 0.1s;
 }
-.wd-release-cta:active { opacity: 0.88; transform: scale(0.98); }
+.wd-release-cta:active { background: rgba(255, 255, 255, 0.3); transform: scale(0.98); }
 .wd-release-later {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 14px;
-  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
   font-family: inherit;
-  padding: 6px 12px;
+  padding: 4px 12px;
 }
-.wd-release-later:hover { color: rgba(255,255,255,0.75); }
+.wd-release-later:hover { color: rgba(255, 255, 255, 0.7); }
 
 /* ─── Admin withdrawal history filters ──────────────────────────────────────── */
 .adm-wd-filters {

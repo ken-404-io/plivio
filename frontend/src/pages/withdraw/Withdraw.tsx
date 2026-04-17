@@ -580,6 +580,7 @@ export default function Withdraw() {
   return (
     <div className="page">
       {showReleaseBanner && (
+        <div className="wd-release-backdrop">
         <div className="wd-release-overlay">
           <div className="wd-release-overlay-bg">
             <div className="wd-release-overlay-circle1" />
@@ -617,6 +618,7 @@ export default function Withdraw() {
               Remind me later
             </button>
           </div>
+        </div>
         </div>
       )}
 
