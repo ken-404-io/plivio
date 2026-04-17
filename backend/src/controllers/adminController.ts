@@ -658,6 +658,55 @@ export async function resetUserDevice(req: Request, res: Response, next: NextFun
 
 // ─── GET /admin/referrals — list all referrals across users ─────────────────
 
+export async function listReferralLeaderboard(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const page   = Math.max(1, Number(req.query.page)  || 1);
+    const limit  = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const offset = (page - 1) * limit;
+    const search   = req.query.search ? `%${req.query.search as string}%` : null;
+    const dateFrom = req.query.date_from ? (req.query.date_from as string) : null;
+    const dateTo   = req.query.date_to   ? (req.query.date_to as string)   : null;
+
+    const { rows } = await pool.query(
+      `SELECT
+         u.id            AS referrer_id,
+         u.username      AS referrer_username,
+         u.email         AS referrer_email,
+         u.plan::text    AS referrer_plan,
+         u.is_banned,
+         u.is_suspended,
+         u.suspended_until,
+         COUNT(invited.id)::int    AS referral_count,
+         MAX(invited.created_at)   AS last_referred_at
+       FROM users u
+       INNER JOIN users invited
+         ON invited.referred_by = u.id AND invited.is_email_verified = TRUE
+       WHERE ($1::text IS NULL OR u.username ILIKE $1 OR u.email ILIKE $1)
+         AND ($2::timestamptz IS NULL OR invited.created_at >= $2::timestamptz)
+         AND ($3::timestamptz IS NULL OR invited.created_at <= ($3::timestamptz + INTERVAL '1 day'))
+       GROUP BY u.id, u.username, u.email, u.plan, u.is_banned, u.is_suspended, u.suspended_until
+       ORDER BY referral_count DESC, last_referred_at DESC
+       LIMIT $4 OFFSET $5`,
+      [search, dateFrom, dateTo, limit, offset],
+    );
+
+    const countResult = await pool.query(
+      `SELECT COUNT(DISTINCT u.id) FROM users u
+       INNER JOIN users invited ON invited.referred_by = u.id AND invited.is_email_verified = TRUE
+       WHERE ($1::text IS NULL OR u.username ILIKE $1 OR u.email ILIKE $1)
+         AND ($2::timestamptz IS NULL OR invited.created_at >= $2::timestamptz)
+         AND ($3::timestamptz IS NULL OR invited.created_at <= ($3::timestamptz + INTERVAL '1 day'))`,
+      [search, dateFrom, dateTo],
+    );
+
+    res.json({
+      success: true,
+      data: rows,
+      meta: { page, limit, total: Number((countResult.rows[0] as { count: string }).count) },
+    });
+  } catch (err) { next(err); }
+}
+
 export async function listReferrals(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const page   = Math.max(1, Number(req.query.page)  || 1);

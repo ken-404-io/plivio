@@ -22,6 +22,7 @@ import {
   processWithdrawal,
   resetUserDevice,
   listReferrals,
+  listReferralLeaderboard,
   listNotificationLogs,
   exportCsv,
   changePlan,
@@ -138,6 +139,7 @@ router.put('/withdrawals/:id',
   processWithdrawal,
 );
 
+router.get('/referrals/leaderboard', listReferralLeaderboard);
 router.get('/referrals', listReferrals);
 router.get('/notifications', listNotificationLogs);
 router.get('/export/:section', exportCsv);

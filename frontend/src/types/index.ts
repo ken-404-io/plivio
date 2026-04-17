@@ -385,6 +385,18 @@ export interface AdminReferral {
   invited_at: string;
 }
 
+export interface AdminReferralLeaderboard {
+  referrer_id: string;
+  referrer_username: string;
+  referrer_email: string;
+  referrer_plan: PlanType;
+  is_banned: boolean;
+  is_suspended: boolean;
+  suspended_until: string | null;
+  referral_count: number;
+  last_referred_at: string;
+}
+
 export interface AdminNotificationLog {
   id: string;
   type: string;

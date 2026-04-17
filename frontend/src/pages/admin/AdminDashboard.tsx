@@ -12,7 +12,8 @@ import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type {
   AdminUser, AdminWithdrawal, AdminWithdrawalHistory, AdminStats,
-  AdminKycSubmission, AdminUserDetails, AdminReferral, AdminNotificationLog,
+  AdminKycSubmission, AdminUserDetails, AdminReferral, AdminReferralLeaderboard,
+  AdminNotificationLog,
 } from '../../types/index.ts';
 
 const TABS = ['overview', 'users', 'withdrawals', 'referrals', 'notifications', 'kyc'] as const;
@@ -970,11 +971,20 @@ export default function AdminDashboard() {
   const [userDateTo,       setUserDateTo]       = useState('');
 
   // Referrals state
+  const [refSubTab,  setRefSubTab]  = useState<'leaderboard' | 'records'>('leaderboard');
   const [refData,    setRefData]    = useState<AdminReferral[]>([]);
   const [refMeta,    setRefMeta]    = useState({ page: 1, total: 0, limit: 25 });
   const [refLoading, setRefLoading] = useState(false);
   const [refPage,    setRefPage]    = useState(1);
   const [refFilters, setRefFilters] = useState({ search: '', date_from: '', date_to: '' });
+
+  // Referral leaderboard state
+  const [refLbData,     setRefLbData]     = useState<AdminReferralLeaderboard[]>([]);
+  const [refLbMeta,     setRefLbMeta]     = useState({ page: 1, total: 0, limit: 25 });
+  const [refLbLoading,  setRefLbLoading]  = useState(false);
+  const [refLbPage,     setRefLbPage]     = useState(1);
+  const [refLbFilters,  setRefLbFilters]  = useState({ search: '', date_from: '', date_to: '' });
+  const [refLbSelected, setRefLbSelected] = useState<Set<string>>(new Set());
 
   // Notifications state
   const [notifData,    setNotifData]    = useState<AdminNotificationLog[]>([]);
@@ -1177,7 +1187,29 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { if (tab === 'referrals') void loadReferrals(refPage, refFilters); }, [tab, refPage, loadReferrals]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadRefLeaderboard = useCallback(async (page: number, filters: typeof refLbFilters) => {
+    setRefLbLoading(true);
+    try {
+      const params: Record<string, string | number> = { page, limit: 25 };
+      if (filters.search)    params.search    = filters.search;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to)   params.date_to   = filters.date_to;
+      const { data } = await api.get<{ data: AdminReferralLeaderboard[]; meta: { page: number; total: number; limit: number } }>('/admin/referrals/leaderboard', { params });
+      setRefLbData(data.data);
+      setRefLbMeta(data.meta);
+    } catch { toast.error('Failed to load leaderboard.'); }
+    finally { setRefLbLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (tab !== 'referrals') return;
+    if (refSubTab === 'leaderboard') void loadRefLeaderboard(refLbPage, refLbFilters);
+    else void loadReferrals(refPage, refFilters);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, refSubTab, refPage, refLbPage]);
+
+  const refLbSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleRefFilterChange(key: string, value: string) {
     const updated = { ...refFilters, [key]: value };
@@ -1186,6 +1218,47 @@ export default function AdminDashboard() {
       if (refSearchDebounceRef.current) clearTimeout(refSearchDebounceRef.current);
       refSearchDebounceRef.current = setTimeout(() => { setRefPage(1); void loadReferrals(1, updated); }, 400);
     } else { setRefPage(1); void loadReferrals(1, updated); }
+  }
+
+  function handleRefLbFilterChange(key: string, value: string) {
+    const updated = { ...refLbFilters, [key]: value };
+    setRefLbFilters(updated);
+    if (key === 'search') {
+      if (refLbSearchDebounceRef.current) clearTimeout(refLbSearchDebounceRef.current);
+      refLbSearchDebounceRef.current = setTimeout(() => { setRefLbPage(1); void loadRefLeaderboard(1, updated); }, 400);
+    } else { setRefLbPage(1); void loadRefLeaderboard(1, updated); }
+  }
+
+  function handleRefLbSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      if (refLbSearchDebounceRef.current) clearTimeout(refLbSearchDebounceRef.current);
+      setRefLbPage(1);
+      void loadRefLeaderboard(1, refLbFilters);
+    }
+  }
+
+  function handleRefSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      if (refSearchDebounceRef.current) clearTimeout(refSearchDebounceRef.current);
+      setRefPage(1);
+      void loadReferrals(1, refFilters);
+    }
+  }
+
+  function toggleRefLbSelect(id: string) {
+    setRefLbSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleRefLbSelectAll() {
+    if (refLbSelected.size === refLbData.length) {
+      setRefLbSelected(new Set());
+    } else {
+      setRefLbSelected(new Set(refLbData.map((r) => r.referrer_id)));
+    }
   }
 
   // ── Notifications loader ──────────────────────────────────────────────────
@@ -2536,57 +2609,254 @@ export default function AdminDashboard() {
       {/* ── Referrals ── */}
       {tab === 'referrals' && (
         <>
-          <div className="adm-wd-filters">
-            <div className="adm-filter-toolbar">
-              <span style={{ fontSize: 13, fontWeight: 600 }}>Referral Records</span>
-              <ExportButton section="referrals" />
-            </div>
-            <div className="adm-wd-filter-row">
-              <div className="adm-search-wrap" style={{ flex: 1 }}>
-                <Search size={15} className="adm-search-icon" />
-                <input className="form-input adm-search-input" placeholder="Search referrer or invited user…" value={refFilters.search} onChange={(e) => handleRefFilterChange('search', e.target.value)} />
-              </div>
-              <label className="adm-wd-filter-label">From</label>
-              <input type="date" className="form-input adm-wd-filter-date" value={refFilters.date_from} onChange={(e) => handleRefFilterChange('date_from', e.target.value)} />
-              <label className="adm-wd-filter-label">To</label>
-              <input type="date" className="form-input adm-wd-filter-date" value={refFilters.date_to} onChange={(e) => handleRefFilterChange('date_to', e.target.value)} />
-              <button className="btn btn-ghost btn-sm" onClick={() => { setRefFilters({ search: '', date_from: '', date_to: '' }); setRefPage(1); void loadReferrals(1, { search: '', date_from: '', date_to: '' }); }}>Reset</button>
-            </div>
+          {/* Sub-tabs */}
+          <div className="adm-details-tabs" style={{ marginBottom: 12 }}>
+            <button
+              className={`adm-details-tab${refSubTab === 'leaderboard' ? ' adm-details-tab--active' : ''}`}
+              onClick={() => setRefSubTab('leaderboard')}
+            >
+              <TrendingUp size={13} /> Leaderboard
+            </button>
+            <button
+              className={`adm-details-tab${refSubTab === 'records' ? ' adm-details-tab--active' : ''}`}
+              onClick={() => setRefSubTab('records')}
+            >
+              <History size={13} /> Records
+            </button>
           </div>
-          <FilterChips
-            filters={{ from: refFilters.date_from, to: refFilters.date_to }}
-            onRemove={(k) => handleRefFilterChange(k === 'from' ? 'date_from' : 'date_to', '')}
-            onClear={() => { setRefFilters({ search: '', date_from: '', date_to: '' }); setRefPage(1); void loadReferrals(1, { search: '', date_from: '', date_to: '' }); }}
-          />
-          <div className="adm-list" style={{ opacity: refLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
-            {refData.length === 0 && !refLoading ? (
-              <div className="empty-state"><p>No referral records found.</p></div>
-            ) : refData.map((r, i) => (
-              <div key={`${r.referrer_id}-${r.invited_username}-${i}`} className="adm-ref-card">
-                <div className="adm-ref-user">
-                  <span className="adm-ref-username">{r.referrer_username}</span>
-                  <span className="adm-ref-email">Referrer</span>
+
+          {/* ── Leaderboard sub-tab ── */}
+          {refSubTab === 'leaderboard' && (
+            <>
+              <div className="adm-wd-filters">
+                <div className="adm-filter-toolbar">
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>
+                    Referral Leaderboard
+                    {refLbMeta.total > 0 && <span className="adm-tab-badge" style={{ marginLeft: 8 }}>{refLbMeta.total}</span>}
+                  </span>
+                  {refLbSelected.size > 0 && (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{refLbSelected.size} selected</span>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => {
+                          const first = refLbData.find((r) => refLbSelected.has(r.referrer_id));
+                          if (first) setBanTarget({ id: first.referrer_id, username: first.referrer_username });
+                        }}
+                      >
+                        <Ban size={13} /> Ban
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => {
+                          const first = refLbData.find((r) => refLbSelected.has(r.referrer_id));
+                          if (first) setSuspendTarget({ id: first.referrer_id, username: first.referrer_username });
+                        }}
+                      >
+                        <Clock size={13} /> Suspend
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => {
+                          const first = refLbData.find((r) => refLbSelected.has(r.referrer_id));
+                          if (first) setNotifyTarget({ id: first.referrer_id, username: first.referrer_username });
+                        }}
+                      >
+                        <Bell size={13} /> Message
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <span className="adm-ref-arrow">→</span>
-                <div className="adm-ref-user" style={{ flex: 1 }}>
-                  <span className="adm-ref-username">{r.invited_username}</span>
-                  <span className="adm-ref-email">{r.invited_email}</span>
+                <div className="adm-wd-filter-row">
+                  <div className="adm-search-wrap" style={{ flex: 1 }}>
+                    <Search size={15} className="adm-search-icon" />
+                    <input
+                      className="form-input adm-search-input"
+                      placeholder="Search referrer… (Enter or auto)"
+                      value={refLbFilters.search}
+                      onChange={(e) => handleRefLbFilterChange('search', e.target.value)}
+                      onKeyDown={handleRefLbSearchKey}
+                    />
+                  </div>
+                  <label className="adm-wd-filter-label">From</label>
+                  <input type="date" className="form-input adm-wd-filter-date" value={refLbFilters.date_from} onChange={(e) => handleRefLbFilterChange('date_from', e.target.value)} />
+                  <label className="adm-wd-filter-label">To</label>
+                  <input type="date" className="form-input adm-wd-filter-date" value={refLbFilters.date_to} onChange={(e) => handleRefLbFilterChange('date_to', e.target.value)} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => { const e = { search: '', date_from: '', date_to: '' }; setRefLbFilters(e); setRefLbPage(1); void loadRefLeaderboard(1, e); }}>Reset</button>
                 </div>
-                <div className="adm-ref-meta">
-                  <span className={`plan-badge plan-badge--${r.invited_plan}`}>{r.invited_plan}</span>
-                  <span className="adm-ref-date">
-                    {new Date(r.invited_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+              <FilterChips
+                filters={{ from: refLbFilters.date_from, to: refLbFilters.date_to }}
+                onRemove={(k) => handleRefLbFilterChange(k === 'from' ? 'date_from' : 'date_to', '')}
+                onClear={() => { const e = { search: '', date_from: '', date_to: '' }; setRefLbFilters(e); setRefLbPage(1); void loadRefLeaderboard(1, e); }}
+              />
+
+              {/* Select-all row */}
+              {refLbData.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px', marginBottom: 4 }}>
+                  <input
+                    type="checkbox"
+                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                    checked={refLbSelected.size === refLbData.length && refLbData.length > 0}
+                    onChange={toggleRefLbSelectAll}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {refLbSelected.size === refLbData.length && refLbData.length > 0 ? 'Deselect all' : 'Select all on page'}
                   </span>
                 </div>
+              )}
+
+              <div className="adm-list" style={{ opacity: refLbLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
+                {refLbData.length === 0 && !refLbLoading ? (
+                  <div className="empty-state"><p>No referrers found.</p></div>
+                ) : refLbData.map((r, i) => {
+                  const rank = (refLbPage - 1) * refLbMeta.limit + i + 1;
+                  const isSelected = refLbSelected.has(r.referrer_id);
+                  return (
+                    <div
+                      key={r.referrer_id}
+                      className="adm-ref-card"
+                      style={{ alignItems: 'center', gap: 10, background: isSelected ? 'var(--primary-alpha, rgba(99,102,241,0.08))' : undefined }}
+                    >
+                      {/* Checkbox */}
+                      <input
+                        type="checkbox"
+                        style={{ width: 15, height: 15, cursor: 'pointer', flexShrink: 0, accentColor: 'var(--primary)' }}
+                        checked={isSelected}
+                        onChange={() => toggleRefLbSelect(r.referrer_id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+
+                      {/* Rank badge */}
+                      <div style={{
+                        minWidth: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 800, flexShrink: 0,
+                        background: rank === 1 ? '#f59e0b' : rank === 2 ? '#94a3b8' : rank === 3 ? '#cd7c4f' : 'var(--bg-secondary, rgba(255,255,255,0.08))',
+                        color: rank <= 3 ? '#fff' : 'var(--text-secondary)',
+                      }}>
+                        {rank}
+                      </div>
+
+                      {/* User info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span className="adm-ref-username">{r.referrer_username}</span>
+                          <span className={`plan-badge plan-badge--${r.referrer_plan}`}>{r.referrer_plan}</span>
+                          {r.is_banned && <span style={{ fontSize: 10, background: 'var(--error)', color: '#fff', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>BANNED</span>}
+                          {!r.is_banned && r.is_suspended && r.suspended_until && new Date(r.suspended_until) > new Date() && (
+                            <span style={{ fontSize: 10, background: 'var(--warning)', color: '#fff', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>SUSPENDED</span>
+                          )}
+                        </div>
+                        <span className="adm-ref-email">{r.referrer_email}</span>
+                      </div>
+
+                      {/* Referral count */}
+                      <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                        <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1 }}>{r.referral_count}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>referrals</div>
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          title="Send message"
+                          onClick={() => setNotifyTarget({ id: r.referrer_id, username: r.referrer_username })}
+                        >
+                          <MessageSquare size={13} />
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          title="Suspend user"
+                          onClick={() => setSuspendTarget({ id: r.referrer_id, username: r.referrer_username })}
+                        >
+                          <Clock size={13} />
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          title="Ban user"
+                          onClick={() => setBanTarget({ id: r.referrer_id, username: r.referrer_username })}
+                        >
+                          <Ban size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-          {refMeta.total > refMeta.limit && (
-            <div className="adm-pagination">
-              <button className="btn btn-sm btn-ghost" disabled={refPage <= 1} onClick={() => setRefPage((p) => p - 1)}><ChevronLeft size={15} /> Prev</button>
-              <span className="adm-pagination-info">Page {refMeta.page} of {Math.ceil(refMeta.total / refMeta.limit)} · {refMeta.total} records</span>
-              <button className="btn btn-sm btn-ghost" disabled={refPage * refMeta.limit >= refMeta.total} onClick={() => setRefPage((p) => p + 1)}>Next <ChevronRight size={15} /></button>
-            </div>
+
+              {refLbMeta.total > refLbMeta.limit && (
+                <div className="adm-pagination">
+                  <button className="btn btn-sm btn-ghost" disabled={refLbPage <= 1} onClick={() => setRefLbPage((p) => p - 1)}><ChevronLeft size={15} /> Prev</button>
+                  <span className="adm-pagination-info">Page {refLbMeta.page} of {Math.ceil(refLbMeta.total / refLbMeta.limit)} · {refLbMeta.total} referrers</span>
+                  <button className="btn btn-sm btn-ghost" disabled={refLbPage * refLbMeta.limit >= refLbMeta.total} onClick={() => setRefLbPage((p) => p + 1)}>Next <ChevronRight size={15} /></button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Records sub-tab ── */}
+          {refSubTab === 'records' && (
+            <>
+              <div className="adm-wd-filters">
+                <div className="adm-filter-toolbar">
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Referral Records</span>
+                  <ExportButton section="referrals" />
+                </div>
+                <div className="adm-wd-filter-row">
+                  <div className="adm-search-wrap" style={{ flex: 1 }}>
+                    <Search size={15} className="adm-search-icon" />
+                    <input
+                      className="form-input adm-search-input"
+                      placeholder="Search referrer or invited user… (Enter or auto)"
+                      value={refFilters.search}
+                      onChange={(e) => handleRefFilterChange('search', e.target.value)}
+                      onKeyDown={handleRefSearchKey}
+                    />
+                  </div>
+                  <label className="adm-wd-filter-label">From</label>
+                  <input type="date" className="form-input adm-wd-filter-date" value={refFilters.date_from} onChange={(e) => handleRefFilterChange('date_from', e.target.value)} />
+                  <label className="adm-wd-filter-label">To</label>
+                  <input type="date" className="form-input adm-wd-filter-date" value={refFilters.date_to} onChange={(e) => handleRefFilterChange('date_to', e.target.value)} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setRefFilters({ search: '', date_from: '', date_to: '' }); setRefPage(1); void loadReferrals(1, { search: '', date_from: '', date_to: '' }); }}>Reset</button>
+                </div>
+              </div>
+              <FilterChips
+                filters={{ from: refFilters.date_from, to: refFilters.date_to }}
+                onRemove={(k) => handleRefFilterChange(k === 'from' ? 'date_from' : 'date_to', '')}
+                onClear={() => { setRefFilters({ search: '', date_from: '', date_to: '' }); setRefPage(1); void loadReferrals(1, { search: '', date_from: '', date_to: '' }); }}
+              />
+              <div className="adm-list" style={{ opacity: refLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
+                {refData.length === 0 && !refLoading ? (
+                  <div className="empty-state"><p>No referral records found.</p></div>
+                ) : refData.map((r, i) => (
+                  <div key={`${r.referrer_id}-${r.invited_username}-${i}`} className="adm-ref-card">
+                    <div className="adm-ref-user">
+                      <span className="adm-ref-username">{r.referrer_username}</span>
+                      <span className="adm-ref-email">Referrer</span>
+                    </div>
+                    <span className="adm-ref-arrow">→</span>
+                    <div className="adm-ref-user" style={{ flex: 1 }}>
+                      <span className="adm-ref-username">{r.invited_username}</span>
+                      <span className="adm-ref-email">{r.invited_email}</span>
+                    </div>
+                    <div className="adm-ref-meta">
+                      <span className={`plan-badge plan-badge--${r.invited_plan}`}>{r.invited_plan}</span>
+                      <span className="adm-ref-date">
+                        {new Date(r.invited_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {refMeta.total > refMeta.limit && (
+                <div className="adm-pagination">
+                  <button className="btn btn-sm btn-ghost" disabled={refPage <= 1} onClick={() => setRefPage((p) => p - 1)}><ChevronLeft size={15} /> Prev</button>
+                  <span className="adm-pagination-info">Page {refMeta.page} of {Math.ceil(refMeta.total / refMeta.limit)} · {refMeta.total} records</span>
+                  <button className="btn btn-sm btn-ghost" disabled={refPage * refMeta.limit >= refMeta.total} onClick={() => setRefPage((p) => p + 1)}>Next <ChevronRight size={15} /></button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
