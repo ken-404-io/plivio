@@ -188,6 +188,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('auth:expired', handler);
   }, []);
 
+  // Refresh user data (including plan) when the user returns to the tab so
+  // that admin-side plan changes take effect without requiring a full reload.
+  useEffect(() => {
+    let lastRefresh = 0;
+    const handleVisibility = () => {
+      if (document.hidden || !userRef.current) return;
+      const now = Date.now();
+      if (now - lastRefresh < 60_000) return; // at most once per minute
+      lastRefresh = now;
+      void fetchMe();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [fetchMe]);
+
   const login = useCallback(async (email: string, password: string) => {
     // Check if another user is already active in this browser
     try {

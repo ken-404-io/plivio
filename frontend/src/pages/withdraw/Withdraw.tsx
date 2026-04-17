@@ -397,7 +397,7 @@ export default function Withdraw() {
     } catch { /* silent */ }
   }
 
-  useEffect(() => { void loadHistory(); void loadCooldown(); void loadPaymentMethods(); }, []);
+  useEffect(() => { void loadHistory(); void loadCooldown(); void loadPaymentMethods(); void fetchMe(); }, []);
 
   // Countdown timer for cooldown
   useEffect(() => {
