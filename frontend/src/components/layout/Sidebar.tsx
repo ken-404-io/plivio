@@ -1,4 +1,4 @@
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useSearchParams } from 'react-router-dom';
 import { Flame, MessageCircle } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import {
@@ -13,6 +13,10 @@ import {
   Settings,
   Coins,
   SlidersHorizontal,
+  Users,
+  Bell,
+  Link2,
+  ShieldCheck,
 } from 'lucide-react';
 
 type LucideIcon = React.ElementType;
@@ -37,9 +41,14 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/settings',  label: 'Settings',  Icon: SlidersHorizontal  },
 ];
 
-const ADMIN_ITEMS: NavItem[] = [
-  { to: '/admin', label: 'Admin Panel', Icon: Settings },
-];
+const ADMIN_TABS = [
+  { tab: 'overview',      label: 'Overview',      Icon: LayoutDashboard },
+  { tab: 'users',         label: 'Users',         Icon: Users           },
+  { tab: 'withdrawals',   label: 'Withdrawals',   Icon: ArrowUpCircle   },
+  { tab: 'referrals',     label: 'Referrals',     Icon: Link2           },
+  { tab: 'notifications', label: 'Notifications', Icon: Bell            },
+  { tab: 'kyc',           label: 'KYC',           Icon: ShieldCheck     },
+] as const;
 
 interface SidebarProps {
   isAdmin?: boolean;
@@ -47,7 +56,8 @@ interface SidebarProps {
 
 export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const { user, logout } = useAuth();
-  const items = isAdmin ? ADMIN_ITEMS : NAV_ITEMS;
+  const [searchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') ?? 'overview';
 
   return (
     <aside className="sidebar">
@@ -60,23 +70,49 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       </div>
 
       <nav className="sidebar-nav" aria-label="Main navigation">
-        {items.map(({ to, label, Icon }) => {
-          const isQuizly = to === '/quizly';
-          return (
+        {isAdmin ? (
+          <>
             <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `nav-item${isActive ? ' nav-item--active' : ''}${isQuizly ? ' nav-item--quizly' : ''}`
-              }
+              to="/admin"
+              className={({ isActive }) => `nav-item${isActive ? ' nav-item--active' : ''}`}
+              end
             >
-              <span className="nav-icon" aria-hidden="true">
-                <Icon size={isQuizly ? 22 : 18} />
-              </span>
-              <span className="nav-label">{label}</span>
+              <span className="nav-icon" aria-hidden="true"><Settings size={18} /></span>
+              <span className="nav-label">Admin Panel</span>
             </NavLink>
-          );
-        })}
+
+            <div className="adm-subnav">
+              {ADMIN_TABS.map(({ tab, label, Icon }) => (
+                <NavLink
+                  key={tab}
+                  to={`/admin?tab=${tab}`}
+                  className={`adm-subnav-item${activeTab === tab ? ' adm-subnav-item--active' : ''}`}
+                >
+                  <Icon size={15} />
+                  <span>{label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </>
+        ) : (
+          NAV_ITEMS.map(({ to, label, Icon }) => {
+            const isQuizly = to === '/quizly';
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  `nav-item${isActive ? ' nav-item--active' : ''}${isQuizly ? ' nav-item--quizly' : ''}`
+                }
+              >
+                <span className="nav-icon" aria-hidden="true">
+                  <Icon size={isQuizly ? 22 : 18} />
+                </span>
+                <span className="nav-label">{label}</span>
+              </NavLink>
+            );
+          })
+        )}
       </nav>
 
       <div className="sidebar-footer">
