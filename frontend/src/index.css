@@ -5676,6 +5676,52 @@ a, button, [role="button"], [tabindex] {
   50%      { opacity: 0.85; }
 }
 
+/* ─── Withdrawal release schedule banner ────────────────────────────────────── */
+.wd-release-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(59,130,246,0.14) 100%);
+  border-top: 3px solid var(--accent);
+  border-bottom: 1px solid rgba(99,102,241,0.3);
+  /* Break out of page padding so it fills the full screen width */
+  margin-left: -16px;
+  margin-right: -16px;
+}
+.wd-release-banner-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(99,102,241,0.2);
+  color: #818cf8;
+}
+.wd-release-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wd-release-banner-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #a5b4fc;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.wd-release-banner-sub {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.wd-release-banner-sub strong {
+  color: #818cf8;
+  font-weight: 700;
+}
+
 /* ─── Admin withdrawal history filters ──────────────────────────────────────── */
 .adm-wd-filters {
   display: flex;
