@@ -352,6 +352,14 @@ export default function Withdraw() {
   const [cooldownRemaining, setCooldownRemaining] = useState('');
   const [quizGatePassed,  setQuizGatePassed]  = useState<boolean | null>(null);
   const [quizTodayEarned, setQuizTodayEarned] = useState(0);
+  const [showReleaseBanner, setShowReleaseBanner] = useState(
+    () => sessionStorage.getItem('wd_release_banner_dismissed') !== '1',
+  );
+
+  function dismissReleaseBanner() {
+    sessionStorage.setItem('wd_release_banner_dismissed', '1');
+    setShowReleaseBanner(false);
+  }
 
   async function loadHistory() {
     try {
@@ -571,6 +579,47 @@ export default function Withdraw() {
 
   return (
     <div className="page">
+      {showReleaseBanner && (
+        <div className="wd-release-overlay">
+          <div className="wd-release-overlay-bg">
+            <div className="wd-release-overlay-circle1" />
+            <div className="wd-release-overlay-circle2" />
+            <div className="wd-release-overlay-circle3" />
+          </div>
+          <div className="wd-release-content">
+            <div className="wd-release-icon-ring">
+              <CalendarDays size={38} />
+            </div>
+            <p className="wd-release-eyebrow">Payout Schedule</p>
+            <h2 className="wd-release-headline">
+              Withdrawals are<br />released on the
+            </h2>
+            <div className="wd-release-dates-row">
+              <div className="wd-release-date-chip">
+                <span className="wd-release-date-num">15</span>
+                <span className="wd-release-date-suffix">th</span>
+              </div>
+              <span className="wd-release-date-sep">&amp;</span>
+              <div className="wd-release-date-chip">
+                <span className="wd-release-date-num">30</span>
+                <span className="wd-release-date-suffix">th</span>
+              </div>
+            </div>
+            <p className="wd-release-sub">
+              of every month. Submit your withdrawal request anytime — it will be processed on the next release date.
+            </p>
+          </div>
+          <div className="wd-release-footer">
+            <button className="wd-release-cta" onClick={dismissReleaseBanner}>
+              Got it!
+            </button>
+            <button className="wd-release-later" onClick={dismissReleaseBanner}>
+              Remind me later
+            </button>
+          </div>
+        </div>
+      )}
+
       {showConfirm && selectedPm && (
         <ConfirmModal
           amount={liveAmount}
@@ -600,19 +649,6 @@ export default function Withdraw() {
           <p className="page-subtitle">Cash out to GCash or PayPal</p>
         </div>
       </header>
-
-      {/* Release schedule banner */}
-      <div className="wd-release-banner">
-        <div className="wd-release-banner-icon-wrap">
-          <CalendarDays size={22} />
-        </div>
-        <div className="wd-release-banner-body">
-          <span className="wd-release-banner-title">Withdrawal Release Schedule</span>
-          <span className="wd-release-banner-sub">
-            Withdrawals are released every <strong>15th</strong> and <strong>30th</strong> of the month.
-          </span>
-        </div>
-      </div>
 
       {/* KYC gate */}
       {kycBlocked && (
