@@ -250,6 +250,7 @@ async function paymongoGet(path: string): Promise<Record<string, unknown>> {
 async function activateSubscription(checkout: {
   id: string; user_id: string; plan: string;
   duration_days: number; email: string; username: string;
+  payment_id?: string;
 }): Promise<Date> {
   const client = await pool.connect();
   try {
@@ -257,8 +258,10 @@ async function activateSubscription(checkout: {
 
     if (checkout.id !== 'admin-override') {
       await client.query(
-        `UPDATE subscription_checkouts SET status = 'paid' WHERE id = $1`,
-        [checkout.id],
+        `UPDATE subscription_checkouts
+         SET status = 'paid', paymongo_payment_id = COALESCE($2, paymongo_payment_id)
+         WHERE id = $1`,
+        [checkout.id, checkout.payment_id ?? null],
       );
     }
 
@@ -388,13 +391,18 @@ export async function verifyPayment(
 
     // Query PayMongo for the link payment status
     let status = '';
+    let verifyPaymentId = '';
     try {
       const linkRes  = await paymongoGet(`/links/${checkout.paymongo_ref}`);
       const linkData = (linkRes.data as Record<string, unknown>);
       const attrs    = (linkData?.attributes as Record<string, unknown>) ?? {};
       status = attrs.status as string;
 
-      logger.info({ userId, paymongo_ref: checkout.paymongo_ref, status, attrs }, '🔍 verifyPayment: PayMongo link status');
+      // Extract the pay_xxx ID from the first payment on this link
+      const linkPayments = (attrs.payments as Array<Record<string, unknown>>) ?? [];
+      verifyPaymentId = (linkPayments[0]?.id as string) ?? '';
+
+      logger.info({ userId, paymongo_ref: checkout.paymongo_ref, status, verifyPaymentId }, '🔍 verifyPayment: PayMongo link status');
     } catch (pmErr) {
       logger.error({ userId, err: (pmErr as Error).message }, '❌ verifyPayment: PayMongo API error');
       res.json({ success: true, activated: false, message: 'Could not reach PayMongo API' });
@@ -407,7 +415,7 @@ export async function verifyPayment(
     }
 
     // Payment confirmed by PayMongo — activate now
-    const expiresAt = await activateSubscription(checkout);
+    const expiresAt = await activateSubscription({ ...checkout, payment_id: verifyPaymentId || undefined });
     logger.info({ userId, plan: checkout.plan }, '✅ verifyPayment: subscription activated');
 
     res.json({
@@ -536,9 +544,22 @@ export async function handleWebhook(
     const paymentData  = attributes?.data as Record<string, unknown> | undefined;
     const payAttribs   = paymentData?.attributes as Record<string, unknown> | undefined;
 
+    // Extract the concrete pay_xxx ID.
+    // payment.paid  → paymentData IS the payment object, so its id = pay_xxx
+    // link.payment.paid → paymentData IS the link object; the payment is in
+    //   payAttribs.payments[0] (PayMongo nests it there)
+    let webhookPaymentId = '';
+    if (eventType === 'payment.paid') {
+      webhookPaymentId = (paymentData?.id as string) ?? '';
+    } else {
+      const nestedPayments = (payAttribs?.payments as Array<Record<string, unknown>>) ?? [];
+      webhookPaymentId = (nestedPayments[0]?.id as string) ?? '';
+    }
+
     logger.info({
       paymentDataId:   paymentData?.id,
       paymentDataType: paymentData?.type,
+      webhookPaymentId,
       remarks:         payAttribs?.remarks,
       description:     payAttribs?.description,
       reference:       payAttribs?.reference_number,
@@ -598,7 +619,7 @@ export async function handleWebhook(
       status: string; amount_php: string; email: string; username: string;
     };
 
-    await activateSubscription(checkout);
+    await activateSubscription({ ...checkout, payment_id: webhookPaymentId || undefined });
     res.json({ received: true });
   } catch (err) {
     // Log but still acknowledge — prevents PayMongo from disabling the webhook
@@ -642,9 +663,12 @@ export async function reconcilePendingCheckouts(): Promise<void> {
 
         if (status !== 'paid') continue;
 
-        logger.info({ checkoutId: row.id, userId: row.user_id, plan: row.plan },
+        const linkPayments   = (attrs.payments as Array<Record<string, unknown>>) ?? [];
+        const reconcilePayId = (linkPayments[0]?.id as string) || undefined;
+
+        logger.info({ checkoutId: row.id, userId: row.user_id, plan: row.plan, reconcilePayId },
           '✅ reconcile: activating subscription from pending checkout');
-        await activateSubscription(row);
+        await activateSubscription({ ...row, payment_id: reconcilePayId });
       } catch (inner) {
         logger.error({ checkoutId: row.id, err: (inner as Error).message },
           '⚠️ reconcile: error checking checkout');

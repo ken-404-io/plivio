@@ -127,20 +127,22 @@ CREATE TABLE subscriptions (
 -- ─── Subscription checkouts (PayMongo) ───────────────────────────────────────
 
 CREATE TABLE subscription_checkouts (
-  id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID          NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  plan            TEXT          NOT NULL,
-  duration_days   INT           NOT NULL DEFAULT 30,
-  amount_php      NUMERIC(10,2) NOT NULL,
-  paymongo_ref    TEXT          UNIQUE,
-  status          TEXT          NOT NULL DEFAULT 'pending', -- pending | paid | expired
-  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  expires_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW() + INTERVAL '2 hours'
+  id                   UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id              UUID          NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  plan                 TEXT          NOT NULL,
+  duration_days        INT           NOT NULL DEFAULT 30,
+  amount_php           NUMERIC(10,2) NOT NULL,
+  paymongo_ref         TEXT          UNIQUE,        -- PayMongo link ID (link_xxx)
+  paymongo_payment_id  TEXT,                        -- PayMongo payment ID (pay_xxx)
+  status               TEXT          NOT NULL DEFAULT 'pending', -- pending | paid | expired
+  created_at           TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  expires_at           TIMESTAMPTZ   NOT NULL DEFAULT NOW() + INTERVAL '2 hours'
 );
 
-CREATE INDEX idx_sc_user_id  ON subscription_checkouts(user_id);
-CREATE INDEX idx_sc_paymongo ON subscription_checkouts(paymongo_ref);
-CREATE INDEX idx_sc_status   ON subscription_checkouts(status);
+CREATE INDEX idx_sc_user_id    ON subscription_checkouts(user_id);
+CREATE INDEX idx_sc_paymongo   ON subscription_checkouts(paymongo_ref);
+CREATE INDEX idx_sc_payment_id ON subscription_checkouts(paymongo_payment_id);
+CREATE INDEX idx_sc_status     ON subscription_checkouts(status);
 
 -- ─── Email verification tokens ────────────────────────────────────────────────
 
