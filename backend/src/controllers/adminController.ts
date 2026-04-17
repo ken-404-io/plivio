@@ -342,7 +342,7 @@ export async function listPendingWithdrawals(req: Request, res: Response, next: 
       `SELECT w.id, w.amount, w.fee_amount, w.net_amount, w.method, w.status,
               w.account_name, w.account_number,
               w.requested_at, w.processed_at,
-              u.username, u.email, u.plan::text AS user_plan
+              u.id AS user_id, u.username, u.email, u.plan::text AS user_plan
        FROM withdrawals w JOIN users u ON u.id = w.user_id
        WHERE w.status = $1 ORDER BY w.requested_at ASC`,
       [status]
@@ -372,7 +372,7 @@ export async function listWithdrawalHistory(req: Request, res: Response, next: N
       `SELECT w.id, w.amount, w.fee_amount, w.net_amount, w.method, w.status::text,
               w.account_name, w.account_number, w.rejection_reason,
               w.requested_at, w.processed_at,
-              u.username, u.email, u.plan::text AS user_plan
+              u.id AS user_id, u.username, u.email, u.plan::text AS user_plan
        FROM withdrawals w JOIN users u ON u.id = w.user_id
        WHERE ($1::text IS NULL OR w.status::text = $1)
          AND ($2::text IS NULL OR u.plan::text = $2)
@@ -480,6 +480,47 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
   } finally {
     client.release();
   }
+}
+
+// ─── GET /admin/users/:id/payment-history ────────────────────────────────────
+
+export async function getUserPaymentHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params as Record<string, string>;
+
+    const { rows: userRows } = await pool.query(
+      `SELECT id, username, email, plan::text FROM users WHERE id = $1`,
+      [id],
+    );
+    if (userRows.length === 0) throw new NotFoundError('User not found');
+
+    const { rows } = await pool.query(
+      `SELECT id, amount, fee_amount, net_amount, method, status::text,
+              account_name, account_number, rejection_reason,
+              requested_at, processed_at
+       FROM withdrawals
+       WHERE user_id = $1
+       ORDER BY requested_at DESC`,
+      [id],
+    );
+
+    type WRow = { amount: string; net_amount: string; status: string };
+    const typedRows = rows as WRow[];
+    const totalRequested = typedRows.reduce((s, r) => s + Number(r.amount), 0);
+    const totalPaid      = typedRows.filter((r) => r.status === 'paid')
+                                    .reduce((s, r) => s + Number(r.net_amount || r.amount), 0);
+    const countByStatus  = typedRows.reduce<Record<string, number>>((acc, r) => {
+      acc[r.status] = (acc[r.status] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      user: userRows[0],
+      withdrawals: rows,
+      stats: { total: rows.length, total_requested: totalRequested, total_paid: totalPaid, count_by_status: countByStatus },
+    });
+  } catch (err) { next(err); }
 }
 
 // ─── GET /admin/users/:id/details ────────────────────────────────────────────

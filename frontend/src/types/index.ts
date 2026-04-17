@@ -309,6 +309,7 @@ export interface AdminUserDetails {
 
 export interface AdminWithdrawalHistory {
   id: string;
+  user_id: string;
   amount: string | number;
   fee_amount: string | number;
   net_amount: string | number;
@@ -336,6 +337,7 @@ export interface AdminTask {
 
 export interface AdminWithdrawal {
   id: string;
+  user_id: string;
   amount: string | number;
   fee_amount: string | number;
   net_amount: string | number;
