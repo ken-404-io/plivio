@@ -9,6 +9,7 @@ import {
   createCheckout,
   handleWebhook,
   verifyPayment,
+  hasPendingCheckout,
   adminActivateSubscription,
 } from '../controllers/subscriptionController.ts';
 
@@ -38,6 +39,7 @@ router.post(
 router.use(authenticate);
 
 router.get('/current', getCurrentSubscription);
+router.get('/pending-checkout', hasPendingCheckout);
 // Verify payment after PayMongo redirect (fallback when webhook is delayed/missing)
 router.post('/verify-payment', verifyPayment);
 
