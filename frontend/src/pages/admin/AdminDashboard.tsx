@@ -174,6 +174,159 @@ function WithdrawalRejectModal({ onConfirm, onCancel }: {
   );
 }
 
+// ─── Payment history modal (per-user) ────────────────────────────────────────
+
+interface UserPaymentHistoryData {
+  user: { id: string; username: string; email: string; plan: string };
+  withdrawals: Array<{
+    id: string;
+    amount: string | number;
+    fee_amount: string | number;
+    net_amount: string | number;
+    method: string;
+    status: string;
+    account_name: string;
+    account_number: string;
+    rejection_reason: string | null;
+    requested_at: string;
+    processed_at: string | null;
+  }>;
+  stats: {
+    total: number;
+    total_requested: number;
+    total_paid: number;
+    count_by_status: Record<string, number>;
+  };
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  paid:       'var(--success)',
+  pending:    'var(--warning)',
+  processing: 'var(--info, #3b82f6)',
+  rejected:   'var(--error)',
+  cancelled:  'var(--text-muted)',
+};
+
+function UserPaymentHistoryModal({ data, onClose }: {
+  data:    UserPaymentHistoryData;
+  onClose: () => void;
+}) {
+  const { user, withdrawals, stats } = data;
+
+  return (
+    <div className="adm-modal-overlay" onClick={onClose}>
+      <div
+        className="adm-modal adm-modal--wide"
+        style={{ maxWidth: 680, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div>
+            <h3 className="adm-modal-title" style={{ marginBottom: 2 }}>
+              <History size={15} style={{ marginRight: 6 }} />
+              Payment History — {user.username}
+            </h3>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>{user.email}</p>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}><X size={14} /></button>
+        </div>
+
+        {/* Summary stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
+          {[
+            { label: 'Total Requests', value: stats.total },
+            { label: 'Total Requested', value: `₱${Number(stats.total_requested).toFixed(2)}` },
+            { label: 'Total Paid Out', value: `₱${Number(stats.total_paid).toFixed(2)}` },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ background: 'var(--bg-secondary, rgba(255,255,255,0.04))', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Status breakdown */}
+        {Object.keys(stats.count_by_status).length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+            {Object.entries(stats.count_by_status).map(([st, cnt]) => (
+              <span
+                key={st}
+                style={{
+                  fontSize: 11, padding: '2px 8px', borderRadius: 12,
+                  background: 'var(--bg-secondary, rgba(255,255,255,0.06))',
+                  color: STATUS_COLOR[st] ?? 'var(--text-secondary)',
+                  border: `1px solid ${STATUS_COLOR[st] ?? 'var(--border)'}`,
+                  fontWeight: 600,
+                  textTransform: 'capitalize',
+                }}
+              >
+                {st}: {cnt}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Scrollable list */}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {withdrawals.length === 0 ? (
+            <div className="empty-state"><p>No withdrawal records.</p></div>
+          ) : (
+            <div className="adm-list">
+              {withdrawals.map((w) => (
+                <div key={w.id} className="adm-wd-card" style={{ cursor: 'default' }}>
+                  <div className="adm-wd-top">
+                    <div className="adm-wd-user">
+                      <span className="adm-wd-username" style={{ fontSize: 12 }}>
+                        {w.method.toUpperCase()} · {w.account_name}
+                      </span>
+                      <span className="adm-wd-email" style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                        {w.account_number}
+                      </span>
+                    </div>
+                    <div className="adm-wd-amounts">
+                      <div className="adm-wd-amount">₱{Number(w.net_amount || w.amount).toFixed(2)}</div>
+                      <div className="adm-wd-amount-sub">
+                        Req ₱{Number(w.amount).toFixed(2)} · Fee ₱{Number(w.fee_amount || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="adm-wd-payment" style={{ justifyContent: 'space-between' }}>
+                    <span
+                      className={`adm-details-wd-status adm-details-wd-status--${w.status}`}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      {w.status}
+                    </span>
+                    <span className="adm-wd-date">
+                      {new Date(w.requested_at).toLocaleDateString('en-PH', {
+                        month: 'short', day: 'numeric', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </span>
+                    {w.processed_at && (
+                      <span className="adm-wd-date" style={{ color: 'var(--text-muted)' }}>
+                        Processed {new Date(w.processed_at).toLocaleDateString('en-PH', {
+                          month: 'short', day: 'numeric', year: 'numeric',
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  {w.rejection_reason && (
+                    <div style={{ fontSize: 11, color: 'var(--error)', marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)' }}>
+                      Rejected: {w.rejection_reason}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Notify modal ─────────────────────────────────────────────────────────────
 function NotifyModal({ username, onSend, onCancel }: {
   username: string;
@@ -793,6 +946,8 @@ export default function AdminDashboard() {
     amount_max: '' as string,
   });
   const [wdExpanded,       setWdExpanded]       = useState<string | null>(null);
+  const [paymentHistoryData,    setPaymentHistoryData]    = useState<UserPaymentHistoryData | null>(null);
+  const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
 
   // Enhanced user filters
   const [userStatusFilter, setUserStatusFilter] = useState('');
@@ -1170,6 +1325,18 @@ export default function AdminDashboard() {
     }
   }
 
+  async function openPaymentHistory(userId: string) {
+    setPaymentHistoryLoading(true);
+    try {
+      const { data } = await api.get<UserPaymentHistoryData>(`/admin/users/${userId}/payment-history`);
+      setPaymentHistoryData(data);
+    } catch {
+      toast.error('Failed to load payment history.');
+    } finally {
+      setPaymentHistoryLoading(false);
+    }
+  }
+
   async function processWithdrawal(id: string, action: 'approve' | 'reject', rejection_reason?: string) {
     try {
       await api.put(`/admin/withdrawals/${id}`, { action, rejection_reason });
@@ -1243,6 +1410,12 @@ export default function AdminDashboard() {
         <WithdrawalRejectModal
           onConfirm={(reason) => { void processWithdrawal(wdRejectTarget, 'reject', reason); setWdRejectTarget(null); }}
           onCancel={() => setWdRejectTarget(null)}
+        />
+      )}
+      {paymentHistoryData && (
+        <UserPaymentHistoryModal
+          data={paymentHistoryData}
+          onClose={() => setPaymentHistoryData(null)}
         />
       )}
       {notifyTarget && (
@@ -1925,6 +2098,14 @@ export default function AdminDashboard() {
                     >
                       <XCircle size={13} /> Reject
                     </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      disabled={paymentHistoryLoading}
+                      onClick={() => { void openPaymentHistory(w.user_id); }}
+                      title="View full payment history for this user"
+                    >
+                      <History size={13} /> History
+                    </button>
                   </div>
                 </div>
               ))}
@@ -2058,6 +2239,15 @@ export default function AdminDashboard() {
                               <span className="adm-wd-detail-value" style={{ color: 'var(--error)' }}>{w.rejection_reason}</span>
                             </div>
                           )}
+                        </div>
+                        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={paymentHistoryLoading}
+                            onClick={() => { void openPaymentHistory(w.user_id); }}
+                          >
+                            <History size={13} /> View All History for {w.username}
+                          </button>
                         </div>
                       </div>
                     )}
