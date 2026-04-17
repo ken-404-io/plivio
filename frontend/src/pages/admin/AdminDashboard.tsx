@@ -931,9 +931,10 @@ export default function AdminDashboard() {
   const [batchRejectMode, setBatchRejectMode] = useState(false);
 
   // Withdrawal history state
-  const [wdSubTab,         setWdSubTab]         = useState<'pending' | 'history'>('pending');
+  const [wdSubTab,         setWdSubTab]         = useState<'pending' | 'history' | 'paid'>('pending');
   const [wdHistory,        setWdHistory]        = useState<AdminWithdrawalHistory[]>([]);
   const [wdHistoryMeta,    setWdHistoryMeta]    = useState({ page: 1, total: 0, limit: 25 });
+  const [wdHistoryTotals,  setWdHistoryTotals]  = useState({ total_amount: 0, total_fee: 0, total_net: 0 });
   const [wdHistoryLoading, setWdHistoryLoading] = useState(false);
   const [wdHistoryPage,    setWdHistoryPage]    = useState(1);
   const [wdFilters,        setWdFilters]        = useState({
@@ -946,6 +947,19 @@ export default function AdminDashboard() {
     amount_max: '' as string,
   });
   const [wdExpanded,       setWdExpanded]       = useState<string | null>(null);
+
+  // Paid history tab state
+  const [wdPaidList,    setWdPaidList]    = useState<AdminWithdrawalHistory[]>([]);
+  const [wdPaidMeta,    setWdPaidMeta]    = useState({ page: 1, total: 0, limit: 25 });
+  const [wdPaidTotals,  setWdPaidTotals]  = useState({ total_amount: 0, total_fee: 0, total_net: 0 });
+  const [wdPaidLoading, setWdPaidLoading] = useState(false);
+  const [wdPaidPage,    setWdPaidPage]    = useState(1);
+  const [wdPaidFilters, setWdPaidFilters] = useState({
+    plan: '' as string, search: '' as string,
+    date_from: '' as string, date_to: '' as string,
+    amount_min: '' as string, amount_max: '' as string,
+  });
+  const [wdPaidExpanded, setWdPaidExpanded] = useState<string | null>(null);
   const [paymentHistoryData,    setPaymentHistoryData]    = useState<UserPaymentHistoryData | null>(null);
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
 
@@ -1054,9 +1068,11 @@ export default function AdminDashboard() {
       const { data } = await api.get<{
         data: AdminWithdrawalHistory[];
         meta: { page: number; total: number; limit: number };
+        totals: { total_amount: number; total_fee: number; total_net: number };
       }>('/admin/withdrawals/history', { params });
       setWdHistory(data.data);
       setWdHistoryMeta(data.meta);
+      if (data.totals) setWdHistoryTotals(data.totals);
     } catch {
       toast.error('Failed to load withdrawal history.');
     } finally {
@@ -1065,10 +1081,38 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const loadWdPaidHistory = useCallback(async (page: number, filters: typeof wdPaidFilters) => {
+    setWdPaidLoading(true);
+    try {
+      const params: Record<string, string | number> = { page, limit: 25, status: 'paid' };
+      if (filters.plan)       params.plan       = filters.plan;
+      if (filters.search)     params.search     = filters.search;
+      if (filters.date_from)  params.date_from  = filters.date_from;
+      if (filters.date_to)    params.date_to    = filters.date_to;
+      if (filters.amount_min) params.amount_min = filters.amount_min;
+      if (filters.amount_max) params.amount_max = filters.amount_max;
+
+      const { data } = await api.get<{
+        data: AdminWithdrawalHistory[];
+        meta: { page: number; total: number; limit: number };
+        totals: { total_amount: number; total_fee: number; total_net: number };
+      }>('/admin/withdrawals/history', { params });
+      setWdPaidList(data.data);
+      setWdPaidMeta(data.meta);
+      if (data.totals) setWdPaidTotals(data.totals);
+    } catch {
+      toast.error('Failed to load paid history.');
+    } finally {
+      setWdPaidLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (wdSubTab === 'history') void loadWdHistory(wdHistoryPage, wdFilters);
+    if (wdSubTab === 'paid')    void loadWdPaidHistory(wdPaidPage, wdPaidFilters);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wdSubTab, wdHistoryPage]);
+  }, [wdSubTab, wdHistoryPage, wdPaidPage]);
 
   function handleWdFilterChange(key: string, value: string) {
     const updated = { ...wdFilters, [key]: value };
@@ -1082,6 +1126,22 @@ export default function AdminDashboard() {
     } else {
       setWdHistoryPage(1);
       void loadWdHistory(1, updated);
+    }
+  }
+
+  const paidSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function handleWdPaidFilterChange(key: string, value: string) {
+    const updated = { ...wdPaidFilters, [key]: value };
+    setWdPaidFilters(updated);
+    if (key === 'search') {
+      if (paidSearchDebounceRef.current) clearTimeout(paidSearchDebounceRef.current);
+      paidSearchDebounceRef.current = setTimeout(() => {
+        setWdPaidPage(1);
+        void loadWdPaidHistory(1, updated);
+      }, 400);
+    } else {
+      setWdPaidPage(1);
+      void loadWdPaidHistory(1, updated);
     }
   }
 
@@ -2035,6 +2095,12 @@ export default function AdminDashboard() {
             >
               <History size={13} /> All History
             </button>
+            <button
+              className={`adm-details-tab${wdSubTab === 'paid' ? ' adm-details-tab--active' : ''}`}
+              onClick={() => setWdSubTab('paid')}
+            >
+              <CheckCircle2 size={13} /> Paid History
+            </button>
           </div>
 
           {/* Pending withdrawals */}
@@ -2160,6 +2226,22 @@ export default function AdminDashboard() {
                 onClear={() => { setWdFilters({ status: '', plan: '', search: '', date_from: '', date_to: '', amount_min: '', amount_max: '' }); setWdHistoryPage(1); void loadWdHistory(1, { status: '', plan: '', search: '', date_from: '', date_to: '', amount_min: '', amount_max: '' }); }}
               />
 
+              {/* Totals bar */}
+              {wdHistoryMeta.total > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { label: 'Matched Records', value: wdHistoryMeta.total.toString() },
+                    { label: 'Total Requested', value: `₱${Number(wdHistoryTotals.total_amount).toFixed(2)}` },
+                    { label: 'Total Net Paid', value: `₱${Number(wdHistoryTotals.total_net).toFixed(2)}` },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ background: 'var(--bg-secondary, rgba(255,255,255,0.04))', borderRadius: 8, padding: '8px 12px' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Results */}
               <div className="adm-list" style={{ opacity: wdHistoryLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
                 {wdHistory.length === 0 && !wdHistoryLoading ? (
@@ -2272,6 +2354,175 @@ export default function AdminDashboard() {
                     className="btn btn-sm btn-ghost"
                     disabled={wdHistoryPage * wdHistoryMeta.limit >= wdHistoryMeta.total}
                     onClick={() => setWdHistoryPage((p) => p + 1)}
+                  >
+                    Next <ChevronRight size={15} />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Paid History tab ── */}
+          {wdSubTab === 'paid' && (
+            <>
+              {/* Filters */}
+              <div className="adm-wd-filters">
+                <div className="adm-filter-toolbar">
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Filters</span>
+                  <ExportButton section="withdrawals" />
+                </div>
+                <div className="adm-wd-filter-row">
+                  <div className="adm-search-wrap" style={{ flex: 1 }}>
+                    <Search size={15} className="adm-search-icon" />
+                    <input className="form-input adm-search-input" placeholder="Search user…" value={wdPaidFilters.search} onChange={(e) => handleWdPaidFilterChange('search', e.target.value)} />
+                  </div>
+                  <select className="form-input adm-wd-filter-select" value={wdPaidFilters.plan} onChange={(e) => handleWdPaidFilterChange('plan', e.target.value)}>
+                    <option value="">All Plans</option>
+                    <option value="free">Free</option>
+                    <option value="premium">Premium</option>
+                    <option value="elite">Elite</option>
+                  </select>
+                </div>
+                <div className="adm-wd-filter-row">
+                  <label className="adm-wd-filter-label">From</label>
+                  <input type="date" className="form-input adm-wd-filter-date" value={wdPaidFilters.date_from} onChange={(e) => handleWdPaidFilterChange('date_from', e.target.value)} />
+                  <label className="adm-wd-filter-label">To</label>
+                  <input type="date" className="form-input adm-wd-filter-date" value={wdPaidFilters.date_to} onChange={(e) => handleWdPaidFilterChange('date_to', e.target.value)} />
+                  <label className="adm-wd-filter-label">Min ₱</label>
+                  <input type="number" className="form-input adm-amount-input" placeholder="0" value={wdPaidFilters.amount_min} onChange={(e) => handleWdPaidFilterChange('amount_min', e.target.value)} />
+                  <label className="adm-wd-filter-label">Max ₱</label>
+                  <input type="number" className="form-input adm-amount-input" placeholder="∞" value={wdPaidFilters.amount_max} onChange={(e) => handleWdPaidFilterChange('amount_max', e.target.value)} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => { const empty = { plan: '', search: '', date_from: '', date_to: '', amount_min: '', amount_max: '' }; setWdPaidFilters(empty); setWdPaidPage(1); void loadWdPaidHistory(1, empty); }}>Reset</button>
+                </div>
+              </div>
+              <FilterChips
+                filters={{ plan: wdPaidFilters.plan, from: wdPaidFilters.date_from, to: wdPaidFilters.date_to, 'min ₱': wdPaidFilters.amount_min, 'max ₱': wdPaidFilters.amount_max }}
+                onRemove={(k) => { const key = k === 'min ₱' ? 'amount_min' : k === 'max ₱' ? 'amount_max' : k === 'from' ? 'date_from' : k === 'to' ? 'date_to' : k; handleWdPaidFilterChange(key, ''); }}
+                onClear={() => { const empty = { plan: '', search: '', date_from: '', date_to: '', amount_min: '', amount_max: '' }; setWdPaidFilters(empty); setWdPaidPage(1); void loadWdPaidHistory(1, empty); }}
+              />
+
+              {/* Totals summary */}
+              {(wdPaidMeta.total > 0 || !wdPaidLoading) && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { label: 'Paid Records',     value: wdPaidMeta.total.toString() },
+                    { label: 'Total Requested',  value: `₱${Number(wdPaidTotals.total_amount).toFixed(2)}` },
+                    { label: 'Total Fees',        value: `₱${Number(wdPaidTotals.total_fee).toFixed(2)}` },
+                    { label: 'Total Disbursed',  value: `₱${Number(wdPaidTotals.total_net).toFixed(2)}` },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ background: 'var(--bg-secondary, rgba(255,255,255,0.04))', borderRadius: 8, padding: '8px 12px' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: label === 'Total Disbursed' ? 'var(--success)' : undefined }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* List */}
+              <div className="adm-list" style={{ opacity: wdPaidLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
+                {wdPaidList.length === 0 && !wdPaidLoading ? (
+                  <div className="empty-state"><p>No paid withdrawals found.</p></div>
+                ) : wdPaidList.map((w) => (
+                  <div
+                    key={w.id}
+                    className={`adm-wd-card adm-wd-card--clickable${wdPaidExpanded === w.id ? ' adm-wd-card--expanded' : ''}`}
+                    onClick={() => setWdPaidExpanded(wdPaidExpanded === w.id ? null : w.id)}
+                  >
+                    <div className="adm-wd-top">
+                      <div className="adm-wd-user">
+                        <span className="adm-wd-username">{w.username}</span>
+                        <span className="adm-wd-email">{w.email}</span>
+                      </div>
+                      <div className="adm-wd-amounts">
+                        <div className="adm-wd-amount">₱{Number(w.net_amount || w.amount).toFixed(2)}</div>
+                        <div className="adm-wd-amount-sub">
+                          Requested ₱{Number(w.amount).toFixed(2)} · Fee ₱{Number(w.fee_amount || 0).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="adm-wd-payment">
+                      <span className="adm-wd-method">{w.method.toUpperCase()}</span>
+                      <span className="adm-details-wd-status adm-details-wd-status--paid">paid</span>
+                      <span className={`plan-badge plan-badge--${w.user_plan}`}>{w.user_plan}</span>
+                      <span className="adm-wd-date">
+                        {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
+                    {wdPaidExpanded === w.id && (
+                      <div className="adm-wd-expanded" onClick={(e) => e.stopPropagation()}>
+                        <div className="adm-wd-detail-grid">
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Account Name</span>
+                            <span className="adm-wd-detail-value">{w.account_name}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Account Number</span>
+                            <span className="adm-wd-detail-value" style={{ fontFamily: 'monospace' }}>{w.account_number}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Requested Amount</span>
+                            <span className="adm-wd-detail-value">₱{Number(w.amount).toFixed(2)}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Fee</span>
+                            <span className="adm-wd-detail-value">₱{Number(w.fee_amount || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Net Disbursed</span>
+                            <span className="adm-wd-detail-value" style={{ color: 'var(--success)', fontWeight: 700 }}>₱{Number(w.net_amount || w.amount).toFixed(2)}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">User Plan</span>
+                            <span className={`plan-badge plan-badge--${w.user_plan}`}>{w.user_plan}</span>
+                          </div>
+                          <div className="adm-wd-detail-item">
+                            <span className="adm-wd-detail-label">Requested At</span>
+                            <span className="adm-wd-detail-value">
+                              {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          {w.processed_at && (
+                            <div className="adm-wd-detail-item">
+                              <span className="adm-wd-detail-label">Paid At</span>
+                              <span className="adm-wd-detail-value">
+                                {new Date(w.processed_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={paymentHistoryLoading}
+                            onClick={() => { void openPaymentHistory(w.user_id); }}
+                          >
+                            <History size={13} /> View All History for {w.username}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {wdPaidMeta.total > wdPaidMeta.limit && (
+                <div className="adm-pagination">
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    disabled={wdPaidPage <= 1}
+                    onClick={() => setWdPaidPage((p) => p - 1)}
+                  >
+                    <ChevronLeft size={15} /> Prev
+                  </button>
+                  <span className="adm-pagination-info">
+                    Page {wdPaidMeta.page} of {Math.ceil(wdPaidMeta.total / wdPaidMeta.limit)} · {wdPaidMeta.total} records
+                  </span>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    disabled={wdPaidPage * wdPaidMeta.limit >= wdPaidMeta.total}
+                    onClick={() => setWdPaidPage((p) => p + 1)}
                   >
                     Next <ChevronRight size={15} />
                   </button>

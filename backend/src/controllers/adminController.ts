@@ -398,10 +398,34 @@ export async function listWithdrawalHistory(req: Request, res: Response, next: N
       [status, plan, search, dateFrom, dateTo, amountMin, amountMax],
     );
 
+    const totalsResult = await pool.query(
+      `SELECT
+         COALESCE(SUM(w.amount), 0)      AS total_amount,
+         COALESCE(SUM(w.fee_amount), 0)  AS total_fee,
+         COALESCE(SUM(w.net_amount), 0)  AS total_net
+       FROM withdrawals w JOIN users u ON u.id = w.user_id
+       WHERE ($1::text IS NULL OR w.status::text = $1)
+         AND ($2::text IS NULL OR u.plan::text = $2)
+         AND ($3::text IS NULL OR u.username ILIKE $3 OR u.email ILIKE $3)
+         AND ($4::timestamptz IS NULL OR w.requested_at >= $4::timestamptz)
+         AND ($5::timestamptz IS NULL OR w.requested_at <= ($5::timestamptz + INTERVAL '1 day'))
+         AND ($6::numeric IS NULL OR w.amount >= $6)
+         AND ($7::numeric IS NULL OR w.amount <= $7)`,
+      [status, plan, search, dateFrom, dateTo, amountMin, amountMax],
+    );
+
+    type TotalsRow = { total_amount: string; total_fee: string; total_net: string };
+    const t = totalsResult.rows[0] as TotalsRow;
+
     res.json({
       success: true,
       data: rows,
       meta: { page, limit, total: Number((countResult.rows[0] as { count: string }).count) },
+      totals: {
+        total_amount: Number(t.total_amount),
+        total_fee:    Number(t.total_fee),
+        total_net:    Number(t.total_net),
+      },
     });
   } catch (err) { next(err); }
 }
