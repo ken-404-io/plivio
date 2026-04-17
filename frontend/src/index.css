@@ -5676,51 +5676,168 @@ a, button, [role="button"], [tabindex] {
   50%      { opacity: 0.85; }
 }
 
-/* ─── Withdrawal release schedule banner ────────────────────────────────────── */
-.wd-release-banner {
+/* ─── Withdrawal release schedule full-screen banner ─────────────────────────── */
+.wd-release-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 20px;
-  background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(59,130,246,0.14) 100%);
-  border-top: 3px solid var(--accent);
-  border-bottom: 1px solid rgba(99,102,241,0.3);
-  /* Break out of page padding so it fills the full screen width */
-  margin-left: -16px;
-  margin-right: -16px;
+  flex-direction: column;
+  align-items: stretch;
+  background: linear-gradient(160deg, #1e1b4b 0%, #312e81 40%, #1e3a5f 100%);
+  overflow: hidden;
 }
-.wd-release-banner-icon-wrap {
+.wd-release-overlay-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.wd-release-overlay-circle1 {
+  position: absolute;
+  top: -120px;
+  right: -80px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: rgba(129,140,248,0.12);
+}
+.wd-release-overlay-circle2 {
+  position: absolute;
+  bottom: 80px;
+  left: -100px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: rgba(59,130,246,0.10);
+}
+.wd-release-overlay-circle3 {
+  position: absolute;
+  top: 40%;
+  right: -60px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(99,102,241,0.08);
+}
+.wd-release-content {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px 20px;
+  gap: 0;
+  text-align: center;
+}
+.wd-release-icon-ring {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: rgba(129,140,248,0.18);
+  border: 2px solid rgba(129,140,248,0.35);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #a5b4fc;
+  margin-bottom: 28px;
   flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: rgba(99,102,241,0.2);
-  color: #818cf8;
 }
-.wd-release-banner-body {
+.wd-release-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  margin-bottom: 12px;
+}
+.wd-release-headline {
+  font-size: clamp(26px, 7vw, 36px);
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+  margin-bottom: 20px;
+}
+.wd-release-dates-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.wd-release-date-chip {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 20px;
+  background: rgba(129,140,248,0.15);
+  border: 1px solid rgba(129,140,248,0.35);
+  gap: 0;
 }
-.wd-release-banner-title {
-  font-size: 13px;
-  font-weight: 700;
+.wd-release-date-num {
+  font-size: 32px;
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+}
+.wd-release-date-suffix {
+  font-size: 11px;
+  font-weight: 600;
   color: #a5b4fc;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
-.wd-release-banner-sub {
-  font-size: 14px;
-  color: var(--text);
-  line-height: 1.4;
-}
-.wd-release-banner-sub strong {
-  color: #818cf8;
+.wd-release-date-sep {
+  font-size: 22px;
   font-weight: 700;
+  color: rgba(255,255,255,0.35);
 }
+.wd-release-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,0.65);
+  line-height: 1.6;
+  max-width: 300px;
+  margin: 0 auto;
+}
+.wd-release-footer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 32px 36px;
+}
+.wd-release-cta {
+  width: 100%;
+  max-width: 340px;
+  height: 52px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: inherit;
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+  color: #fff;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+  transition: opacity 0.15s, transform 0.1s;
+}
+.wd-release-cta:active { opacity: 0.88; transform: scale(0.98); }
+.wd-release-later {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+  font-family: inherit;
+  padding: 6px 12px;
+}
+.wd-release-later:hover { color: rgba(255,255,255,0.75); }
 
 /* ─── Admin withdrawal history filters ──────────────────────────────────────── */
 .adm-wd-filters {
