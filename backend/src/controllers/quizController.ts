@@ -25,7 +25,7 @@ const RECYCLE_INTERVAL_SQL  = `INTERVAL '${QUESTION_RECYCLE_DAYS} days'`;
 // Daily question cap (resets 00:00 PST / Asia/Manila). null = unlimited.
 const DAILY_QUESTION_LIMITS: Record<string, number | null> = {
   free:    null,     // Free uses the lifetime cap above
-  premium: 100,
+  premium: 200,
   elite:   null,     // Unlimited daily
 };
 
