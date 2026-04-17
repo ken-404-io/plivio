@@ -16,6 +16,7 @@ import {
   Trash2,
   Star,
   BookOpen,
+  CalendarDays,
 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
@@ -599,6 +600,19 @@ export default function Withdraw() {
           <p className="page-subtitle">Cash out to GCash or PayPal</p>
         </div>
       </header>
+
+      {/* Release schedule banner */}
+      <div className="wd-release-banner">
+        <div className="wd-release-banner-icon-wrap">
+          <CalendarDays size={22} />
+        </div>
+        <div className="wd-release-banner-body">
+          <span className="wd-release-banner-title">Withdrawal Release Schedule</span>
+          <span className="wd-release-banner-sub">
+            Withdrawals are released every <strong>15th</strong> and <strong>30th</strong> of the month.
+          </span>
+        </div>
+      </div>
 
       {/* KYC gate */}
       {kycBlocked && (
