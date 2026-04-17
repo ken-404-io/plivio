@@ -1591,31 +1591,31 @@ export default function AdminDashboard() {
       {/* Header + tab bar + KYC batch toolbar — sticky */}
       <div className="adm-sticky-top">
         <header className="adm-header">
-          <div>
+          <div className="adm-header-brand">
             <h1 className="adm-title">Admin Panel</h1>
             <p className="adm-subtitle">{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
           </div>
-        </header>
 
-        <div className="adm-tabs">
-          {TABS.map((t) => {
-            const { label, Icon } = TAB_META[t];
-            const badge = t === 'kyc' ? stats?.pending_kyc
-                        : t === 'withdrawals' ? stats?.pending_withdrawals
-                        : 0;
-            return (
-              <button
-                key={t}
-                className={`adm-tab${tab === t ? ' adm-tab--active' : ''}`}
-                onClick={() => setTab(t)}
-              >
-                <Icon size={15} />
-                <span>{label}</span>
-                {badge != null && badge > 0 && <span className="adm-tab-badge">{badge}</span>}
-              </button>
-            );
-          })}
-        </div>
+          <nav className="adm-tabs">
+            {TABS.map((t) => {
+              const { label, Icon } = TAB_META[t];
+              const badge = t === 'kyc' ? stats?.pending_kyc
+                          : t === 'withdrawals' ? stats?.pending_withdrawals
+                          : 0;
+              return (
+                <button
+                  key={t}
+                  className={`adm-tab${tab === t ? ' adm-tab--active' : ''}`}
+                  onClick={() => setTab(t)}
+                >
+                  <Icon size={15} />
+                  <span>{label}</span>
+                  {badge != null && badge > 0 && <span className="adm-tab-badge">{badge}</span>}
+                </button>
+              );
+            })}
+          </nav>
+        </header>
 
         {/* KYC batch select toolbar — only visible on the KYC tab */}
         {tab === 'kyc' && kycList.length > 0 && (
