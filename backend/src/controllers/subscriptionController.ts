@@ -306,6 +306,25 @@ async function activateSubscription(checkout: {
   }
 }
 
+// ─── 2b. Check if user has a pending checkout (for cross-device banner) ──────
+
+export async function hasPendingCheckout(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id FROM subscription_checkouts
+       WHERE user_id = $1 AND status = 'pending'
+         AND created_at >= NOW() - INTERVAL '24 hours'
+       LIMIT 1`,
+      [req.user!.id],
+    );
+    res.json({ success: true, has_pending: rows.length > 0 });
+  } catch (err) { next(err); }
+}
+
 // ─── 3. Verify payment after redirect (fallback when webhook is delayed) ──────
 
 
@@ -526,29 +545,43 @@ export async function handleWebhook(
       status:          payAttribs?.status,
     }, '🔍 Webhook: payment data extracted');
 
-    // Try remarks first (our checkoutId), then link ID, then paymongo_ref lookup
+    // Try remarks first (our checkoutId), then link ID, then paymongo_ref lookup.
+    // For payment.paid events the data object is a payment (pay_xxx), not a link (link_xxx).
+    // PayMongo attaches the originating link ID in attributes.source.id — use that as
+    // a third lookup key so we always match even when remarks is missing.
     const remarks = (payAttribs?.remarks as string)
                  ?? (payAttribs?.reference_number as string)
                  ?? '';
 
-    // Also capture the link/payment ID for paymongo_ref lookup
-    const pmId = (paymentData?.id as string) ?? '';
+    const pmId    = (paymentData?.id as string) ?? '';
+    // source.id is present on payment objects and holds the originating link_xxx ID
+    const sourceId = ((payAttribs?.source as Record<string, unknown>)?.id as string) ?? '';
 
-    if (!remarks && !pmId) {
+    if (!remarks && !pmId && !sourceId) {
       logger.warn({ payAttribs }, '⚠️ Webhook: no remarks or ID to look up checkout');
       res.json({ received: true });
       return;
     }
 
-    // Look up the checkout session by remarks (checkoutId), paymongo_ref (link ID), or payment ID
+    logger.info({ remarks, pmId, sourceId }, '🔍 Webhook: lookup identifiers');
+
+    // Look up the checkout session by:
+    //   1. sc.id = remarks        (our checkoutId UUID stored in the link's remarks field)
+    //   2. sc.paymongo_ref = pmId  (link ID for link.payment.paid events)
+    //   3. sc.paymongo_ref = sourceId (link ID extracted from payment.paid source field)
     const { rows } = await pool.query(
       `SELECT sc.id, sc.user_id, sc.plan, sc.duration_days, sc.status, sc.amount_php,
               u.email, u.username
        FROM subscription_checkouts sc
        JOIN users u ON u.id = sc.user_id
-       WHERE (sc.id = $1 OR sc.paymongo_ref = $1 OR sc.paymongo_ref = $2) AND sc.status = 'pending'
+       WHERE (
+         sc.id           = $1
+         OR sc.paymongo_ref = $1
+         OR sc.paymongo_ref = $2
+         OR sc.paymongo_ref = $3
+       ) AND sc.status = 'pending'
        LIMIT 1`,
-      [remarks || pmId, pmId],
+      [remarks || pmId, pmId, sourceId],
     );
 
     logger.info({ remarks, pmId, found: rows.length }, '🔍 Webhook: checkout lookup result');
@@ -589,7 +622,7 @@ export async function reconcilePendingCheckouts(): Promise<void> {
        JOIN users u ON u.id = sc.user_id
        WHERE sc.status = 'pending'
          AND sc.paymongo_ref IS NOT NULL
-         AND sc.created_at >= NOW() - INTERVAL '2 hours'`,
+         AND sc.created_at >= NOW() - INTERVAL '24 hours'`,
     );
 
     if (rows.length === 0) return;

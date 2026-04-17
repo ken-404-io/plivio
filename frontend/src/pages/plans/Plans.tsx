@@ -115,6 +115,8 @@ export default function Plans() {
   const [loading,        setLoading]        = useState(true);
   const [subscribing,    setSubscribing]    = useState('');
   const [awaitingPayment, setAwaitingPayment] = useState(false);
+  const [hasPending,     setHasPending]     = useState(false);
+  const [checking,       setChecking]       = useState(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Default to 'premium' for free users so the upgrade CTA is immediately visible
   const [activeTab,   setActiveTab]   = useState<string>(
@@ -125,10 +127,12 @@ export default function Plans() {
     Promise.all([
       api.get<PlansResponse>('/subscriptions/plans'),
       api.get<{ subscription: Subscription | null }>('/subscriptions/current'),
+      api.get<{ has_pending: boolean }>('/subscriptions/pending-checkout'),
     ])
-      .then(([planRes, subRes]) => {
+      .then(([planRes, subRes, pendingRes]) => {
         setPlans(planRes.data.plans);
         setSub(subRes.data.subscription);
+        setHasPending(pendingRes.data.has_pending);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -148,6 +152,7 @@ export default function Plans() {
       const { data } = await api.post<{ activated: boolean; plan?: string }>('/subscriptions/verify-payment');
       if (data.activated) {
         setAwaitingPayment(false);
+        setHasPending(false);
         if (pollTimer.current) { clearTimeout(pollTimer.current); pollTimer.current = null; }
         const planName = (data.plan ?? 'your new plan');
         achievement.showAchievement({
@@ -162,6 +167,16 @@ export default function Plans() {
       }
     } catch { /* keep going */ }
     return false;
+  }
+
+  async function handleManualCheck() {
+    setChecking(true);
+    try {
+      const activated = await checkActivation();
+      if (!activated) toast.error('Payment not confirmed yet. If you already paid, please wait a few minutes and try again.');
+    } finally {
+      setChecking(false);
+    }
   }
 
   function startPolling() {
@@ -310,7 +325,7 @@ export default function Plans() {
         </div>
       </header>
 
-      {/* ── Awaiting payment banner ── */}
+      {/* ── Awaiting payment banner (active polling) ── */}
       {awaitingPayment && (
         <div className="payment-awaiting-banner">
           <Loader size={18} className="spin" />
@@ -319,6 +334,23 @@ export default function Plans() {
             Check
           </button>
           <button className="payment-awaiting-dismiss" onClick={() => { setAwaitingPayment(false); if (pollTimer.current) clearTimeout(pollTimer.current); }}>
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Pending payment banner (cross-device: shown when a recent checkout exists but plan not yet active) ── */}
+      {!awaitingPayment && hasPending && !sub && (
+        <div className="payment-awaiting-banner">
+          <span>You have a pending payment. Already paid? Check your activation status.</span>
+          <button
+            className="payment-awaiting-check"
+            onClick={() => { void handleManualCheck(); }}
+            disabled={checking}
+          >
+            {checking ? <Loader size={14} className="spin" /> : 'Check payment'}
+          </button>
+          <button className="payment-awaiting-dismiss" onClick={() => setHasPending(false)}>
             <X size={15} />
           </button>
         </div>
