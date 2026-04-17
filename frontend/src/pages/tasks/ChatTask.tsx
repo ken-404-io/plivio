@@ -106,7 +106,17 @@ export default function ChatTask({ onClose }: Props) {
         if (data.reason === 'no_questions') {
           setDoneMode('bank-empty');
           setLimitMsg(data.message ?? 'No more questions available right now.');
+        } else if (data.reason === 'free_lifetime_exhausted') {
+          setDoneMode('upgrade');
+          setLimitMsg(data.message ?? 'No more questions available.');
+        } else if (data.reason === 'earnings_capped') {
+          setDoneMode('earnings-capped');
+          setLimitMsg(data.message ?? 'No more questions available.');
+        } else if (data.reason === 'daily_limit_reached') {
+          setDoneMode('generic');
+          setLimitMsg(data.message ?? 'No more questions available.');
         } else {
+          setDoneMode('generic');
           setLimitMsg(data.message ?? 'No more questions available.');
         }
         setPhase('done');
