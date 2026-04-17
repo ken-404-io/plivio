@@ -7,7 +7,7 @@ import {
   CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
   Download, X, Link2,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
 import type {
@@ -896,7 +896,9 @@ function ExportButton({ section }: { section: string }) {
 export default function AdminDashboard() {
   const toast = useToast();
 
-  const [tab,           setTab]           = useState<Tab>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = (TABS.includes(searchParams.get('tab') as Tab) ? searchParams.get('tab') : 'overview') as Tab;
+  const setTab = (t: Tab) => setSearchParams({ tab: t }, { replace: true });
   const [stats,         setStats]         = useState<AdminStats | null>(null);
   const [users,         setUsers]         = useState<AdminUser[]>([]);
   const [usersMeta,     setUsersMeta]     = useState({ page: 1, total: 0, limit: 25 });
@@ -1591,30 +1593,10 @@ export default function AdminDashboard() {
       {/* Header + tab bar + KYC batch toolbar — sticky */}
       <div className="adm-sticky-top">
         <header className="adm-header">
-          <div className="adm-header-brand">
+          <div>
             <h1 className="adm-title">Admin Panel</h1>
             <p className="adm-subtitle">{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
           </div>
-
-          <nav className="adm-tabs">
-            {TABS.map((t) => {
-              const { label, Icon } = TAB_META[t];
-              const badge = t === 'kyc' ? stats?.pending_kyc
-                          : t === 'withdrawals' ? stats?.pending_withdrawals
-                          : 0;
-              return (
-                <button
-                  key={t}
-                  className={`adm-tab${tab === t ? ' adm-tab--active' : ''}`}
-                  onClick={() => setTab(t)}
-                >
-                  <Icon size={15} />
-                  <span>{label}</span>
-                  {badge != null && badge > 0 && <span className="adm-tab-badge">{badge}</span>}
-                </button>
-              );
-            })}
-          </nav>
         </header>
 
         {/* KYC batch select toolbar — only visible on the KYC tab */}

@@ -2340,19 +2340,11 @@ a, button, [role="button"], [tabindex] {
   border-bottom: 1px solid var(--border);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.10);
 }
-.adm-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding-bottom: 8px;
-}
-.adm-header-brand { flex-shrink: 0; }
+.adm-header { margin-bottom: 8px; }
 .adm-title  { font-size: 20px; font-weight: 700; color: var(--text-heading); margin: 0; }
 .adm-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
-/* Tabs — now lives inside the header navbar */
+/* Tabs */
 .adm-tabs {
   display: flex;
   gap: 4px;
@@ -2362,7 +2354,6 @@ a, button, [role="button"], [tabindex] {
   padding: 4px;
   overflow-x: auto;
   scrollbar-width: none;
-  flex-wrap: nowrap;
 }
 .adm-tabs::-webkit-scrollbar { display: none; }
 .adm-tab {
@@ -2398,6 +2389,29 @@ a, button, [role="button"], [tabindex] {
   font-weight: 700;
   line-height: 1;
 }
+
+/* Admin sidebar sub-navigation */
+.adm-subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 16px;
+  margin-top: 2px;
+}
+.adm-subnav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.adm-subnav-item:hover { background: var(--bg-elevated); color: var(--text-heading); }
+.adm-subnav-item--active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
 
 /* Stats grid */
 .adm-stats-grid {
