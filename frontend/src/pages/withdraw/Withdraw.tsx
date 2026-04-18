@@ -453,9 +453,10 @@ export default function Withdraw() {
     return null;
   }
 
-  // Check proactively if free-plan user has already used their one withdrawal
+  // Check proactively if free-plan user has already used their one withdrawal.
+  // Rejected withdrawals don't count — the slot is restored so the user can retry.
   const hasUsedFreeWithdrawal = isFreePlan && history.some(
-    (w) => !['cancelled'].includes(w.status),
+    (w) => !['cancelled', 'rejected'].includes(w.status),
   );
 
   // Cooldown active for premium/elite users
