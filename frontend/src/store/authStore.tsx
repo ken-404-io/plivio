@@ -203,6 +203,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [fetchMe]);
 
+  // Heartbeat: tell the server the user is active every 30 seconds.
+  // Used by the admin "Online" tab to show who is currently on the webapp.
+  useEffect(() => {
+    const ping = () => {
+      if (!userRef.current || document.hidden) return;
+      void api.post('/users/me/heartbeat').catch(() => {});
+    };
+    ping(); // immediate ping on login/mount
+    const id = setInterval(ping, 30_000);
+    return () => clearInterval(id);
+  }, [state.user?.id]); // restart timer when user changes (login/logout)
+
   const login = useCallback(async (email: string, password: string) => {
     // Check if another user is already active in this browser
     try {

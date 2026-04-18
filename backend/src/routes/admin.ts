@@ -29,6 +29,7 @@ import {
   suspendUser,
   banUser,
   notifyRejectedFreeWithdrawals,
+  getOnlineUsers,
 } from '../controllers/adminController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
@@ -43,7 +44,8 @@ router.use(
   rateLimiter({ max: 200, windowMs: 60_000, keyPrefix: 'admin' }),
 );
 
-router.get('/stats', getStats);
+router.get('/stats',  getStats);
+router.get('/online', getOnlineUsers);
 
 router.post('/notify',
   validateBody({

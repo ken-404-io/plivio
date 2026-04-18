@@ -9,6 +9,7 @@ import {
   uploadAvatar,
   requestEmailChange,
   confirmEmailChange,
+  heartbeat,
 } from '../controllers/userController.ts';
 import { avatarUpload } from '../middleware/upload.ts';
 
@@ -16,9 +17,10 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/me',           getMe);
-router.get('/me/earnings',  getEarnings);
-router.get('/me/referrals', getReferrals);
+router.get('/me',            getMe);
+router.post('/me/heartbeat', heartbeat);
+router.get('/me/earnings',   getEarnings);
+router.get('/me/referrals',  getReferrals);
 
 router.put('/me/password',
   validateBody({
