@@ -3,18 +3,21 @@ import pool from '../config/db.ts';
 import { ValidationError, ForbiddenError, NotFoundError } from '../utils/errors.ts';
 
 const FREE_PLAN_WITHDRAWAL_LIMIT    = 1;
-const FREE_PLAN_MAX_AMOUNT          = 100;
+const FREE_PLAN_MIN_AMOUNT          = 400;  // ₱400 minimum payout for Free plan
+const FREE_PLAN_MAX_AMOUNT          = 5000; // no hard cap beyond global max
 const FREE_PLAN_UPGRADE_CODE        = 'free_plan_limit_reached';
-const PREMIUM_DAILY_WITHDRAWAL_MAX  = 149;  // ₱149 total per day for Premium
-const ELITE_DAILY_WITHDRAWAL_MAX    = 500;  // ₱500 total per day for Elite
+const PREMIUM_MIN_AMOUNT            = 500;  // ₱500 minimum payout for Premium
+const PREMIUM_DAILY_WITHDRAWAL_MAX  = 5000; // ₱5000 daily cap for Premium
+const ELITE_MIN_AMOUNT              = 1500; // ₱1,500 minimum payout for Elite
+const ELITE_DAILY_WITHDRAWAL_MAX    = 5000; // ₱5000 daily cap for Elite
 // SQL snippet: start of "today" in Philippine Standard Time (UTC+8)
 const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila')`;
 
 // Minimum quiz earnings (₱) a user must accumulate today before they can withdraw.
-// Free plan users who have exhausted their 100-question lifetime bank are exempt.
-const QUIZ_EARN_GATE_DEFAULT = 20;
-const QUIZ_EARN_GATE_PREMIUM = 35;
-const QUIZ_EARN_GATE_ELITE   = 80;
+// Resets at 12am Philippine time. Free plan users who have exhausted their 100-question lifetime bank are exempt.
+const QUIZ_EARN_GATE_DEFAULT = 30;
+const QUIZ_EARN_GATE_PREMIUM = 50;
+const QUIZ_EARN_GATE_ELITE   = 150;
 const FREE_PLAN_LIFETIME_CAP = 100;
 
 const MIN_WITHDRAWAL  = 50;
@@ -145,10 +148,13 @@ export async function requestWithdrawal(
       throw new ValidationError(`Insufficient balance. Available: ₱${Number(user.balance).toFixed(2)}`);
     }
 
-    // Free plan: max ₱100 per withdrawal and limited to 1 total
+    // Free plan: min ₱400 per withdrawal and limited to 1 total
     if (user.plan === 'free') {
+      if (amount < FREE_PLAN_MIN_AMOUNT) {
+        throw new ValidationError(`Free plan minimum payout is ₱${FREE_PLAN_MIN_AMOUNT}.`);
+      }
       if (amount > FREE_PLAN_MAX_AMOUNT) {
-        throw new ValidationError(`Free plan withdrawals are limited to ₱${FREE_PLAN_MAX_AMOUNT}. Upgrade your plan to withdraw more.`);
+        throw new ValidationError(`Free plan withdrawals cannot exceed ₱${FREE_PLAN_MAX_AMOUNT}.`);
       }
       const { rows: wdCountRows } = await client.query(
         `SELECT COUNT(*) AS count FROM withdrawals
@@ -164,8 +170,11 @@ export async function requestWithdrawal(
       }
     }
 
-    // Premium: ₱149/day total withdrawal limit
+    // Premium: min ₱500 per withdrawal, ₱5,000/day total limit
     if (user.plan === 'premium') {
+      if (amount < PREMIUM_MIN_AMOUNT) {
+        throw new ValidationError(`Premium plan minimum payout is ₱${PREMIUM_MIN_AMOUNT}.`);
+      }
       const { rows: todayRows } = await client.query(
         `SELECT COALESCE(SUM(amount), 0) AS today_total
          FROM withdrawals
@@ -184,8 +193,11 @@ export async function requestWithdrawal(
       }
     }
 
-    // Elite: ₱500/day total withdrawal limit
+    // Elite: min ₱1,500 per withdrawal, ₱5,000/day total limit
     if (user.plan === 'elite') {
+      if (amount < ELITE_MIN_AMOUNT) {
+        throw new ValidationError(`Elite plan minimum payout is ₱${ELITE_MIN_AMOUNT}.`);
+      }
       const { rows: todayRows } = await client.query(
         `SELECT COALESCE(SUM(amount), 0) AS today_total
          FROM withdrawals
@@ -285,6 +297,7 @@ export async function getWithdrawalCooldown(
         success:          true,
         on_cooldown:      false,
         daily_limit:      PREMIUM_DAILY_WITHDRAWAL_MAX,
+        min_amount:       PREMIUM_MIN_AMOUNT,
         today_withdrawn:  todayTotal,
         daily_remaining:  remaining,
         ...quizInfo,
@@ -308,6 +321,7 @@ export async function getWithdrawalCooldown(
         success:          true,
         on_cooldown:      false,
         daily_limit:      ELITE_DAILY_WITHDRAWAL_MAX,
+        min_amount:       ELITE_MIN_AMOUNT,
         today_withdrawn:  todayTotal,
         daily_remaining:  remaining,
         ...quizInfo,
@@ -328,6 +342,7 @@ export async function getWithdrawalCooldown(
         on_cooldown:           false,
         free_withdrawal_used:  usedCount >= FREE_PLAN_WITHDRAWAL_LIMIT,
         free_withdrawal_limit: FREE_PLAN_WITHDRAWAL_LIMIT,
+        min_amount:            FREE_PLAN_MIN_AMOUNT,
         ...quizInfo,
       });
       return;
