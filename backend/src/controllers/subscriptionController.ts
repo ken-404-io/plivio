@@ -43,8 +43,10 @@ export const PLANS: Record<string, PlanInfo> = {
     price_php:   0,
     daily_limit: 20,
     features:    [
-      'Up to 20 quiz questions',
+      'Up to 20 quiz questions per day',
       '₱20 daily earning cap',
+      '₱400 minimum payout',
+      '1 lifetime withdrawal',
       'GCash & PayPal withdrawals',
       'Standard support',
     ],
@@ -56,8 +58,8 @@ export const PLANS: Record<string, PlanInfo> = {
     features:    [
       '200 quiz questions per day',
       '₱50 daily quiz earning cap',
+      '₱500 minimum payout',
       'Earn via referrals (no cap)',
-      'Ad-free experience',
       'All task types unlocked',
       'Priority support',
     ],
@@ -69,8 +71,8 @@ export const PLANS: Record<string, PlanInfo> = {
     features:    [
       'Unlimited quiz questions',
       'No daily earning cap',
-      '₱500/day withdrawal limit',
-      'Ad-free experience',
+      '₱1,500 minimum payout',
+      'Earn via referrals (no cap)',
       'Early access to new features',
       'VIP dedicated support',
     ],

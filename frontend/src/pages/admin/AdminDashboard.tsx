@@ -105,6 +105,7 @@ function RejectModal({ onConfirm, onCancel }: {
 
 // ─── Withdrawal rejection modal (predefined reasons) ─────────────────────────
 const WITHDRAWAL_REJECT_REASONS = [
+  'The minimum pay out is 500.',
   'PayPal is currently under maintenance.',
   'GCash is currently under maintenance.',
   'Account information mismatch. Please verify your account details.',

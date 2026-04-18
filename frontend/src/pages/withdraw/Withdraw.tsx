@@ -84,10 +84,13 @@ function ValidationModal({ message, onClose }: { message: string; onClose: () =>
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const MIN_AMOUNT            = 50;
-const MAX_AMOUNT            = 5000;
-const FREE_PLAN_MAX_AMOUNT  = 100;
-const QUIZ_EARN_GATE        = 20;
+const MIN_AMOUNT                = 50;
+const MAX_AMOUNT                = 5000;
+const FREE_PLAN_MIN_AMOUNT      = 400;
+const FREE_PLAN_MAX_AMOUNT      = 5000;
+const PREMIUM_PLAN_MIN_AMOUNT   = 500;
+const ELITE_PLAN_MIN_AMOUNT     = 1500;
+const QUIZ_EARN_GATE            = 30;
 const DOC_FEE_RATE      = 0.01;
 const HANDLING_FEE_RATE  = 0.04;
 const TOTAL_FEE_RATE    = DOC_FEE_RATE + HANDLING_FEE_RATE;
@@ -433,26 +436,30 @@ export default function Withdraw() {
   const liveNet    = Math.round((liveAmount - liveFee) * 100) / 100;
 
   // ── Plan checks ───────────────────────────────────────────────────────────
-  const isFreePlan = user?.plan === 'free';
+  const isFreePlan    = user?.plan === 'free';
+  const isPremiumPlan = user?.plan === 'premium';
+  const isElitePlan   = user?.plan === 'elite';
+
+  const planMinAmount = isElitePlan ? ELITE_PLAN_MIN_AMOUNT : isPremiumPlan ? PREMIUM_PLAN_MIN_AMOUNT : FREE_PLAN_MIN_AMOUNT;
+  const effectiveMinLabel = `₱${planMinAmount.toLocaleString()}`;
 
   // ── Quick amounts filtered by balance ─────────────────────────────────────
   const balance = Number(user?.balance ?? 0);
-  const effectiveMax = isFreePlan ? FREE_PLAN_MAX_AMOUNT : MAX_AMOUNT;
+  const effectiveMax = FREE_PLAN_MAX_AMOUNT; // global max applies to all plans
   const quickAmounts = useMemo(
-    () => QUICK_AMOUNTS.filter((a) => a <= balance && a <= effectiveMax),
-    [balance, effectiveMax],
+    () => QUICK_AMOUNTS.filter((a) => a <= balance && a <= effectiveMax && a >= planMinAmount),
+    [balance, effectiveMax, planMinAmount],
   );
 
   const selectedPm = paymentMethods.find((pm) => pm.id === selectedPmId) ?? null;
 
   // ── Validation ────────────────────────────────────────────────────────────
   function validate(): string | null {
-    if (!amount || isNaN(liveAmount))                         return 'Enter a valid amount.';
-    if (liveAmount < MIN_AMOUNT)                              return `Minimum withdrawal is ₱${MIN_AMOUNT}.`;
-    if (liveAmount > MAX_AMOUNT)                              return `Maximum withdrawal is ₱${MAX_AMOUNT.toLocaleString()}.`;
-    if (isFreePlan && liveAmount > FREE_PLAN_MAX_AMOUNT)      return `Free plan withdrawals are limited to ₱${FREE_PLAN_MAX_AMOUNT}. Upgrade to withdraw more.`;
-    if (liveAmount > balance)                                 return 'Insufficient balance.';
-    if (!selectedPm)                                          return 'Please add and select a payment method before withdrawing.';
+    if (!amount || isNaN(liveAmount))            return 'Enter a valid amount.';
+    if (liveAmount < planMinAmount)              return `Minimum payout for your plan is ${effectiveMinLabel}.`;
+    if (liveAmount > MAX_AMOUNT)                 return `Maximum withdrawal is ₱${MAX_AMOUNT.toLocaleString()}.`;
+    if (liveAmount > balance)                    return 'Insufficient balance.';
+    if (!selectedPm)                             return 'Please add and select a payment method before withdrawing.';
     return null;
   }
 
