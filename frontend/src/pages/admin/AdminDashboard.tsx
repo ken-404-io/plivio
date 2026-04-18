@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
   XCircle, Eye, Coins, MessageSquare, Clock,
   CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
-  Download, X, Link2,
+  Download, X, Link2, Wifi, RefreshCw,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api.ts';
@@ -16,7 +16,7 @@ import type {
   AdminNotificationLog,
 } from '../../types/index.ts';
 
-const TABS = ['overview', 'users', 'withdrawals', 'referrals', 'notifications', 'kyc'] as const;
+const TABS = ['overview', 'users', 'withdrawals', 'referrals', 'notifications', 'kyc', 'online'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
@@ -26,6 +26,7 @@ const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
   referrals:     { label: 'Referrals',     Icon: Link2           },
   notifications: { label: 'Notifications', Icon: Bell            },
   kyc:           { label: 'KYC',           Icon: ShieldCheck     },
+  online:        { label: 'Online',        Icon: Wifi            },
 };
 
 // ─── KYC rejection modal (predefined reasons + custom) ───────────────────────
@@ -996,6 +997,12 @@ export default function AdminDashboard() {
   const [notifFilters, setNotifFilters] = useState({ search: '', status: '', date_from: '', date_to: '' });
   const [notifExpanded, setNotifExpanded] = useState<string | null>(null);
 
+  // Online users state
+  const [onlineUsers,        setOnlineUsers]        = useState<{ id: string; username: string; email: string; plan: string; last_active_at: string }[]>([]);
+  const [onlineLoading,      setOnlineLoading]      = useState(false);
+  const [onlineLastRefreshed, setOnlineLastRefreshed] = useState<Date | null>(null);
+  const onlineIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wdSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1022,6 +1029,29 @@ export default function AdminDashboard() {
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const loadOnlineUsers = useCallback(async () => {
+    setOnlineLoading(true);
+    try {
+      const { data } = await api.get<{ users: typeof onlineUsers; count: number }>('/admin/online');
+      setOnlineUsers(data.users);
+      setOnlineLastRefreshed(new Date());
+    } catch { /* silent */ }
+    finally { setOnlineLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-refresh online list every 30s while the tab is active
+  useEffect(() => {
+    if (tab === 'online') {
+      void loadOnlineUsers();
+      onlineIntervalRef.current = setInterval(() => { void loadOnlineUsers(); }, 30_000);
+    } else {
+      if (onlineIntervalRef.current) { clearInterval(onlineIntervalRef.current); onlineIntervalRef.current = null; }
+    }
+    return () => { if (onlineIntervalRef.current) clearInterval(onlineIntervalRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   const loadUsers = useCallback(async () => {
     setUsersLoading(true);
@@ -2988,6 +3018,104 @@ export default function AdminDashboard() {
             ))}
           </div>
         </>
+      )}
+
+      {/* ── Online ── */}
+      {tab === 'online' && (
+        <div className="adm-section">
+          <div className="adm-section-header" style={{ justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Wifi size={15} style={{ color: 'var(--success)' }} />
+              <h2 className="adm-section-title">
+                Online Now
+                <span style={{
+                  marginLeft: 8,
+                  background: 'var(--success)',
+                  color: '#fff',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: '1px 8px',
+                }}>
+                  {onlineUsers.length}
+                </span>
+              </h2>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {onlineLastRefreshed && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  Updated {onlineLastRefreshed.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              )}
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => { void loadOnlineUsers(); }}
+                disabled={onlineLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                <RefreshCw size={13} className={onlineLoading ? 'spin' : ''} />
+                Refresh
+              </button>
+            </div>
+          </div>
+          <p className="adm-section-hint">Users who pinged the server in the last 5 minutes. Auto-refreshes every 30 seconds.</p>
+
+          {onlineLoading && onlineUsers.length === 0 ? (
+            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+              Loading…
+            </div>
+          ) : onlineUsers.length === 0 ? (
+            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+              No users online right now.
+            </div>
+          ) : (
+            <div className="adm-table-wrap">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Plan</th>
+                    <th>Last Active</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {onlineUsers.map((u, i) => {
+                    const secsAgo = Math.floor((Date.now() - new Date(u.last_active_at).getTime()) / 1000);
+                    const ago = secsAgo < 60
+                      ? `${secsAgo}s ago`
+                      : `${Math.floor(secsAgo / 60)}m ${secsAgo % 60}s ago`;
+                    return (
+                      <tr key={u.id}>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{i + 1}</td>
+                        <td>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', flexShrink: 0 }} />
+                            <strong>{u.username}</strong>
+                          </span>
+                        </td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{u.email}</td>
+                        <td>
+                          <span className={`adm-plan-badge adm-plan-badge--${u.plan}`}>
+                            {u.plan}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{ago}</td>
+                        <td>
+                          <Link to={`/admin/users/${u.id}`} className="btn btn-ghost btn-sm">
+                            <Eye size={13} /> View
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
 
     </div>

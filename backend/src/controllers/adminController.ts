@@ -1160,3 +1160,18 @@ export async function notifyRejectedFreeWithdrawals(
     });
   } catch (err) { next(err); }
 }
+
+// ─── GET /admin/online ────────────────────────────────────────────────────────
+
+export async function getOnlineUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, username, email, plan, last_active_at
+       FROM users
+       WHERE last_active_at >= NOW() - INTERVAL '5 minutes'
+         AND is_banned = FALSE
+       ORDER BY last_active_at DESC`,
+    );
+    res.json({ success: true, users: rows, count: rows.length });
+  } catch (err) { next(err); }
+}

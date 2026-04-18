@@ -38,6 +38,18 @@ export async function getMe(req: Request, res: Response, next: NextFunction): Pr
   } catch (err) { next(err); }
 }
 
+// ─── POST /users/me/heartbeat ─────────────────────────────────────────────────
+
+export async function heartbeat(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await pool.query(
+      'UPDATE users SET last_active_at = NOW() WHERE id = $1',
+      [req.user!.id],
+    );
+    res.json({ success: true });
+  } catch (err) { next(err); }
+}
+
 // ─── PUT /users/me/password ───────────────────────────────────────────────
 
 export async function changePassword(
