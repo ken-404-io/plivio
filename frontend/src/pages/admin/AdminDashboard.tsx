@@ -911,6 +911,7 @@ export default function AdminDashboard() {
   const [userPage,             setUserPage]             = useState(1);
   const [withdrawals,   setWithdrawals]   = useState<AdminWithdrawal[]>([]);
   const [pendingPlanFilter, setPendingPlanFilter] = useState('');
+  const [pendingSearchFilter, setPendingSearchFilter] = useState('');
   const [kycList,       setKycList]       = useState<AdminKycSubmission[]>([]);
   const [loading,       setLoading]       = useState(true);
 
@@ -2215,6 +2216,18 @@ export default function AdminDashboard() {
             <>
               <div className="adm-wd-filters" style={{ marginBottom: 12 }}>
                 <div className="adm-wd-filter-row">
+                  <div className="adm-search-wrap" style={{ flex: 1 }}>
+                    <Search size={14} className="adm-search-icon" />
+                    <input
+                      className="form-input adm-search-input"
+                      placeholder="Search by username…"
+                      value={pendingSearchFilter}
+                      onChange={(e) => setPendingSearchFilter(e.target.value)}
+                    />
+                    {pendingSearchFilter && (
+                      <button className="adm-search-clear" onClick={() => setPendingSearchFilter('')}>×</button>
+                    )}
+                  </div>
                   <select
                     className="form-input adm-wd-filter-select"
                     value={pendingPlanFilter}
@@ -2225,15 +2238,20 @@ export default function AdminDashboard() {
                     <option value="premium">Premium</option>
                     <option value="elite">Elite</option>
                   </select>
-                  {pendingPlanFilter && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => setPendingPlanFilter('')}>Reset</button>
+                  {(pendingPlanFilter || pendingSearchFilter) && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setPendingPlanFilter(''); setPendingSearchFilter(''); }}>Reset</button>
                   )}
                 </div>
               </div>
             <div className="adm-list">
-              {(pendingPlanFilter ? withdrawals.filter((w) => w.user_plan === pendingPlanFilter) : withdrawals).length === 0 ? (
-                <div className="empty-state"><p>No pending withdrawals.</p></div>
-              ) : (pendingPlanFilter ? withdrawals.filter((w) => w.user_plan === pendingPlanFilter) : withdrawals).map((w) => (
+              {(() => {
+                const filtered = withdrawals.filter((w) =>
+                  (!pendingPlanFilter || w.user_plan === pendingPlanFilter) &&
+                  (!pendingSearchFilter || w.username.toLowerCase().includes(pendingSearchFilter.toLowerCase()))
+                );
+                return filtered.length === 0 ? (
+                  <div className="empty-state"><p>No pending withdrawals.</p></div>
+                ) : filtered.map((w) => (
                 <div key={w.id} className="adm-wd-card">
                   <div className="adm-wd-top">
                     <div className="adm-wd-user">
@@ -2281,7 +2299,8 @@ export default function AdminDashboard() {
                     </button>
                   </div>
                 </div>
-              ))}
+              ));
+              })()}
             </div>
             </>
           )}
