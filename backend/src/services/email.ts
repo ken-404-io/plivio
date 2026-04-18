@@ -254,6 +254,126 @@ export async function sendSubscriptionConfirmEmail(
   await send(to, `${planName} subscription activated – ${APP_NAME}`, wrap('Subscription', body));
 }
 
+export async function sendPaymentFailedEmail(
+  to: string,
+  username: string,
+  amountPhp: number,
+): Promise<void> {
+  const body = `
+    <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+      Payment failed
+    </p>
+    <p>Hi <strong>${username}</strong>,</p>
+    <p>Your payment of <strong>₱${amountPhp.toFixed(2)}</strong> could not be processed.
+       This may be due to insufficient funds, an expired card, or a temporary issue
+       with your payment method.</p>
+    <p>Please try again with a different payment method or contact your bank for details.</p>
+    ${button(`${APP_URL}/plans`, 'Try Again')}
+    <p style="color:#6b6880;font-size:13px;margin-top:8px;">
+      If you believe this is an error, please contact our support team.
+    </p>`;
+  await send(to, `Payment of ₱${amountPhp.toFixed(2)} failed – ${APP_NAME}`, wrap('Payment Failed', body));
+}
+
+export async function sendSubscriptionInvoiceCreatedEmail(
+  to: string,
+  username: string,
+  planName: string,
+  amountPhp: number,
+): Promise<void> {
+  const body = `
+    <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+      New invoice created
+    </p>
+    <p>Hi <strong>${username}</strong>,</p>
+    <p>An invoice of <strong>₱${amountPhp.toFixed(2)}</strong> has been created for your
+       <strong>${planName}</strong> subscription renewal.</p>
+    <p>Payment will be collected automatically on your next billing date.</p>
+    ${button(`${APP_URL}/plans`, 'View Subscription')}`;
+  await send(to, `New invoice for your ${planName} subscription – ${APP_NAME}`, wrap('Invoice Created', body));
+}
+
+export async function sendSubscriptionInvoicePaidEmail(
+  to: string,
+  username: string,
+  planName: string,
+  amountPhp: number,
+): Promise<void> {
+  const body = `
+    <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+      Invoice paid
+    </p>
+    <p>Hi <strong>${username}</strong>,</p>
+    <p>Your invoice of <strong>₱${amountPhp.toFixed(2)}</strong> for your
+       <strong>${planName}</strong> subscription has been
+       <strong style="color:#22c55e;">paid successfully</strong>.</p>
+    <p>Your subscription remains active. Thank you!</p>
+    ${button(`${APP_URL}/dashboard`, 'Go to Dashboard')}`;
+  await send(to, `Invoice paid – ${planName} subscription – ${APP_NAME}`, wrap('Invoice Paid', body));
+}
+
+export async function sendSubscriptionPastDueEmail(
+  to: string,
+  username: string,
+  planName: string,
+): Promise<void> {
+  const body = `
+    <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+      Subscription payment past due
+    </p>
+    <p>Hi <strong>${username}</strong>,</p>
+    <p>Your <strong>${planName}</strong> subscription payment is
+       <strong style="color:#f59e0b;">past due</strong>.</p>
+    <p>To keep your subscription active and avoid losing access to premium features,
+       please update your payment method as soon as possible.</p>
+    ${button(`${APP_URL}/plans`, 'Update Payment')}
+    <p style="color:#6b6880;font-size:13px;margin-top:8px;">
+      If payment is not received soon, your subscription may be suspended.
+    </p>`;
+  await send(to, `Action required: ${planName} subscription payment past due – ${APP_NAME}`, wrap('Payment Past Due', body));
+}
+
+export async function sendSubscriptionUnpaidEmail(
+  to: string,
+  username: string,
+  planName: string,
+): Promise<void> {
+  const body = `
+    <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+      Subscription suspended – unpaid
+    </p>
+    <p>Hi <strong>${username}</strong>,</p>
+    <p>Your <strong>${planName}</strong> subscription has been
+       <strong style="color:#ef4444;">suspended</strong> due to an unpaid invoice.</p>
+    <p>To restore access to your premium features, please settle your outstanding
+       balance by subscribing again.</p>
+    ${button(`${APP_URL}/plans`, 'Resubscribe')}
+    <p style="color:#6b6880;font-size:13px;margin-top:8px;">
+      Contact support if you need assistance.
+    </p>`;
+  await send(to, `Your ${planName} subscription has been suspended – ${APP_NAME}`, wrap('Subscription Suspended', body));
+}
+
+export async function sendSubscriptionUpdatedEmail(
+  to: string,
+  username: string,
+  planName: string,
+  status: string,
+): Promise<void> {
+  const body = `
+    <p style="color:#f1f0f5;font-size:18px;font-weight:600;margin:0 0 12px;">
+      Subscription updated
+    </p>
+    <p>Hi <strong>${username}</strong>,</p>
+    <p>Your <strong>${planName}</strong> subscription has been updated.</p>
+    <p>Current status: <strong style="color:#aa3bff;">${status}</strong></p>
+    ${button(`${APP_URL}/plans`, 'View Subscription')}
+    <p style="color:#6b6880;font-size:13px;margin-top:8px;">
+      If you did not make this change, please contact support immediately.
+    </p>`;
+  await send(to, `Your ${APP_NAME} subscription has been updated`, wrap('Subscription Updated', body));
+}
+
 /** Sleep helper */
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
