@@ -28,6 +28,7 @@ import {
   changePlan,
   suspendUser,
   banUser,
+  notifyRejectedFreeWithdrawals,
 } from '../controllers/adminController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 
@@ -131,6 +132,7 @@ router.put('/tasks/:id',             validateParam('id'), updateTask);
 router.put('/tasks/:id/ad-networks', validateParam('id'), updateAdNetworks);
 router.delete('/tasks/:id',          validateParam('id'), deleteTask);
 
+router.post('/notify-rejected-withdrawals', notifyRejectedFreeWithdrawals);
 router.get('/withdrawals', listPendingWithdrawals);
 router.get('/withdrawals/history', listWithdrawalHistory);
 router.put('/withdrawals/:id',
