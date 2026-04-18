@@ -1027,6 +1027,7 @@ export default function AdminDashboard() {
       }
     }
     void load();
+    void loadOnlineUsers(); // load count for header pill on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1626,6 +1627,26 @@ export default function AdminDashboard() {
           <div>
             <h1 className="adm-title">Admin Panel</h1>
             <p className="adm-subtitle">{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          </div>
+          <div className="adm-header-actions">
+            <button
+              className="adm-online-pill"
+              onClick={() => setTab('online')}
+              title="View online users"
+            >
+              <span className="adm-online-dot" />
+              <Wifi size={13} />
+              <span>{onlineUsers.length} online</span>
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => { void loadOnlineUsers(); }}
+              disabled={onlineLoading}
+              title="Refresh online count"
+              style={{ padding: '5px 8px' }}
+            >
+              <RefreshCw size={13} className={onlineLoading ? 'spin' : ''} />
+            </button>
           </div>
         </header>
 
