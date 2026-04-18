@@ -17,6 +17,7 @@ import {
   Bell,
   Link2,
   ShieldCheck,
+  Wifi,
 } from 'lucide-react';
 
 type LucideIcon = React.ElementType;
@@ -48,6 +49,7 @@ const ADMIN_TABS = [
   { tab: 'referrals',     label: 'Referrals',     Icon: Link2           },
   { tab: 'notifications', label: 'Notifications', Icon: Bell            },
   { tab: 'kyc',           label: 'KYC',           Icon: ShieldCheck     },
+  { tab: 'online',        label: 'Online',        Icon: Wifi            },
 ] as const;
 
 interface SidebarProps {
