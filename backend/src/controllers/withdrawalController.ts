@@ -12,7 +12,9 @@ const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila'))
 
 // Minimum quiz earnings (₱) a user must accumulate today before they can withdraw.
 // Free plan users who have exhausted their 100-question lifetime bank are exempt.
-const QUIZ_EARN_GATE         = 20;
+const QUIZ_EARN_GATE_DEFAULT = 20;
+const QUIZ_EARN_GATE_PREMIUM = 35;
+const QUIZ_EARN_GATE_ELITE   = 80;
 const FREE_PLAN_LIFETIME_CAP = 100;
 
 const MIN_WITHDRAWAL  = 50;
@@ -109,9 +111,10 @@ export async function requestWithdrawal(
       throw new ForbiddenError('Identity verification required before withdrawing');
     }
 
-    // Quiz earn gate — must earn at least ₱20 from Quizly today before withdrawing.
+    // Quiz earn gate — must earn at least the plan's threshold from Quizly today before withdrawing.
     // Free users who've exhausted their 100-question lifetime bank are exempt.
     {
+      const quizEarnGate = user.plan === 'elite' ? QUIZ_EARN_GATE_ELITE : user.plan === 'premium' ? QUIZ_EARN_GATE_PREMIUM : QUIZ_EARN_GATE_DEFAULT;
       const { rows: quizRows } = await client.query(
         `SELECT COALESCE(SUM(reward_earned), 0) AS today_earned FROM user_question_answers
          WHERE user_id = $1 AND answered_at >= ${SQL_PH_DAY_START}`,
@@ -119,7 +122,7 @@ export async function requestWithdrawal(
       );
       const todayEarned = Number((quizRows[0] as { today_earned: string }).today_earned);
 
-      if (todayEarned < QUIZ_EARN_GATE) {
+      if (todayEarned < quizEarnGate) {
         let exempt = false;
         if (user.plan === 'free') {
           const { rows: lifeRows } = await client.query(
@@ -129,9 +132,9 @@ export async function requestWithdrawal(
           if (Number((lifeRows[0] as { total: string }).total) >= FREE_PLAN_LIFETIME_CAP) exempt = true;
         }
         if (!exempt) {
-          const remaining = (QUIZ_EARN_GATE - todayEarned).toFixed(2);
+          const remaining = (quizEarnGate - todayEarned).toFixed(2);
           throw new ForbiddenError(
-            `Earn ₱${QUIZ_EARN_GATE} in Quizly today to unlock your withdrawal. You need ₱${remaining} more.`,
+            `Earn ₱${quizEarnGate} in Quizly today to unlock your withdrawal. You need ₱${remaining} more.`,
             'quiz_gate_not_met',
           );
         }
@@ -256,11 +259,12 @@ export async function getWithdrawalCooldown(
     const quizTodayEarned   = Number((quizTodayRes.rows[0] as { today_earned: string }).today_earned);
     const quizLifetimeTotal = Number((quizLifetimeRes.rows[0] as { total: string }).total);
 
+    const quizEarnGate   = plan === 'elite' ? QUIZ_EARN_GATE_ELITE : plan === 'premium' ? QUIZ_EARN_GATE_PREMIUM : QUIZ_EARN_GATE_DEFAULT;
     const freeExempt     = plan === 'free' && quizLifetimeTotal >= FREE_PLAN_LIFETIME_CAP;
-    const quizGatePassed = quizTodayEarned >= QUIZ_EARN_GATE || freeExempt;
+    const quizGatePassed = quizTodayEarned >= quizEarnGate || freeExempt;
 
     const quizInfo = {
-      quiz_earn_gate:      QUIZ_EARN_GATE,
+      quiz_earn_gate:      quizEarnGate,
       quiz_today_earned:   quizTodayEarned,
       quiz_gate_passed:    quizGatePassed,
     };

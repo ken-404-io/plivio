@@ -352,6 +352,7 @@ export default function Withdraw() {
   const [cooldownRemaining, setCooldownRemaining] = useState('');
   const [quizGatePassed,  setQuizGatePassed]  = useState<boolean | null>(null);
   const [quizTodayEarned, setQuizTodayEarned] = useState(0);
+  const [quizEarnGate,    setQuizEarnGate]    = useState(QUIZ_EARN_GATE);
   const [showReleaseBanner, setShowReleaseBanner] = useState(
     () => sessionStorage.getItem('wd_release_banner_dismissed') !== '1',
   );
@@ -376,6 +377,7 @@ export default function Withdraw() {
         cooldown_end?: string;
         quiz_gate_passed?: boolean;
         quiz_today_earned?: number;
+        quiz_earn_gate?: number;
       }>('/withdrawals/cooldown');
       if (data.on_cooldown && data.cooldown_end) {
         setCooldownEnd(new Date(data.cooldown_end));
@@ -384,6 +386,7 @@ export default function Withdraw() {
       }
       setQuizGatePassed(data.quiz_gate_passed ?? true);
       setQuizTodayEarned(data.quiz_today_earned ?? 0);
+      setQuizEarnGate(data.quiz_earn_gate ?? QUIZ_EARN_GATE);
     } catch { /* silent */ }
   }
 
@@ -670,8 +673,8 @@ export default function Withdraw() {
         <div className="alert alert--warning">
           <BookOpen size={18} style={{ flexShrink: 0 }} />
           <div>
-            <strong>Earn ₱{QUIZ_EARN_GATE} in Quizly today to unlock withdrawal.</strong>{' '}
-            You've earned ₱{quizTodayEarned.toFixed(2)} so far — ₱{Math.max(0, QUIZ_EARN_GATE - quizTodayEarned).toFixed(2)} more to go.{' '}
+            <strong>Earn ₱{quizEarnGate} in Quizly today to unlock withdrawal.</strong>{' '}
+            You've earned ₱{quizTodayEarned.toFixed(2)} so far — ₱{Math.max(0, quizEarnGate - quizTodayEarned).toFixed(2)} more to go.{' '}
             <Link to="/tasks">Open Quizly →</Link>
           </div>
         </div>
