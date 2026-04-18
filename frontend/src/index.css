@@ -2340,9 +2340,26 @@ a, button, [role="button"], [tabindex] {
   border-bottom: 1px solid var(--border);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.10);
 }
-.adm-header { margin-bottom: 8px; }
+.adm-header { margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .adm-title  { font-size: 20px; font-weight: 700; color: var(--text-heading); margin: 0; }
 .adm-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.adm-header-actions { display: flex; align-items: center; gap: 8px; }
+.adm-online-pill {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3);
+  color: #22c55e; border-radius: 999px; padding: 5px 12px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s; white-space: nowrap;
+}
+.adm-online-pill:hover { background: rgba(34,197,94,0.22); }
+.adm-online-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #22c55e;
+  animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
 
 /* Tabs */
 .adm-tabs {
