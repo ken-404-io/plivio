@@ -1102,3 +1102,61 @@ export async function updateAdNetworks(req: Request, res: Response, next: NextFu
     res.json({ success: true, task: result.rows[0] });
   } catch (err) { next(err); }
 }
+
+// ─── POST /admin/notify-rejected-withdrawals ──────────────────────────────────
+// One-time blast: email all free-plan users whose only withdrawals are rejected,
+// telling them their slot has been restored and they can withdraw again.
+
+export async function notifyRejectedFreeWithdrawals(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { rows } = await pool.query<{ id: string; email: string; username: string }>(
+      `SELECT DISTINCT u.id, u.email, u.username
+       FROM users u
+       WHERE u.plan = 'free'
+         AND u.is_banned = FALSE
+         AND EXISTS (
+           SELECT 1 FROM withdrawals w
+           WHERE w.user_id = u.id AND w.status = 'rejected'
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM withdrawals w2
+           WHERE w2.user_id = u.id
+             AND w2.status NOT IN ('cancelled', 'rejected')
+         )
+       ORDER BY u.username`,
+    );
+
+    if (rows.length === 0) {
+      res.json({ success: true, sent: 0, message: 'No affected users found.' });
+      return;
+    }
+
+    const APP_URL = process.env.APP_URL ?? 'http://localhost:5173';
+
+    for (const user of rows) {
+      const subject = 'Good news — your withdrawal is available again!';
+      const message = `We recently updated our withdrawal policy for free plan members.\n\nYour previously rejected withdrawal no longer counts against your limit, so your 1 free withdrawal has been restored.\n\nYou can now submit a new withdrawal request from your dashboard.\n\nThank you for your patience and for being part of Plivio!`;
+
+      void sendAdminEmail(user.email, user.username, subject, message);
+
+      void createNotification(
+        user.id,
+        'admin_message',
+        'Your withdrawal slot has been restored!',
+        'Your previously rejected withdrawal no longer counts against your free plan limit. You can now request a withdrawal again.',
+        '/withdraw',
+      );
+    }
+
+    logger.info({ count: rows.length }, '📧 notifyRejectedFreeWithdrawals: emails queued');
+    res.json({
+      success: true,
+      sent:    rows.length,
+      users:   rows.map((u) => ({ id: u.id, username: u.username, email: u.email })),
+    });
+  } catch (err) { next(err); }
+}
