@@ -22,6 +22,12 @@ import { logger } from '../utils/logger.ts';
 import { createNotification } from '../utils/notify.ts';
 import {
   sendSubscriptionConfirmEmail,
+  sendPaymentFailedEmail,
+  sendSubscriptionInvoiceCreatedEmail,
+  sendSubscriptionInvoicePaidEmail,
+  sendSubscriptionPastDueEmail,
+  sendSubscriptionUnpaidEmail,
+  sendSubscriptionUpdatedEmail,
 } from '../services/email.ts';
 
 interface PlanInfo {
@@ -534,92 +540,183 @@ export async function handleWebhook(
 
     logger.info({ eventType, eventId: eventData?.id, payload: JSON.stringify(event).slice(0, 1000) }, '📨 Webhook received');
 
-    // Only handle successful payments
-    if (eventType !== 'payment.paid' && eventType !== 'link.payment.paid') {
-      logger.info({ eventType }, '⏭ Webhook: ignored event type');
-      res.json({ received: true });
-      return;
-    }
-
     const paymentData  = attributes?.data as Record<string, unknown> | undefined;
     const payAttribs   = paymentData?.attributes as Record<string, unknown> | undefined;
 
-    // Extract the concrete pay_xxx ID.
-    // payment.paid  → paymentData IS the payment object, so its id = pay_xxx
-    // link.payment.paid → paymentData IS the link object; the payment is in
-    //   payAttribs.payments[0] (PayMongo nests it there)
-    let webhookPaymentId = '';
-    if (eventType === 'payment.paid') {
-      webhookPaymentId = (paymentData?.id as string) ?? '';
-    } else {
-      const nestedPayments = (payAttribs?.payments as Array<Record<string, unknown>>) ?? [];
-      webhookPaymentId = (nestedPayments[0]?.id as string) ?? '';
-    }
+    // ── Handle payment.paid / link.payment.paid ───────────────────────────────
+    if (eventType === 'payment.paid' || eventType === 'link.payment.paid') {
+      let webhookPaymentId = '';
+      if (eventType === 'payment.paid') {
+        webhookPaymentId = (paymentData?.id as string) ?? '';
+      } else {
+        const nestedPayments = (payAttribs?.payments as Array<Record<string, unknown>>) ?? [];
+        webhookPaymentId = (nestedPayments[0]?.id as string) ?? '';
+      }
 
-    logger.info({
-      paymentDataId:   paymentData?.id,
-      paymentDataType: paymentData?.type,
-      webhookPaymentId,
-      remarks:         payAttribs?.remarks,
-      description:     payAttribs?.description,
-      reference:       payAttribs?.reference_number,
-      status:          payAttribs?.status,
-    }, '🔍 Webhook: payment data extracted');
+      logger.info({
+        paymentDataId:   paymentData?.id,
+        paymentDataType: paymentData?.type,
+        webhookPaymentId,
+        remarks:         payAttribs?.remarks,
+        description:     payAttribs?.description,
+        reference:       payAttribs?.reference_number,
+        status:          payAttribs?.status,
+      }, '🔍 Webhook: payment data extracted');
 
-    // Try remarks first (our checkoutId), then link ID, then paymongo_ref lookup.
-    // For payment.paid events the data object is a payment (pay_xxx), not a link (link_xxx).
-    // PayMongo attaches the originating link ID in attributes.source.id — use that as
-    // a third lookup key so we always match even when remarks is missing.
-    const remarks = (payAttribs?.remarks as string)
-                 ?? (payAttribs?.reference_number as string)
-                 ?? '';
+      const remarks  = (payAttribs?.remarks as string) ?? (payAttribs?.reference_number as string) ?? '';
+      const pmId     = (paymentData?.id as string) ?? '';
+      const sourceId = ((payAttribs?.source as Record<string, unknown>)?.id as string) ?? '';
 
-    const pmId    = (paymentData?.id as string) ?? '';
-    // source.id is present on payment objects and holds the originating link_xxx ID
-    const sourceId = ((payAttribs?.source as Record<string, unknown>)?.id as string) ?? '';
+      if (!remarks && !pmId && !sourceId) {
+        logger.warn({ payAttribs }, '⚠️ Webhook: no remarks or ID to look up checkout');
+        res.json({ received: true });
+        return;
+      }
 
-    if (!remarks && !pmId && !sourceId) {
-      logger.warn({ payAttribs }, '⚠️ Webhook: no remarks or ID to look up checkout');
+      logger.info({ remarks, pmId, sourceId }, '🔍 Webhook: lookup identifiers');
+
+      const { rows } = await pool.query(
+        `SELECT sc.id, sc.user_id, sc.plan, sc.duration_days, sc.status, sc.amount_php,
+                u.email, u.username
+         FROM subscription_checkouts sc
+         JOIN users u ON u.id = sc.user_id
+         WHERE (
+           sc.id           = $1
+           OR sc.paymongo_ref = $1
+           OR sc.paymongo_ref = $2
+           OR sc.paymongo_ref = $3
+         ) AND sc.status = 'pending'
+         LIMIT 1`,
+        [remarks || pmId, pmId, sourceId],
+      );
+
+      logger.info({ remarks, pmId, found: rows.length }, '🔍 Webhook: checkout lookup result');
+
+      if (rows.length === 0) {
+        logger.warn({ remarks, pmId }, '⚠️ Webhook: no pending checkout found');
+        res.json({ received: true });
+        return;
+      }
+
+      const checkout = rows[0] as {
+        id: string; user_id: string; plan: string; duration_days: number;
+        status: string; amount_php: string; email: string; username: string;
+      };
+
+      await activateSubscription({ ...checkout, payment_id: webhookPaymentId || undefined });
       res.json({ received: true });
       return;
     }
 
-    logger.info({ remarks, pmId, sourceId }, '🔍 Webhook: lookup identifiers');
+    // ── Handle payment.failed ─────────────────────────────────────────────────
+    if (eventType === 'payment.failed') {
+      const billing    = (payAttribs?.billing as Record<string, unknown>) ?? {};
+      const userEmail  = (billing.email as string) ?? '';
+      const amountCentavos = (payAttribs?.amount as number) ?? 0;
+      const amountPhp  = amountCentavos / 100;
 
-    // Look up the checkout session by:
-    //   1. sc.id = remarks        (our checkoutId UUID stored in the link's remarks field)
-    //   2. sc.paymongo_ref = pmId  (link ID for link.payment.paid events)
-    //   3. sc.paymongo_ref = sourceId (link ID extracted from payment.paid source field)
-    const { rows } = await pool.query(
-      `SELECT sc.id, sc.user_id, sc.plan, sc.duration_days, sc.status, sc.amount_php,
-              u.email, u.username
-       FROM subscription_checkouts sc
-       JOIN users u ON u.id = sc.user_id
-       WHERE (
-         sc.id           = $1
-         OR sc.paymongo_ref = $1
-         OR sc.paymongo_ref = $2
-         OR sc.paymongo_ref = $3
-       ) AND sc.status = 'pending'
-       LIMIT 1`,
-      [remarks || pmId, pmId, sourceId],
-    );
-
-    logger.info({ remarks, pmId, found: rows.length }, '🔍 Webhook: checkout lookup result');
-
-    if (rows.length === 0) {
-      // Already processed or unknown — acknowledge to stop retries
-      logger.warn({ remarks, pmId }, '⚠️ Webhook: no pending checkout found');
+      if (userEmail) {
+        const { rows: userRows } = await pool.query(
+          'SELECT email, username FROM users WHERE email = $1 LIMIT 1',
+          [userEmail],
+        );
+        if (userRows.length > 0) {
+          const u = userRows[0] as { email: string; username: string };
+          sendPaymentFailedEmail(u.email, u.username, amountPhp).catch(() => {});
+          logger.info({ email: userEmail, amountPhp }, '📧 payment.failed email queued');
+        }
+      }
       res.json({ received: true });
       return;
     }
 
-    const checkout = rows[0] as {
-      id: string; user_id: string; plan: string; duration_days: number;
-      status: string; amount_php: string; email: string; username: string;
+    // ── Helper: look up user by customer email from subscription events ────────
+    const customerEmail = ((payAttribs?.customer as Record<string, unknown>)?.email as string)
+                       ?? (payAttribs?.email as string)
+                       ?? '';
+    const planName = ((payAttribs?.plan as Record<string, unknown>)?.name as string)
+                  ?? (payAttribs?.plan as string)
+                  ?? 'your';
+    const invoiceAmountCentavos = (payAttribs?.amount as number) ?? 0;
+    const invoiceAmountPhp = invoiceAmountCentavos / 100;
+
+    const lookupUser = async (): Promise<{ email: string; username: string } | null> => {
+      if (!customerEmail) return null;
+      const { rows } = await pool.query(
+        'SELECT email, username FROM users WHERE email = $1 LIMIT 1',
+        [customerEmail],
+      );
+      return rows.length > 0 ? (rows[0] as { email: string; username: string }) : null;
     };
 
-    await activateSubscription({ ...checkout, payment_id: webhookPaymentId || undefined });
+    // ── Handle subscription.activated ─────────────────────────────────────────
+    if (eventType === 'subscription.activated') {
+      const u = await lookupUser();
+      if (u) {
+        sendSubscriptionConfirmEmail(u.email, u.username, planName, new Date()).catch(() => {});
+        logger.info({ email: customerEmail }, '📧 subscription.activated email queued');
+      }
+      res.json({ received: true });
+      return;
+    }
+
+    // ── Handle subscription.invoice.created ───────────────────────────────────
+    if (eventType === 'subscription.invoice.created') {
+      const u = await lookupUser();
+      if (u) {
+        sendSubscriptionInvoiceCreatedEmail(u.email, u.username, planName, invoiceAmountPhp).catch(() => {});
+        logger.info({ email: customerEmail }, '📧 subscription.invoice.created email queued');
+      }
+      res.json({ received: true });
+      return;
+    }
+
+    // ── Handle subscription.invoice.paid ──────────────────────────────────────
+    if (eventType === 'subscription.invoice.paid') {
+      const u = await lookupUser();
+      if (u) {
+        sendSubscriptionInvoicePaidEmail(u.email, u.username, planName, invoiceAmountPhp).catch(() => {});
+        logger.info({ email: customerEmail }, '📧 subscription.invoice.paid email queued');
+      }
+      res.json({ received: true });
+      return;
+    }
+
+    // ── Handle subscription.past_due ──────────────────────────────────────────
+    if (eventType === 'subscription.past_due') {
+      const u = await lookupUser();
+      if (u) {
+        sendSubscriptionPastDueEmail(u.email, u.username, planName).catch(() => {});
+        logger.info({ email: customerEmail }, '📧 subscription.past_due email queued');
+      }
+      res.json({ received: true });
+      return;
+    }
+
+    // ── Handle subscription.unpaid ────────────────────────────────────────────
+    if (eventType === 'subscription.unpaid') {
+      const u = await lookupUser();
+      if (u) {
+        sendSubscriptionUnpaidEmail(u.email, u.username, planName).catch(() => {});
+        logger.info({ email: customerEmail }, '📧 subscription.unpaid email queued');
+      }
+      res.json({ received: true });
+      return;
+    }
+
+    // ── Handle subscription.updated ───────────────────────────────────────────
+    if (eventType === 'subscription.updated') {
+      const status = (payAttribs?.status as string) ?? 'updated';
+      const u = await lookupUser();
+      if (u) {
+        sendSubscriptionUpdatedEmail(u.email, u.username, planName, status).catch(() => {});
+        logger.info({ email: customerEmail, status }, '📧 subscription.updated email queued');
+      }
+      res.json({ received: true });
+      return;
+    }
+
+    logger.info({ eventType }, '⏭ Webhook: ignored event type');
     res.json({ received: true });
   } catch (err) {
     // Log but still acknowledge — prevents PayMongo from disabling the webhook
