@@ -149,7 +149,7 @@ export async function requestWithdrawal(
       }
       const { rows: wdCountRows } = await client.query(
         `SELECT COUNT(*) AS count FROM withdrawals
-         WHERE user_id = $1 AND status NOT IN ('cancelled')`,
+         WHERE user_id = $1 AND status NOT IN ('cancelled', 'rejected')`,
         [userId],
       );
       const existingCount = Number((wdCountRows[0] as { count: string }).count);
@@ -311,7 +311,24 @@ export async function getWithdrawalCooldown(
       return;
     }
 
-    // Free plan (and any other plan): no withdrawal daily cap, but quiz gate still applies
+    // Free plan: report whether the 1-withdrawal slot is still available
+    if (plan === 'free') {
+      const { rows: freeWdRows } = await pool.query(
+        `SELECT COUNT(*) AS count FROM withdrawals
+         WHERE user_id = $1 AND status NOT IN ('cancelled', 'rejected')`,
+        [userId],
+      );
+      const usedCount = Number((freeWdRows[0] as { count: string }).count);
+      res.json({
+        success:               true,
+        on_cooldown:           false,
+        free_withdrawal_used:  usedCount >= FREE_PLAN_WITHDRAWAL_LIMIT,
+        free_withdrawal_limit: FREE_PLAN_WITHDRAWAL_LIMIT,
+        ...quizInfo,
+      });
+      return;
+    }
+
     res.json({ success: true, on_cooldown: false, ...quizInfo });
   } catch (err) { next(err); }
 }

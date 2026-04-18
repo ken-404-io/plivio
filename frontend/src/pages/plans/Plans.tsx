@@ -133,9 +133,24 @@ export default function Plans() {
         setPlans(planRes.data.plans);
         setSub(subRes.data.subscription);
         setHasPending(pendingRes.data.has_pending);
+
+        const activeSub = subRes.data.subscription;
+        // Webhook may have activated the subscription while user was away —
+        // sync user.plan if the DB subscription doesn't match the cached value.
+        if (activeSub && user?.plan !== activeSub.plan) {
+          void fetchMe();
+        }
+
+        // Auto-poll when a pending checkout exists (cross-device QR scenario)
+        // so the plan activates without requiring the user to click the banner.
+        if (pendingRes.data.has_pending && !activeSub) {
+          setAwaitingPayment(true);
+          startPolling();
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshPlans = async () => {
