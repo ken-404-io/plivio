@@ -32,8 +32,8 @@ const DAILY_QUESTION_LIMITS: Record<string, number | null> = {
 // Daily earning cap from the quiz bot (₱). null = unlimited.
 // Note: referral earnings are NOT counted against this cap.
 const DAILY_EARN_LIMITS: Record<string, number | null> = {
-  free:    20,
-  premium: 100,
+  free:    60,
+  premium: 90,
   elite:   null,
 };
 
@@ -41,6 +41,29 @@ const DAILY_EARN_LIMITS: Record<string, number | null> = {
 // `answered_at` is TIMESTAMPTZ, so we compare against 00:00 Asia/Manila
 // converted back to an absolute instant.
 const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila')`;
+
+// Look up the currently-active promotion for a given plan. Returns null if
+// none. Migration 024 adds the promotions table; answers during the window
+// are tagged with promo_id so the baseline lifetime counter (which excludes
+// promo-tagged rows) is automatically restored when the window closes.
+async function getActivePromo(plan: string): Promise<{
+  id: number;
+  bonus_questions: number;
+  lift_free_earn_cap: boolean;
+  ends_at: string;
+} | null> {
+  const { rows } = await pool.query(
+    `SELECT id, bonus_questions, lift_free_earn_cap, ends_at
+     FROM promotions
+     WHERE applies_to_plan = $1
+       AND starts_at <= NOW()
+       AND ends_at   >  NOW()
+     ORDER BY ends_at ASC
+     LIMIT 1`,
+    [plan],
+  );
+  return rows[0] ?? null;
+}
 
 // ─── GET /quiz/status ──────────────────────────────────────────────────────
 export async function getQuizStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -58,13 +81,24 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
     );
     const effectivePlan = (planRes.rows[0]?.effective_plan ?? 'free') as string;
     const dailyQuestionLimit = DAILY_QUESTION_LIMITS[effectivePlan] ?? null;
-    const dailyEarnLimit     = DAILY_EARN_LIMITS[effectivePlan] ?? null;
+    let   dailyEarnLimit     = DAILY_EARN_LIMITS[effectivePlan] ?? null;
 
-    // Lifetime answered (used for Free plan cap)
+    // Active promotion (if any) for this plan — grants bonus questions and
+    // optionally lifts the daily earn cap. Answers submitted while a promo
+    // is active are tagged with its id so baseline state is preserved.
+    const activePromo = await getActivePromo(effectivePlan);
+    if (activePromo && activePromo.lift_free_earn_cap) {
+      dailyEarnLimit = null;
+    }
+
+    // Lifetime answered (used for Free plan cap).
+    // Exclude promo-tagged answers from the baseline so the user's real
+    // lifetime counter is unaffected by promo activity.
     const lifetimeRes = await pool.query(
-      `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct,
-              COALESCE(SUM(reward_earned), 0) AS total_earned
+      `SELECT
+         COUNT(*) FILTER (WHERE promo_id IS NULL) AS total,
+         SUM(CASE WHEN is_correct AND promo_id IS NULL THEN 1 ELSE 0 END) AS correct,
+         COALESCE(SUM(reward_earned), 0) AS total_earned
        FROM user_question_answers WHERE user_id = $1`,
       [userId],
     );
@@ -85,14 +119,27 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
     const todayAnswered    = parseInt(todayRes.rows[0]?.today_answered ?? '0');
 
     // Determine the question cap that applies to this user.
-    //  - Free:    lifetime cap (100 total)
-    //  - Premium: daily cap (100/day, resets at PH midnight)
+    //  - Free:    lifetime cap (100 total) + active promo bonus (e.g. +500)
+    //  - Premium: daily cap (1000/day, resets at PH midnight)
     //  - Elite:   no cap at all
     let questionLimit:  number | null;
     let questionsLeft:  number | null;
     if (effectivePlan === 'free') {
-      questionLimit = FREE_LIFETIME_QUESTIONS;
-      questionsLeft = Math.max(0, FREE_LIFETIME_QUESTIONS - lifetimeAnswered);
+      const promoBonus = activePromo?.bonus_questions ?? 0;
+      // Baseline lifetime only consumes the baseline cap; promo answers
+      // consume the promo bonus separately (and expire with the promo).
+      const baselineRemaining = Math.max(0, FREE_LIFETIME_QUESTIONS - lifetimeAnswered);
+      let promoRemaining = 0;
+      if (activePromo) {
+        const promoUsedRes = await pool.query(
+          `SELECT COUNT(*) AS c FROM user_question_answers WHERE user_id = $1 AND promo_id = $2`,
+          [userId, activePromo.id],
+        );
+        const promoUsed = parseInt(promoUsedRes.rows[0]?.c ?? '0');
+        promoRemaining = Math.max(0, promoBonus - promoUsed);
+      }
+      questionLimit = FREE_LIFETIME_QUESTIONS + promoBonus;
+      questionsLeft = baselineRemaining + promoRemaining;
     } else if (dailyQuestionLimit !== null) {
       questionLimit = dailyQuestionLimit;
       questionsLeft = Math.max(0, dailyQuestionLimit - todayAnswered);
@@ -123,9 +170,19 @@ export async function getQuizStatus(req: Request, res: Response, next: NextFunct
       daily_limit:      dailyEarnLimit,
       daily_remaining:  dailyRemaining,
       can_earn_more:    canEarnMore,
-      // Reason flags the frontend uses to decide which UI to render
-      free_lifetime_exhausted: effectivePlan === 'free' && lifetimeAnswered >= FREE_LIFETIME_QUESTIONS,
+      // Reason flags the frontend uses to decide which UI to render.
+      // Free users who've exhausted BOTH their baseline AND any active promo
+      // quota are "done". Any active promo temporarily unblocks them.
+      free_lifetime_exhausted: effectivePlan === 'free'
+        && lifetimeAnswered >= FREE_LIFETIME_QUESTIONS
+        && (questionsLeft ?? 0) <= 0,
       earnings_capped:         dailyRemaining !== null && dailyRemaining <= 0,
+      // Active promo so the UI can show a countdown + bonus hint
+      active_promo: activePromo ? {
+        bonus_questions:    activePromo.bonus_questions,
+        lift_free_earn_cap: activePromo.lift_free_earn_cap,
+        ends_at:            activePromo.ends_at,
+      } : null,
     });
   } catch (err) {
     next(err);
@@ -147,16 +204,30 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
     );
     const effectivePlan  = (planRes.rows[0]?.effective_plan ?? 'free') as string;
     const dailyQuestionLimit = DAILY_QUESTION_LIMITS[effectivePlan] ?? null;
-    const dailyEarnLimit     = DAILY_EARN_LIMITS[effectivePlan] ?? null;
+    let   dailyEarnLimit     = DAILY_EARN_LIMITS[effectivePlan] ?? null;
 
-    // Free plan: enforce lifetime cap
+    // Active promotion for this plan
+    const activePromo = await getActivePromo(effectivePlan);
+    if (activePromo && activePromo.lift_free_earn_cap) dailyEarnLimit = null;
+
+    // Free plan: enforce lifetime cap (baseline). Promo bonus (if any) adds
+    // extra eligible answers that are tagged with promo_id and excluded
+    // from the baseline count.
     if (effectivePlan === 'free') {
       const countRes = await pool.query(
-        `SELECT COUNT(*) AS total FROM user_question_answers WHERE user_id = $1`,
-        [userId],
+        `SELECT
+           COUNT(*) FILTER (WHERE promo_id IS NULL) AS baseline,
+           COUNT(*) FILTER (WHERE promo_id = $2)    AS promo_used
+         FROM user_question_answers WHERE user_id = $1`,
+        [userId, activePromo?.id ?? -1],
       );
-      const lifetime = parseInt(countRes.rows[0]?.total ?? '0');
-      if (lifetime >= FREE_LIFETIME_QUESTIONS) {
+      const baselineUsed = parseInt(countRes.rows[0]?.baseline ?? '0');
+      const promoUsed    = parseInt(countRes.rows[0]?.promo_used ?? '0');
+      const promoBonus   = activePromo?.bonus_questions ?? 0;
+      const baselineLeft = Math.max(0, FREE_LIFETIME_QUESTIONS - baselineUsed);
+      const promoLeft    = Math.max(0, promoBonus - promoUsed);
+
+      if (baselineLeft <= 0 && promoLeft <= 0) {
         res.json({
           success: false,
           reason:  'free_lifetime_exhausted',
@@ -324,16 +395,27 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
 
     const effectivePlan      = submitEffectivePlan;
     const dailyQuestionLimit = DAILY_QUESTION_LIMITS[effectivePlan] ?? null;
-    const dailyEarnLimit     = DAILY_EARN_LIMITS[effectivePlan] ?? null;
+    let   dailyEarnLimit     = DAILY_EARN_LIMITS[effectivePlan] ?? null;
+
+    // Active promotion — tags this answer, grants bonus quota, may lift cap
+    const activePromo = await getActivePromo(effectivePlan);
+    if (activePromo && activePromo.lift_free_earn_cap) dailyEarnLimit = null;
 
     // Enforce the right cap based on plan
     if (effectivePlan === 'free') {
       const countRes = await pool.query(
-        `SELECT COUNT(*) AS total FROM user_question_answers WHERE user_id = $1`,
-        [userId],
+        `SELECT
+           COUNT(*) FILTER (WHERE promo_id IS NULL) AS baseline,
+           COUNT(*) FILTER (WHERE promo_id = $2)    AS promo_used
+         FROM user_question_answers WHERE user_id = $1`,
+        [userId, activePromo?.id ?? -1],
       );
-      const lifetime = parseInt(countRes.rows[0]?.total ?? '0');
-      if (lifetime >= FREE_LIFETIME_QUESTIONS) {
+      const baselineUsed = parseInt(countRes.rows[0]?.baseline ?? '0');
+      const promoUsed    = parseInt(countRes.rows[0]?.promo_used ?? '0');
+      const promoBonus   = activePromo?.bonus_questions ?? 0;
+      const baselineLeft = Math.max(0, FREE_LIFETIME_QUESTIONS - baselineUsed);
+      const promoLeft    = Math.max(0, promoBonus - promoUsed);
+      if (baselineLeft <= 0 && promoLeft <= 0) {
         res.status(403).json({ success: false, error: 'Free plan lifetime question limit reached.' });
         return;
       }
@@ -375,14 +457,29 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
       }
     }
 
+    // Decide whether this answer consumes baseline or promo quota so it can
+    // be tagged accordingly. For Free users we prefer baseline until it's
+    // exhausted, then fall through to promo. Non-Free plans never tag.
+    let promoIdForThisAnswer: number | null = null;
+    if (activePromo && effectivePlan === 'free') {
+      const quotaRes = await pool.query(
+        `SELECT COUNT(*) FILTER (WHERE promo_id IS NULL) AS baseline FROM user_question_answers WHERE user_id = $1`,
+        [userId],
+      );
+      const baselineUsed = parseInt(quotaRes.rows[0]?.baseline ?? '0');
+      if (baselineUsed >= FREE_LIFETIME_QUESTIONS) {
+        promoIdForThisAnswer = activePromo.id;
+      }
+    }
+
     // Save answer in transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       await client.query(
-        `INSERT INTO user_question_answers (user_id, question_id, user_answer, is_correct, reward_earned)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [userId, question_id, userAnswer, isCorrect, rewardEarned],
+        `INSERT INTO user_question_answers (user_id, question_id, user_answer, is_correct, reward_earned, promo_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, question_id, userAnswer, isCorrect, rewardEarned, promoIdForThisAnswer],
       );
       if (rewardEarned > 0) {
         await client.query(

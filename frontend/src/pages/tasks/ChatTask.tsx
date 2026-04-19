@@ -30,6 +30,11 @@ interface QuizStatus {
   can_earn_more: boolean;
   free_lifetime_exhausted?: boolean;
   earnings_capped?: boolean;
+  active_promo?: {
+    bonus_questions: number;
+    lift_free_earn_cap: boolean;
+    ends_at: string;
+  } | null;
 }
 
 interface QuizQuestion {
@@ -328,6 +333,26 @@ export default function ChatTask({ onClose }: Props) {
             <span className="cq-progress-label">{progressUsed}/{qLimit}</span>
           </div>
         )}
+
+        {/* ── Active promo banner ── */}
+        {status?.active_promo && (() => {
+          const endsAt = new Date(status.active_promo.ends_at);
+          const msLeft = endsAt.getTime() - Date.now();
+          const hoursLeft = Math.max(0, Math.floor(msLeft / 3_600_000));
+          const minsLeft  = Math.max(0, Math.floor((msLeft % 3_600_000) / 60_000));
+          const timer = hoursLeft > 0 ? `${hoursLeft}h ${minsLeft}m left` : `${minsLeft}m left`;
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 8, padding: '8px 12px', margin: '6px 0',
+              background: 'linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)',
+              color: '#fff', borderRadius: 10, fontSize: 12, fontWeight: 600,
+            }}>
+              <span>🎁 {status.active_promo.bonus_questions} bonus questions active{status.active_promo.lift_free_earn_cap ? ' · Uncapped earnings' : ''}</span>
+              <span style={{ opacity: 0.9 }}>{timer}</span>
+            </div>
+          );
+        })()}
 
         {/* ── Streak bar ── */}
         <div className="cq-streak-bar">

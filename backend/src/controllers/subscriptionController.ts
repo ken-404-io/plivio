@@ -41,10 +41,10 @@ export const PLANS: Record<string, PlanInfo> = {
   free: {
     name:        'Free',
     price_php:   0,
-    daily_limit: 20,
+    daily_limit: 60,
     features:    [
-      'Up to 20 quiz questions per day',
-      '₱20 daily earning cap',
+      'Up to 100 quiz questions lifetime',
+      '₱60 daily earning cap',
       '₱400 minimum payout',
       '1 lifetime withdrawal',
       'GCash & PayPal withdrawals',
@@ -54,10 +54,10 @@ export const PLANS: Record<string, PlanInfo> = {
   premium: {
     name:        'Premium',
     price_php:   449,
-    daily_limit: 100,
+    daily_limit: 90,
     features:    [
       '1,000 quiz questions per day',
-      '₱100 daily quiz earning cap',
+      '₱90 daily quiz earning cap',
       '₱500 minimum payout',
       'Earn via referrals (no cap)',
       'All task types unlocked',
