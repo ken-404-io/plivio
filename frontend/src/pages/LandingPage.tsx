@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useScrollReveal } from '../hooks/useScrollReveal';
+import { useAuth } from '../store/authStore.tsx';
 import {
   Sun, Moon, Menu, X,
   CheckCircle2, Wallet,
@@ -179,9 +180,13 @@ function StarRating({ count }: { count: number }) {
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  const { user, loading } = useAuth();
   const [theme, toggleTheme] = useTheme();
   const [email, setEmail]   = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Already logged in — send straight to the app
+  if (!loading && user) return <Navigate to="/dashboard" replace />;
 
   // Scroll-reveal refs — each section gets its own observer
   const featuresRef     = useScrollReveal();
