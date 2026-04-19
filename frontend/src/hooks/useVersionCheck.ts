@@ -39,7 +39,16 @@ function handleVisibility(): void {
 export function useVersionCheck(): void {
   useEffect(() => {
     void checkVersion();
+
+    // Catch users who keep the tab open without switching away
+    const interval = setInterval(() => { void checkVersion(); }, 2 * 60 * 1000);
+
+    // Catch users returning from another tab / app
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 }
