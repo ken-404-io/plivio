@@ -339,7 +339,7 @@ export default function ChatTask({ onClose }: Props) {
             <div className="cq-streak-bar-fill" style={{ width: `${streakPct}%` }} />
           </div>
           {sessionCorrect > 0 && (
-            <span className="cq-session-earned">+₱{(sessionCorrect * 0.35).toFixed(2)}</span>
+            <span className="cq-session-earned">+₱{(sessionCorrect * 0.25).toFixed(2)}</span>
           )}
         </div>
 
@@ -462,7 +462,7 @@ export default function ChatTask({ onClose }: Props) {
                     <span className="cq-done-stat-lbl">Correct</span>
                   </div>
                   <div className="cq-done-stat">
-                    <span className="cq-done-stat-val">₱{(sessionCorrect * 0.35).toFixed(2)}</span>
+                    <span className="cq-done-stat-val">₱{(sessionCorrect * 0.25).toFixed(2)}</span>
                     <span className="cq-done-stat-lbl">Earned</span>
                   </div>
                 </div>
@@ -495,7 +495,7 @@ export default function ChatTask({ onClose }: Props) {
                     <span className="cq-done-stat-lbl">Correct</span>
                   </div>
                   <div className="cq-done-stat">
-                    <span className="cq-done-stat-val">₱{(sessionCorrect * 0.35).toFixed(2)}</span>
+                    <span className="cq-done-stat-val">₱{(sessionCorrect * 0.25).toFixed(2)}</span>
                     <span className="cq-done-stat-lbl">Earned</span>
                   </div>
                 </div>
@@ -524,7 +524,7 @@ export default function ChatTask({ onClose }: Props) {
                     <span className="cq-done-stat-lbl">Correct</span>
                   </div>
                   <div className="cq-done-stat">
-                    <span className="cq-done-stat-val">₱{(sessionCorrect * 0.35).toFixed(2)}</span>
+                    <span className="cq-done-stat-val">₱{(sessionCorrect * 0.25).toFixed(2)}</span>
                     <span className="cq-done-stat-lbl">Earned</span>
                   </div>
                 </div>

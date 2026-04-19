@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../config/db.ts';
 
-const REWARD_PER_CORRECT = 0.35;
+const REWARD_PER_CORRECT = 0.25;
 
 // Lifetime question cap — Free plan users have a hard ceiling of 100 total
 // questions. Premium and Elite users have NO lifetime cap; their counters
