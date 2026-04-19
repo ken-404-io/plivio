@@ -15,8 +15,8 @@ const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila'))
 
 // Minimum quiz earnings (₱) a user must accumulate today before they can withdraw.
 // Resets at 12am Philippine time. Free plan users who have exhausted their 100-question lifetime bank are exempt.
-const QUIZ_EARN_GATE_DEFAULT = 30;
-const QUIZ_EARN_GATE_PREMIUM = 50;
+const QUIZ_EARN_GATE_DEFAULT = 60;
+const QUIZ_EARN_GATE_PREMIUM = 90;
 const QUIZ_EARN_GATE_ELITE   = 150;
 const FREE_PLAN_LIFETIME_CAP = 100;
 

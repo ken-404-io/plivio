@@ -429,7 +429,7 @@ export default function LandingPage() {
               </div>
               <ul className="lp-plan-features">
                 <li><span className="lp-check"><Check size={14} /></span> Access to daily quizzes</li>
-                <li><span className="lp-check"><Check size={14} /></span> ₱30/day earning limit</li>
+                <li><span className="lp-check"><Check size={14} /></span> ₱60/day earning limit</li>
                 <li><span className="lp-check"><Check size={14} /></span> GCash &amp; PayPal withdrawal</li>
                 <li><span className="lp-check"><Check size={14} /></span> Referral bonuses</li>
               </ul>
