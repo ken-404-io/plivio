@@ -2437,6 +2437,13 @@ export default function AdminDashboard() {
                     >
                       <History size={13} /> History
                     </button>
+                    <Link
+                      to={`/admin/users/${w.user_id}`}
+                      className="btn btn-ghost btn-sm"
+                      title="View full user profile"
+                    >
+                      <Eye size={13} /> View User
+                    </Link>
                     <div className="adm-wd-divider" />
                     <button
                       className="adm-action-btn adm-action-btn--suspend"
@@ -2603,14 +2610,20 @@ export default function AdminDashboard() {
                             </div>
                           )}
                         </div>
-                        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+                        <div style={{ marginTop: 10, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                           <button
                             className="btn btn-ghost btn-sm"
                             disabled={paymentHistoryLoading}
                             onClick={() => { void openPaymentHistory(w.user_id); }}
                           >
-                            <History size={13} /> View All History for {w.username}
+                            <History size={13} /> Payment History
                           </button>
+                          <Link
+                            to={`/admin/users/${w.user_id}`}
+                            className="btn btn-ghost btn-sm"
+                          >
+                            <Eye size={13} /> View Full Profile
+                          </Link>
                         </div>
                       </div>
                     )}
@@ -2772,14 +2785,20 @@ export default function AdminDashboard() {
                             </div>
                           )}
                         </div>
-                        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+                        <div style={{ marginTop: 10, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                           <button
                             className="btn btn-ghost btn-sm"
                             disabled={paymentHistoryLoading}
                             onClick={() => { void openPaymentHistory(w.user_id); }}
                           >
-                            <History size={13} /> View All History for {w.username}
+                            <History size={13} /> Payment History
                           </button>
+                          <Link
+                            to={`/admin/users/${w.user_id}`}
+                            className="btn btn-ghost btn-sm"
+                          >
+                            <Eye size={13} /> View Full Profile
+                          </Link>
                         </div>
                       </div>
                     )}
