@@ -205,23 +205,24 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
 
     // Get next eligible question.
     // Elite: serve the least-recently-answered question so the bank never
-    // appears exhausted — fulfils the "unlimited questions" promise even when
-    // the user has gone through every question at least once.
-    // Free/Premium: exclude questions answered within the recycle window so the
-    // user doesn't see the same item twice in quick succession.
-    const questionRes = effectivePlan === 'elite'
-      ? await pool.query(
-          `SELECT q.id, q.question, q.answer, q.category
-           FROM chat_questions q
-           LEFT JOIN (
-             SELECT question_id, MAX(answered_at) AS last_answered
-             FROM user_question_answers WHERE user_id = $1
-             GROUP BY question_id
-           ) ua ON ua.question_id = q.id
-           ORDER BY COALESCE(ua.last_answered, '1970-01-01'::timestamptz) ASC, RANDOM()
-           LIMIT 1`,
-          [userId],
-        )
+    // appears exhausted — fulfils the "unlimited questions" promise.
+    // Free/Premium: first try to serve a question the user hasn't answered
+    // within the recycle window. If the bank is smaller than the plan's cap
+    // and that filtered query comes up empty, fall back to the Elite-style
+    // least-recently-answered query so the user can keep going until they
+    // actually hit their plan quota (e.g. 1000/day for Premium).
+    const leastRecentSql = `SELECT q.id, q.question, q.answer, q.category
+       FROM chat_questions q
+       LEFT JOIN (
+         SELECT question_id, MAX(answered_at) AS last_answered
+         FROM user_question_answers WHERE user_id = $1
+         GROUP BY question_id
+       ) ua ON ua.question_id = q.id
+       ORDER BY COALESCE(ua.last_answered, '1970-01-01'::timestamptz) ASC, RANDOM()
+       LIMIT 1`;
+
+    let questionRes = effectivePlan === 'elite'
+      ? await pool.query(leastRecentSql, [userId])
       : await pool.query(
           `SELECT q.id, q.question, q.answer, q.category
            FROM chat_questions q
@@ -235,6 +236,10 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
            LIMIT 1`,
           [userId],
         );
+
+    if (questionRes.rowCount === 0 && effectivePlan !== 'elite') {
+      questionRes = await pool.query(leastRecentSql, [userId]);
+    }
 
     if (questionRes.rowCount === 0) {
       res.json({
@@ -303,9 +308,11 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    // Get effective plan — needed to decide whether to enforce the recycle
-    // window on submit. Elite users are served recycled questions by design
-    // (least-recently-answered), so we must not reject their answers here.
+    // Get effective plan. All plans may be served a recycled question when
+    // the fresh-question bank is exhausted but the user's plan quota isn't,
+    // so we don't reject "already answered recently" here — the real caps
+    // below (lifetime for Free, daily count for Premium, earnings cap for
+    // all) enforce the limits.
     const submitPlanRes = await pool.query(
       `SELECT CASE WHEN s.id IS NOT NULL THEN s.plan ELSE u.plan END AS effective_plan
        FROM users u
@@ -314,23 +321,6 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
       [userId],
     );
     const submitEffectivePlan = (submitPlanRes.rows[0]?.effective_plan ?? 'free') as string;
-
-    // Check not already answered within the recycle window (Free/Premium only).
-    // Elite skips this check because their question query deliberately recycles
-    // previously-answered questions to honour the "unlimited" promise.
-    if (submitEffectivePlan !== 'elite') {
-      const alreadyRes = await pool.query(
-        `SELECT id FROM user_question_answers
-         WHERE user_id = $1
-           AND question_id = $2
-           AND answered_at > NOW() - ${RECYCLE_INTERVAL_SQL}`,
-        [userId, question_id],
-      );
-      if (alreadyRes.rowCount && alreadyRes.rowCount > 0) {
-        res.status(400).json({ success: false, error: 'Already answered this question recently.' });
-        return;
-      }
-    }
 
     const effectivePlan      = submitEffectivePlan;
     const dailyQuestionLimit = DAILY_QUESTION_LIMITS[effectivePlan] ?? null;
