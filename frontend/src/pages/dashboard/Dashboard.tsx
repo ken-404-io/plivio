@@ -206,7 +206,7 @@ export default function Dashboard() {
   const quizSubline = (() => {
     if (!quizly) return 'Loading your quiz…';
     if (quizPlan === 'elite')   return 'Unlimited questions · answer anytime';
-    if (quizPlan === 'premium') return `${quizLeft ?? 0} of 100 questions left today`;
+    if (quizPlan === 'premium') return `${quizLeft ?? 0} of 1,000 questions left today`;
     // Free plan — lifetime cap
     return `${quizLeft ?? 0} of ${quizLimit ?? 100} questions remaining`;
   })();

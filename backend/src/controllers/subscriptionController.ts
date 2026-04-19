@@ -56,7 +56,7 @@ export const PLANS: Record<string, PlanInfo> = {
     price_php:   449,
     daily_limit: 50,
     features:    [
-      '200 quiz questions per day',
+      '1,000 quiz questions per day',
       '₱50 daily quiz earning cap',
       '₱500 minimum payout',
       'Earn via referrals (no cap)',

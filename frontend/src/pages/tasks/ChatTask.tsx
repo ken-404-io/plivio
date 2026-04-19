@@ -430,7 +430,7 @@ export default function ChatTask({ onClose }: Props) {
               <div className="cq-upgrade-benefits">
                 <div className="cq-upgrade-benefit">
                   <Crown size={16} />
-                  <span><strong>Premium:</strong> 100 questions / day &middot; ₱100 daily cap</span>
+                  <span><strong>Premium:</strong> 1,000 questions / day &middot; ₱100 daily cap</span>
                 </div>
                 <div className="cq-upgrade-benefit">
                   <Star size={16} />
