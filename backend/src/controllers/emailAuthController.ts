@@ -301,57 +301,6 @@ export async function verifyEmail(
         };
       }
 
-      // ── Credit referral bonus now that we know the email is real ─────────
-      // Every verified signup credits ₱10 to the referrer immediately. The
-      // previous batch-of-10 gate and `referral_batches_credited` counter
-      // were removed: they rate-limited credits to at most one batch per
-      // verification event, which left heavy referrers permanently owed
-      // money the system could never pay out. Migration 018 backfilled any
-      // legacy credits that were held back by that old logic.
-      if (userRow?.referred_by) {
-        try {
-          const INVITE_VALUE = 10; // ₱10 per verified signup
-
-          // Find the referral task to link the completion record
-          const refTaskRes = await client.query<{ id: string }>(
-            `SELECT id FROM tasks
-             WHERE type = 'referral' AND is_active = TRUE
-               AND (min_plan IS NULL OR min_plan = 'free')
-             LIMIT 1`,
-          );
-
-          await client.query(
-            `UPDATE users SET balance = balance + $1 WHERE id = $2`,
-            [INVITE_VALUE, userRow.referred_by],
-          );
-
-          if (refTaskRes.rowCount && refTaskRes.rowCount > 0) {
-            const refTaskId = refTaskRes.rows[0].id;
-            await client.query(
-              `INSERT INTO task_completions
-                 (user_id, task_id, type, status, reward_earned, completed_at, proof, server_data)
-               VALUES ($1, $2, 'referral', 'approved', $3, NOW(), '{}', '{}')`,
-              [userRow.referred_by, refTaskId, INVITE_VALUE],
-            );
-          }
-
-          logger.info(
-            {
-              referrerId:       userRow.referred_by,
-              referredUsername: userRow.username,
-              referredUserId:   row.user_id,
-              creditAmount:     INVITE_VALUE,
-            },
-            '✅ Referral bonus credited on email verification',
-          );
-        } catch (bonusErr) {
-          // Log but don't fail verification — the account is still verified
-          logger.error(
-            { err: (bonusErr as Error).message, referrerId: userRow.referred_by, referredUserId: row.user_id },
-            '❌ Failed to credit referral bonus on email verification',
-          );
-        }
-      }
 
       await client.query('COMMIT');
     } catch (inner) {
