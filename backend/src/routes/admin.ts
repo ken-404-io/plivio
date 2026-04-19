@@ -8,6 +8,7 @@ import {
   updateUser,
   getUserDetails,
   getUserPaymentHistory,
+  getUserQuickStats,
   notifyUser,
   emailUser,
   broadcastNotification,
@@ -74,6 +75,7 @@ router.post('/email-everyone',
 
 router.get('/users', listUsers);
 router.get('/users/:id/details', validateParam('id'), getUserDetails);
+router.get('/users/:id/quick-stats', validateParam('id'), getUserQuickStats);
 router.get('/users/:id/payment-history', validateParam('id'), getUserPaymentHistory);
 router.put('/users/:id/reset-device', validateParam('id'), resetUserDevice);
 router.post('/users/:id/change-plan',

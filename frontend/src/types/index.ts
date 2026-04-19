@@ -389,6 +389,7 @@ export interface AdminKycSubmission {
 export interface AdminReferral {
   referrer_id: string;
   referrer_username: string;
+  invited_id: string;
   invited_username: string;
   invited_email: string;
   invited_plan: PlanType;
@@ -410,6 +411,7 @@ export interface AdminReferralLeaderboard {
 
 export interface AdminNotificationLog {
   id: string;
+  user_id: string;
   type: string;
   title: string;
   message: string;
@@ -418,6 +420,15 @@ export interface AdminNotificationLog {
   created_at: string;
   username: string;
   email: string;
+}
+
+export interface UserQuickStats {
+  quiz_answered: number;
+  quiz_correct: number;
+  quiz_earned: number;
+  task_earned: number;
+  referral_earned: number;
+  balance: number;
 }
 
 export interface RegisterPayload {

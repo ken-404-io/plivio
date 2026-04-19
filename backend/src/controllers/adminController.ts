@@ -670,6 +670,48 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
   } catch (err) { next(err); }
 }
 
+/** GET /admin/users/:id/quick-stats – lightweight fund-source + quiz summary for admin panels */
+export async function getUserQuickStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params as Record<string, string>;
+
+    const [quizRes, taskRes, balRes] = await Promise.all([
+      pool.query(
+        `SELECT
+           COUNT(*)::int                            AS quiz_answered,
+           COUNT(*) FILTER (WHERE is_correct)::int  AS quiz_correct,
+           COALESCE(SUM(reward_earned), 0)          AS quiz_earned
+         FROM user_question_answers WHERE user_id = $1`,
+        [id],
+      ),
+      pool.query(
+        `SELECT
+           COALESCE(SUM(reward_earned) FILTER (WHERE type = 'referral'), 0)  AS referral_earned,
+           COALESCE(SUM(reward_earned) FILTER (WHERE type != 'referral'), 0) AS task_earned
+         FROM task_completions WHERE user_id = $1 AND status = 'approved'`,
+        [id],
+      ),
+      pool.query('SELECT balance FROM users WHERE id = $1', [id]),
+    ]);
+
+    if (balRes.rows.length === 0) throw new NotFoundError('User not found');
+
+    const qz  = quizRes.rows[0]  as { quiz_answered: string; quiz_correct: string; quiz_earned: string };
+    const tc  = taskRes.rows[0]  as { referral_earned: string; task_earned: string };
+    const bal = balRes.rows[0]   as { balance: string };
+
+    res.json({
+      success:         true,
+      quiz_answered:   Number(qz.quiz_answered),
+      quiz_correct:    Number(qz.quiz_correct),
+      quiz_earned:     Number(qz.quiz_earned),
+      task_earned:     Number(tc.task_earned),
+      referral_earned: Number(tc.referral_earned),
+      balance:         Number(bal.balance),
+    });
+  } catch (err) { next(err); }
+}
+
 /** PUT /admin/users/:id/reset-device – admin resets user's bound device */
 export async function resetUserDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -755,7 +797,7 @@ export async function listReferrals(req: Request, res: Response, next: NextFunct
     const { rows } = await pool.query(
       `SELECT
          referrer.id AS referrer_id, referrer.username AS referrer_username,
-         invited.username AS invited_username, invited.email AS invited_email,
+         invited.id AS invited_id, invited.username AS invited_username, invited.email AS invited_email,
          invited.plan::text AS invited_plan, invited.is_email_verified,
          invited.created_at AS invited_at
        FROM users invited
@@ -801,7 +843,7 @@ export async function listNotificationLogs(req: Request, res: Response, next: Ne
       ? (req.query.status as string) : null;
 
     const { rows } = await pool.query(
-      `SELECT n.id, n.type, n.title, n.message, n.link, n.is_read, n.created_at,
+      `SELECT n.id, n.user_id, n.type, n.title, n.message, n.link, n.is_read, n.created_at,
               u.username, u.email
        FROM notifications n
        JOIN users u ON u.id = n.user_id

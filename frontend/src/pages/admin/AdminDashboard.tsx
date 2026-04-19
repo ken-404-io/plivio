@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
   XCircle, Eye, Coins, MessageSquare, Clock,
   CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
-  Download, X, Link2, Wifi, RefreshCw,
+  Download, X, Link2, Wifi, RefreshCw, BarChart2,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api.ts';
@@ -13,7 +13,7 @@ import { useToast } from '../../components/common/Toast.tsx';
 import type {
   AdminUser, AdminWithdrawal, AdminWithdrawalHistory, AdminStats,
   AdminKycSubmission, AdminUserDetails, AdminReferral, AdminReferralLeaderboard,
-  AdminNotificationLog,
+  AdminNotificationLog, UserQuickStats,
 } from '../../types/index.ts';
 
 const TABS = ['overview', 'users', 'withdrawals', 'referrals', 'notifications', 'kyc', 'online'] as const;
@@ -1053,6 +1053,92 @@ function ExportButton({ section }: { section: string }) {
   );
 }
 
+// ─── Quick fund-source + quiz stats popover ────────────────────────────────────
+function QuickStatsPanel({ userId }: { userId: string }) {
+  const [open,    setOpen]    = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [data,    setData]    = useState<UserQuickStats | null>(null);
+
+  async function toggle() {
+    if (open) { setOpen(false); return; }
+    if (data)  { setOpen(true);  return; }
+    setLoading(true);
+    try {
+      const res = await api.get<{ success: true } & UserQuickStats>(`/admin/users/${userId}/quick-stats`);
+      setData(res.data);
+      setOpen(true);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  }
+
+  const accuracy = data && data.quiz_answered > 0
+    ? Math.round((data.quiz_correct / data.quiz_answered) * 100)
+    : null;
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        className="adm-icon-btn"
+        title="Fund sources & quiz stats"
+        onClick={(e) => { e.stopPropagation(); void toggle(); }}
+        style={open ? { color: 'var(--primary)', background: 'var(--primary-alpha, rgba(99,102,241,0.12))' } : undefined}
+      >
+        {loading
+          ? <RefreshCw size={14} style={{ animation: 'spin 0.7s linear infinite' }} />
+          : <BarChart2 size={14} />}
+      </button>
+
+      {open && data && (
+        <div
+          style={{
+            position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 60,
+            background: 'var(--bg-card)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: '10px 14px', minWidth: 220,
+            boxShadow: '0 6px 24px rgba(0,0,0,0.3)', fontSize: 12,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 7 }}>
+            Fund Sources
+          </div>
+          {[
+            { label: 'Tasks',     value: data.task_earned },
+            { label: 'Quiz',      value: data.quiz_earned },
+            { label: 'Referrals', value: data.referral_earned },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
+              <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+              <span style={{ fontWeight: 600 }}>₱{value.toFixed(2)}</span>
+            </div>
+          ))}
+
+          <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+
+          <div style={{ fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 7 }}>
+            Quiz
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
+            <span style={{ color: 'var(--text-muted)' }}>Answered</span>
+            <span style={{ fontWeight: 600 }}>{data.quiz_answered}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+            <span style={{ color: 'var(--text-muted)' }}>Correct</span>
+            <span style={{ fontWeight: 600, color: 'var(--success)' }}>
+              {data.quiz_correct}{accuracy !== null ? ` · ${accuracy}%` : ''}
+            </span>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+            <span style={{ fontWeight: 700 }}>Balance</span>
+            <span style={{ fontWeight: 700, color: 'var(--success)' }}>₱{data.balance.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const toast = useToast();
@@ -2042,6 +2128,7 @@ export default function AdminDashboard() {
                     </div>
                     <span className="adm-user-balance">₱{Number(u.balance).toFixed(2)}</span>
                     <div className="adm-user-actions">
+                      <QuickStatsPanel userId={u.id} />
                       <Link
                         to={`/admin/users/${u.id}`}
                         className="adm-icon-btn"
@@ -2489,6 +2576,7 @@ export default function AdminDashboard() {
                     >
                       <Eye size={13} /> View User
                     </Link>
+                    <QuickStatsPanel userId={w.user_id} />
                     <div className="adm-wd-divider" />
                     <button
                       className="adm-action-btn adm-action-btn--suspend"
@@ -2604,6 +2692,7 @@ export default function AdminDashboard() {
                       <span className="adm-wd-date">
                         {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
+                      <QuickStatsPanel userId={w.user_id} />
                     </div>
 
                     {/* Expanded details */}
@@ -2786,6 +2875,7 @@ export default function AdminDashboard() {
                       <span className="adm-wd-date">
                         {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
+                      <QuickStatsPanel userId={w.user_id} />
                     </div>
 
                     {wdPaidExpanded === w.id && (
@@ -3029,7 +3119,8 @@ export default function AdminDashboard() {
                       </div>
 
                       {/* Actions */}
-                      <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: 5, flexShrink: 0, alignItems: 'center' }}>
+                        <QuickStatsPanel userId={r.referrer_id} />
                         <button
                           className="btn btn-ghost btn-sm"
                           title="Send message"
@@ -3118,6 +3209,10 @@ export default function AdminDashboard() {
                         {new Date(r.invited_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <QuickStatsPanel userId={r.referrer_id} />
+                      <QuickStatsPanel userId={r.invited_id} />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -3175,6 +3270,7 @@ export default function AdminDashboard() {
                     <span className={`adm-notif-read ${n.is_read ? 'adm-notif-read--yes' : 'adm-notif-read--no'}`}>
                       {n.is_read ? 'Read' : 'Unread'}
                     </span>
+                    <QuickStatsPanel userId={n.user_id} />
                   </div>
                 </div>
                 <div className="adm-notif-sub">
