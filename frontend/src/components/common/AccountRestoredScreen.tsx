@@ -61,7 +61,7 @@ export default function AccountRestoredScreen({ restorationMessage }: Props) {
   const presetMatch = rawMain.match(/^\[preset:([^\]]+)\]\s*/);
   const presetType = presetMatch?.[1] ?? null;
   const mainMessage = rawMain.replace(/^\[preset:[^\]]+\]\s*/, '');
-  const bullets = (presetType && PRESET_BULLETS[presetType]) ?? DEFAULT_BULLETS;
+  const bullets = (presetType != null ? PRESET_BULLETS[presetType] : null) ?? DEFAULT_BULLETS;
 
   async function handleContinue() {
     setDismissing(true);
