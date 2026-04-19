@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Users, Check, Copy, Share2, DollarSign } from 'lucide-react';
+import { Users, Check, Copy, Share2 } from 'lucide-react';
 import { useAuth } from '../../store/authStore.tsx';
 import BackButton from '../../components/common/BackButton.tsx';
 import api from '../../services/api.ts';
@@ -15,13 +14,9 @@ interface ReferredUser {
 }
 
 interface ReferralsResponse {
-  success:          boolean;
-  referrals:        ReferredUser[];
-  total_earned:     number;
-  released_credits: number;
+  success:   boolean;
+  referrals: ReferredUser[];
 }
-
-const INVITE_VALUE = 10; // ₱10 per verified signup
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -32,20 +27,16 @@ const HAS_SHARE_API = typeof navigator !== 'undefined' && 'share' in navigator;
 export default function Referrals() {
   const { user } = useAuth();
 
-  const [referrals,       setReferrals]       = useState<ReferredUser[]>([]);
-  const [releasedCredits, setReleasedCredits] = useState(0);
-  const [loading,         setLoading]         = useState(true);
-  const [copied,          setCopied]          = useState<'code' | 'link' | null>(null);
+  const [referrals, setReferrals] = useState<ReferredUser[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [copied,    setCopied]    = useState<'code' | 'link' | null>(null);
 
   const referralCode = user?.referral_code ?? '';
   const referralLink = `${window.location.origin}/register?ref=${referralCode}`;
 
   useEffect(() => {
     api.get<ReferralsResponse>('/users/me/referrals')
-      .then(({ data }) => {
-        setReferrals(data.referrals);
-        setReleasedCredits(data.released_credits ?? 0);
-      })
+      .then(({ data }) => setReferrals(data.referrals))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -76,8 +67,6 @@ export default function Referrals() {
     window.open(`https://wa.me/?text=${msg}`, '_blank', 'noopener,noreferrer');
   }
 
-  const totalInvites = referrals.length;
-
   if (loading) return (
     <div className="page">
       <div className="sk-section">
@@ -86,12 +75,10 @@ export default function Referrals() {
       </div>
       {/* stats row */}
       <div className="sk-card sk-row" style={{ justifyContent: 'space-around', padding: 20 }}>
-        {[0,1,2].map(i => (
-          <div key={i} className="sk-col" style={{ alignItems: 'center', gap: 8 }}>
-            <span className="sk sk-line--xl skeleton" style={{ width: 60 }} />
-            <span className="sk sk-line--sm skeleton" style={{ width: 70 }} />
-          </div>
-        ))}
+        <div className="sk-col" style={{ alignItems: 'center', gap: 8 }}>
+          <span className="sk sk-line--xl skeleton" style={{ width: 60 }} />
+          <span className="sk sk-line--sm skeleton" style={{ width: 70 }} />
+        </div>
       </div>
       {/* code card */}
       <div className="sk-card sk-row">
@@ -111,7 +98,6 @@ export default function Referrals() {
               <span className="sk sk-line skeleton" style={{ width: '50%' }} />
               <span className="sk sk-line--sm skeleton" style={{ width: '35%' }} />
             </div>
-            <span className="sk skeleton" style={{ width: 50, height: 22, borderRadius: 12, flexShrink: 0 }} />
           </div>
         ))}
       </div>
@@ -124,33 +110,15 @@ export default function Referrals() {
         <div>
           <BackButton />
           <h1 className="page-title">Referrals</h1>
-          <p className="page-subtitle">Invite friends · earn per signup</p>
+          <p className="page-subtitle">Invite friends to Plivio</p>
         </div>
       </header>
 
       {/* Stats row */}
       <div className="ref-stats-row">
         <div className="ref-stat">
-          <span className="ref-stat-num">{totalInvites}</span>
+          <span className="ref-stat-num">{referrals.length}</span>
           <span className="ref-stat-lbl">Invites</span>
-        </div>
-        <div className="ref-stat-divider" />
-        <div className="ref-stat">
-          <span className="ref-stat-num ref-stat-num--accent">
-            ₱{releasedCredits.toFixed(2)}
-          </span>
-          <span className="ref-stat-lbl">Released</span>
-        </div>
-      </div>
-
-      {/* How-you-earn card */}
-      <div className="card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <DollarSign size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-        <div style={{ fontSize: 13 }}>
-          <strong>Earn ₱{INVITE_VALUE} per verified signup.</strong>
-          <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>
-            Credited to your balance the moment your friend verifies their email.
-          </span>
         </div>
       </div>
 
@@ -158,7 +126,7 @@ export default function Referrals() {
       <div className="card">
         <h2 className="card-title">Share your link</h2>
         <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>
-          Anyone who signs up with your code or link earns you a referral bonus.
+          Anyone who signs up with your code or link will be added to your invites list.
         </p>
 
         <div className="ref-share-stack">
@@ -221,13 +189,13 @@ export default function Referrals() {
           </div>
           <div className="ref-how-arrow">→</div>
           <div className="ref-how-item">
-            <div className="ref-how-icon"><DollarSign size={16} /></div>
-            <span>You earn a referral bonus</span>
+            <div className="ref-how-icon"><Check size={16} /></div>
+            <span>They verify their email</span>
           </div>
           <div className="ref-how-arrow">→</div>
           <div className="ref-how-item">
-            <div className="ref-how-icon"><Check size={16} /></div>
-            <span>Both accounts get rewarded</span>
+            <div className="ref-how-icon"><Users size={16} /></div>
+            <span>They appear in your invites list</span>
           </div>
         </div>
       </div>
@@ -236,7 +204,7 @@ export default function Referrals() {
       <section className="section">
         <div className="section-header">
           <h2 className="section-title">
-            People you've referred
+            People you've invited
             {referrals.length > 0 && (
               <span className="ref-count-badge">{referrals.length}</span>
             )}
@@ -245,10 +213,9 @@ export default function Referrals() {
 
         {referrals.length === 0 ? (
           <div className="empty-state">
-            <p>No referrals yet.</p>
+            <p>No invites yet.</p>
             <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
-              Share your link above to start earning.{' '}
-              <Link to="/plans" className="link">Upgrade to Premium</Link> to maximize bonuses.
+              Share your link above to invite friends.
             </p>
           </div>
         ) : (
@@ -271,7 +238,6 @@ export default function Referrals() {
                     </span>
                   </div>
                 </div>
-                <span className="earning-row-amount">+₱{INVITE_VALUE}</span>
               </div>
             ))}
           </div>

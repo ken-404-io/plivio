@@ -363,18 +363,9 @@ export async function getReferrals(
       [userId],
     );
 
-    // ₱10 is credited to the referrer for every verified signup — no more
-    // batching of 10 (see emailAuthController + migration 018). "Released"
-    // is therefore always exactly totalInvites × ₱10.
-    const INVITE_VALUE   = 10;
-    const totalInvites   = listResult.rows.length;
-    const releasedAmount = totalInvites * INVITE_VALUE;
-
     res.json({
-      success:          true,
-      referrals:        listResult.rows,
-      total_earned:     releasedAmount,
-      released_credits: releasedAmount,
+      success:   true,
+      referrals: listResult.rows,
     });
   } catch (err) { next(err); }
 }
