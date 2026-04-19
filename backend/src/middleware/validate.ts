@@ -1,15 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../utils/errors.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE     = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EMAIL_RE    = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,50}$/;
 
-/**
- * Middleware that validates a UUID route parameter by name.
- * Rejects early with 400 before the request reaches the controller,
- * preventing DB queries with malformed input.
- *
- * Usage: router.put('/:id', validateParam('id'), handler)
- */
 export function validateParam(paramName: string) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     const value = (req.params as Record<string, string>)[paramName];
@@ -21,12 +16,6 @@ export function validateParam(paramName: string) {
   };
 }
 
-/**
- * Middleware that validates a positive integer route parameter by name.
- * Use for tables whose PK is BIGSERIAL/INTEGER rather than UUID.
- *
- * Usage: router.put('/:id', validateIntParam('id'), handler)
- */
 export function validateIntParam(paramName: string) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     const value = (req.params as Record<string, string>)[paramName];
@@ -50,9 +39,6 @@ interface FieldRules {
   enum?:      string[];
   pattern?:   RegExp;
 }
-
-const EMAIL_RE    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const USERNAME_RE = /^[a-zA-Z0-9_]{3,50}$/;
 
 export function validateBody(schema: Record<string, FieldRules>) {
   return (req: Request, _res: Response, next: NextFunction): void => {

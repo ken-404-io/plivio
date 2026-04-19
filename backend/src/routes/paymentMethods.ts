@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.ts';
 import { rateLimiter }  from '../middleware/rateLimiter.ts';
+import { validateParam } from '../middleware/validate.ts';
 import {
   listPaymentMethods,
   createPaymentMethod,
@@ -14,14 +15,10 @@ router.use(authenticate);
 
 router.get('/', listPaymentMethods);
 
-// Writes are lightly rate-limited to discourage brute-forcing account numbers
-// against the global uniqueness index.
-router.post('/',
-  rateLimiter({ max: 10, windowMs: 60 * 60_000, keyPrefix: 'pm-create' }),
-  createPaymentMethod,
-);
+const writeLimit = rateLimiter({ max: 10, windowMs: 60 * 60_000, keyPrefix: 'pm-write' });
 
-router.put('/:id',    updatePaymentMethod);
-router.delete('/:id', deletePaymentMethod);
+router.post('/',     writeLimit, createPaymentMethod);
+router.put('/:id',   validateParam('id'), writeLimit, updatePaymentMethod);
+router.delete('/:id', validateParam('id'), writeLimit, deletePaymentMethod);
 
 export default router;

@@ -34,58 +34,48 @@ function deviceFingerprint(req: Request): string {
   return Buffer.from(`${req.ip}|${ua}|${lang}|${enc}`).toString('base64').slice(0, 64);
 }
 
-/** Extract a human-readable device name from User-Agent string */
 function parseDeviceName(ua: string): string {
-  // Try to extract OS
   let os = 'Unknown OS';
-  if (/Windows NT 10/i.test(ua))       os = 'Windows 10/11';
-  else if (/Windows/i.test(ua))        os = 'Windows';
-  else if (/Mac OS X/i.test(ua))       os = 'macOS';
-  else if (/Android/i.test(ua))        os = 'Android';
-  else if (/iPhone|iPad/i.test(ua))    os = 'iOS';
-  else if (/Linux/i.test(ua))          os = 'Linux';
-  else if (/CrOS/i.test(ua))          os = 'Chrome OS';
+  if (/Windows NT 10/i.test(ua))    os = 'Windows 10/11';
+  else if (/Windows/i.test(ua))     os = 'Windows';
+  else if (/Mac OS X/i.test(ua))    os = 'macOS';
+  else if (/Android/i.test(ua))     os = 'Android';
+  else if (/iPhone|iPad/i.test(ua)) os = 'iOS';
+  else if (/Linux/i.test(ua))       os = 'Linux';
+  else if (/CrOS/i.test(ua))        os = 'Chrome OS';
 
-  // Try to extract browser
   let browser = 'Unknown Browser';
-  if (/Edg\//i.test(ua))              browser = 'Edge';
-  else if (/OPR\//i.test(ua))         browser = 'Opera';
-  else if (/Chrome\//i.test(ua))      browser = 'Chrome';
-  else if (/Firefox\//i.test(ua))     browser = 'Firefox';
-  else if (/Safari\//i.test(ua))      browser = 'Safari';
+  if (/Edg\//i.test(ua))       browser = 'Edge';
+  else if (/OPR\//i.test(ua))  browser = 'Opera';
+  else if (/Chrome\//i.test(ua)) browser = 'Chrome';
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+  else if (/Safari\//i.test(ua)) browser = 'Safari';
 
   return `${browser} on ${os}`;
 }
 
-// ─── Disposable / throwaway email domains ─────────────────────────────────
 const DISPOSABLE_DOMAINS = new Set([
   'mailinator.com', 'guerrillamail.com', 'guerrillamail.net', 'guerrillamail.org',
   'guerrillamail.biz', 'guerrillamail.de', 'guerrillamailblock.com', 'grr.la',
-  'sharklasers.com', 'guerrillamailblock.com', 'spam4.me', 'trashmail.com',
-  'trashmail.me', 'trashmail.at', 'trashmail.io', 'trashmail.net', 'trashmail.org',
-  'yopmail.com', 'yopmail.fr', 'cool.fr.nf', 'jetable.fr.nf', 'nospam.ze.tc',
-  'nomail.xl.cx', 'mega.zik.dj', 'speed.1s.fr', 'courriel.fr.nf', 'moncourrier.fr.nf',
-  'monemail.fr.nf', 'monmail.fr.nf', 'tempmail.com', 'temp-mail.org', 'temp-mail.io',
+  'sharklasers.com', 'spam4.me', 'trashmail.com', 'trashmail.me', 'trashmail.at',
+  'trashmail.io', 'trashmail.net', 'trashmail.org', 'yopmail.com', 'yopmail.fr',
+  'cool.fr.nf', 'jetable.fr.nf', 'nospam.ze.tc', 'nomail.xl.cx', 'mega.zik.dj',
+  'speed.1s.fr', 'courriel.fr.nf', 'moncourrier.fr.nf', 'monemail.fr.nf',
+  'monmail.fr.nf', 'tempmail.com', 'temp-mail.org', 'temp-mail.io',
   'fakeinbox.com', 'mailnull.com', 'spamgourmet.com', 'spamgourmet.net',
   'dispostable.com', 'maildrop.cc', 'throwam.com', 'throwaway.email',
   'emailondeck.com', 'mohmal.com', 'getairmail.com', 'filzmail.com',
   'getnada.com', 'nada.email', 'nada.ltd', 'mytemp.email', 'tempinbox.com',
   'tempail.com', 'inboxbear.com', 'discard.email', 'spamhereplease.com',
-  'tempinbox.co.uk', 'mailnesia.com', 'throwam.com', 'binkmail.com',
-  'spamavert.com', 'bspamfree.org', 'mailseal.de', 'oneoffmail.com',
-  'tempr.email', 'trbvm.com', 'spamfree24.org', 'spamfree.eu',
+  'tempinbox.co.uk', 'mailnesia.com', 'binkmail.com', 'spamavert.com',
+  'bspamfree.org', 'mailseal.de', 'oneoffmail.com', 'tempr.email',
+  'trbvm.com', 'spamfree24.org', 'spamfree.eu',
 ]);
 
-/**
- * Normalise a Gmail address to its canonical form so that
- * dots-in-username variants and +alias tricks all map to the same identity.
- * e.g. j.o.h.n+spam@gmail.com → john@gmail.com
- */
 function normaliseEmail(raw: string): string {
   const lower = raw.toLowerCase().trim();
   const [localRaw, domain] = lower.split('@');
   if (!domain) return lower;
-
   if (domain === 'gmail.com' || domain === 'googlemail.com') {
     const local = (localRaw.split('+')[0] ?? localRaw).replace(/\./g, '');
     return `${local}@gmail.com`;
@@ -100,19 +90,15 @@ export function issueTokenCookies(res: Response, payload: Partial<JwtPayload>): 
   res.cookie('refresh_token', refreshToken, cookieOptions.refresh);
 }
 
-// ─── register ──────────────────────────────────────────────────────────────
-
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { username, email, password, referral_code: refCode, device_id: deviceId } = req.body as Record<string, string>;
 
-    // ── Block disposable email domains ────────────────────────────────────
     const emailDomain = email.toLowerCase().trim().split('@')[1] ?? '';
     if (DISPOSABLE_DOMAINS.has(emailDomain)) {
       throw new ValidationError('Disposable email addresses are not allowed. Please use a real email.');
     }
 
-    // ── Normalise email (collapse Gmail dots/plus tricks) ─────────────────
     const normalisedEmail = normaliseEmail(email);
 
     const exists = await pool.query(
@@ -121,9 +107,6 @@ export async function register(req: Request, res: Response, next: NextFunction):
     );
     if (exists.rowCount && exists.rowCount > 0) throw new ConflictError('Email or username is already taken');
 
-    // ── Device-ID uniqueness (1 registration per device) ─────────────────
-    // The client sends a hardware fingerprint (hw_...) derived from canvas,
-    // screen, timezone, etc. — identical in normal and incognito modes.
     const deviceKey = deviceId?.trim().slice(0, 128) || null;
     const serverFp  = deviceFingerprint(req);
     const fpToCheck = deviceKey || serverFp;
@@ -146,7 +129,6 @@ export async function register(req: Request, res: Response, next: NextFunction):
 
     const passwordHash    = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const newReferralCode = makeReferralCode();
-    // Prefer the client-supplied device UUID; fall back to server-side headers fingerprint
     const fingerprint     = deviceKey ?? deviceFingerprint(req);
     const devName         = parseDeviceName(req.headers['user-agent'] ?? '');
 
@@ -160,7 +142,6 @@ export async function register(req: Request, res: Response, next: NextFunction):
       );
       rows = result.rows as Record<string, unknown>[];
     } catch {
-      // Fallback if device_name / device_registered_at columns don't exist yet
       const result = await pool.query(
         `INSERT INTO users (username, email, password_hash, referral_code, referred_by, device_fingerprint)
          VALUES ($1, $2, $3, $4, $5, $6)
@@ -172,26 +153,11 @@ export async function register(req: Request, res: Response, next: NextFunction):
 
     const user = rows[0] as Record<string, unknown>;
 
-    // ── Referral bonus is deferred until email verification ───────────────
-    // (crediting immediately allowed fake-email abuse; bonus now granted
-    //  in emailAuthController.verifyEmail once the address is confirmed)
-
-    // ── Send a 6-digit verification OTP ───────────────────────────────────
-    // For manual sign-ups the account is NOT usable until the email is
-    // verified — we do not issue session cookies here. The user will only
-    // receive cookies after they submit the correct OTP to
-    // /api/auth/verify-email (which itself issues cookies). OAuth sign-ups
-    // still auto-login because the provider has already verified the email.
-    // Fire-and-forget — email sending must never delay the register response.
     issueVerificationOtp(
       user.id as string,
       user.email as string,
       user.username as string,
-    ).catch((err: unknown) => {
-      // Non-fatal — account is created; user can tap "Resend code".
-      // eslint-disable-next-line no-console
-      console.error('[register] issueVerificationOtp failed', err);
-    });
+    ).catch(() => { /* non-fatal — user can request resend */ });
 
     res.status(201).json({
       success: true,
@@ -201,8 +167,6 @@ export async function register(req: Request, res: Response, next: NextFunction):
     });
   } catch (err) { next(err); }
 }
-
-// ─── login ─────────────────────────────────────────────────────────────────
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -222,105 +186,61 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     const user = rows[0] as Record<string, unknown>;
 
     if (user.is_banned) {
-      res.status(403).json({
-        success: false,
-        code:    'account_banned',
-        reason:  user.ban_reason ?? null,
-        error:   'This account has been permanently banned.',
-      });
+      res.status(403).json({ success: false, code: 'account_banned', reason: user.ban_reason ?? null, error: 'This account has been permanently banned.' });
       return;
     }
     if (user.is_suspended && new Date(user.suspended_until as string) > new Date()) {
-      res.status(403).json({
-        success:         false,
-        code:            'account_suspended',
-        reason:          user.suspend_reason ?? null,
-        suspended_until: user.suspended_until,
-        error:           'This account is temporarily suspended.',
-      });
+      res.status(403).json({ success: false, code: 'account_suspended', reason: user.suspend_reason ?? null, suspended_until: user.suspended_until, error: 'This account is temporarily suspended.' });
       return;
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash as string);
     if (!passwordMatch) throw new AuthenticationError('Invalid credentials. Please check your email and password and try again.');
 
-    // Manual sign-ups must verify their email address before they can log in.
-    // OAuth accounts never hit this endpoint (their provider has already
-    // verified the address), so this check is manual-login-only by
-    // construction. We return a structured error so the frontend can
-    // render a friendly screen with a "Resend verification email" button.
     if (!user.is_email_verified) {
-      res.status(403).json({
-        success: false,
-        error:   'Please verify your email address before logging in. Check your inbox for the verification link.',
-        code:    'email_not_verified',
-        email:   user.email as string,
-      });
+      res.status(403).json({ success: false, error: 'Please verify your email address before logging in. Check your inbox for the verification link.', code: 'email_not_verified', email: user.email as string });
       return;
     }
 
-    // ── Device binding enforcement (one user, one device) ────────────────
-    // Admins are exempt from device binding so they can access from anywhere.
-    const currentDeviceId = loginDeviceId?.trim().slice(0, 128) || null;
-    const storedFingerprint = user.device_fingerprint as string | null;
-    const isHardwareFp  = currentDeviceId?.startsWith('hw_');
-    const storedIsLegacy = storedFingerprint && !storedFingerprint.startsWith('hw_');
+    const currentDeviceId    = loginDeviceId?.trim().slice(0, 128) || null;
+    const storedFingerprint  = user.device_fingerprint as string | null;
+    const isHardwareFp       = currentDeviceId?.startsWith('hw_');
+    const storedIsLegacy     = storedFingerprint && !storedFingerprint.startsWith('hw_');
 
     if (!user.is_admin && storedFingerprint && currentDeviceId) {
       if (storedIsLegacy && isHardwareFp) {
-        // Legacy UUID → hardware fingerprint migration: rebind to hardware fp
-        // so subsequent logins (including incognito) match correctly.
-        const ua = req.headers['user-agent'] ?? '';
-        const deviceName = parseDeviceName(ua);
+        const deviceName = parseDeviceName(req.headers['user-agent'] ?? '');
         try {
           await pool.query(
             `UPDATE users SET device_fingerprint = $1, device_name = $2, device_registered_at = NOW() WHERE id = $3`,
             [currentDeviceId, deviceName, user.id],
           );
         } catch {
-          await pool.query(
-            `UPDATE users SET device_fingerprint = $1 WHERE id = $2`,
-            [currentDeviceId, user.id],
-          );
+          await pool.query(`UPDATE users SET device_fingerprint = $1 WHERE id = $2`, [currentDeviceId, user.id]);
         }
       } else if (storedFingerprint !== currentDeviceId) {
-        // Also check if this hardware fp is already taken by another account
         const { rows: fpCheck } = await pool.query(
           'SELECT id FROM users WHERE device_fingerprint = $1 AND id != $2 LIMIT 1',
           [currentDeviceId, user.id],
         );
         if (fpCheck.length > 0) {
-          res.status(403).json({
-            success: false,
-            error:   'Access denied. This device is already linked to another account.',
-            code:    'device_mismatch',
-          });
+          res.status(403).json({ success: false, error: 'Access denied. This device is already linked to another account.', code: 'device_mismatch' });
           return;
         }
-        res.status(403).json({
-          success: false,
-          error:   'Access denied. This account is already linked to another device. Please use your registered device to log in, or contact support to request a device change.',
-          code:    'device_mismatch',
-        });
+        res.status(403).json({ success: false, error: 'Access denied. This account is already linked to another device. Please use your registered device to log in, or contact support to request a device change.', code: 'device_mismatch' });
         return;
       }
     }
 
-    // If user has no device bound yet (e.g. pre-migration, device reset), bind the current device
     if (!user.is_admin && !storedFingerprint && currentDeviceId) {
-      const ua = req.headers['user-agent'] ?? '';
-      const deviceName = parseDeviceName(ua);
+      const deviceName = parseDeviceName(req.headers['user-agent'] ?? '');
       try {
         await pool.query(
           `UPDATE users SET device_fingerprint = $1, device_name = $2, device_registered_at = NOW() WHERE id = $3`,
           [currentDeviceId, deviceName, user.id],
         );
       } catch {
-        // Fallback if device_name / device_registered_at columns don't exist yet
-        await pool.query(
-          `UPDATE users SET device_fingerprint = $1 WHERE id = $2`,
-          [currentDeviceId, user.id],
-        );
+        await pool.query(`UPDATE users SET device_fingerprint = $1 WHERE id = $2`, [currentDeviceId, user.id]);
       }
     }
 
@@ -330,6 +250,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
         httpOnly: true,
         secure:   process.env.NODE_ENV === 'production',
         sameSite: 'strict',
+        path:     '/api/auth/2fa',
         maxAge:   5 * 60 * 1000,
       });
       res.json({ success: true, requires_2fa: true });
@@ -337,18 +258,15 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     }
 
     issueTokenCookies(res, { id: user.id as string, username: user.username as string, is_admin: user.is_admin as boolean });
-    const { password_hash, totp_secret, device_fingerprint, ...safeUser } = user;
-    void password_hash; void totp_secret; void device_fingerprint;
+    const { password_hash: _ph, totp_secret: _ts, device_fingerprint: _df, ...safeUser } = user;
     res.json({ success: true, user: safeUser });
   } catch (err) { next(err); }
 }
 
-// ─── verify2FA login ───────────────────────────────────────────────────────
-
 export async function verify2FALogin(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { token }  = req.body as Record<string, string>;
-    const preToken   = req.cookies?.pre_auth_token as string | undefined;
+    const { token } = req.body as Record<string, string>;
+    const preToken  = req.cookies?.pre_auth_token as string | undefined;
 
     if (!preToken) throw new AuthenticationError('No pending 2FA session');
 
@@ -377,30 +295,21 @@ export async function verify2FALogin(req: Request, res: Response, next: NextFunc
       return;
     }
 
-    const valid = speakeasy.totp.verify({
-      secret:   user.totp_secret as string,
-      encoding: 'base32',
-      token,
-      window:   1,
-    });
-
+    const valid = speakeasy.totp.verify({ secret: user.totp_secret as string, encoding: 'base32', token, window: 1 });
     if (!valid) throw new AuthenticationError('Invalid 2FA code');
 
-    res.clearCookie('pre_auth_token');
+    res.clearCookie('pre_auth_token', { path: '/api/auth/2fa' });
     issueTokenCookies(res, { id: user.id as string, username: user.username as string, is_admin: user.is_admin as boolean });
     res.json({ success: true });
   } catch (err) { next(err); }
 }
 
-// ─── logout ────────────────────────────────────────────────────────────────
-
 export async function logout(_req: Request, res: Response): Promise<void> {
   res.clearCookie('access_token',  { path: '/' });
   res.clearCookie('refresh_token', { path: '/api/auth/refresh' });
+  res.clearCookie('pre_auth_token', { path: '/api/auth/2fa' });
   res.json({ success: true });
 }
-
-// ─── refresh ───────────────────────────────────────────────────────────────
 
 export async function refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -414,25 +323,20 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
       [decoded.id]
     );
     const refreshedUser = rows[0] as Record<string, unknown> | undefined;
-    if (!refreshedUser || refreshedUser.is_banned) {
-      throw new AuthenticationError('User not found or banned');
-    }
+    if (!refreshedUser || refreshedUser.is_banned) throw new AuthenticationError('User not found or banned');
     if (refreshedUser.is_suspended && new Date(refreshedUser.suspended_until as string) > new Date()) {
       throw new AuthenticationError('Account is currently suspended');
     }
 
-    const user = rows[0] as Record<string, unknown>;
     const accessToken = generateAccessToken({
-      id:       user.id as string,
-      username: user.username as string,
-      is_admin: user.is_admin as boolean,
+      id:       refreshedUser.id as string,
+      username: refreshedUser.username as string,
+      is_admin: refreshedUser.is_admin as boolean,
     });
     res.cookie('access_token', accessToken, cookieOptions.access);
     res.json({ success: true });
   } catch (err) { next(err); }
 }
-
-// ─── 2FA setup ─────────────────────────────────────────────────────────────
 
 export async function setup2FA(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -445,15 +349,12 @@ export async function setup2FA(req: Request, res: Response, next: NextFunction):
     if (user.totp_secret) throw new ConflictError('2FA is already enabled');
 
     const secret = speakeasy.generateSecret({ name: `Plivio (${user.username as string})`, length: 20 });
-
     await pool.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secret.base32, userId]);
 
     const qrDataUrl = await qrcode.toDataURL(secret.otpauth_url!);
     res.json({ success: true, qr: qrDataUrl, secret: secret.base32 });
   } catch (err) { next(err); }
 }
-
-// ─── 2FA enable ────────────────────────────────────────────────────────────
 
 export async function enable2FA(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -473,8 +374,6 @@ export async function enable2FA(req: Request, res: Response, next: NextFunction)
   } catch (err) { next(err); }
 }
 
-// ─── 2FA disable ───────────────────────────────────────────────────────────
-
 export async function disable2FA(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { token } = req.body as Record<string, string>;
@@ -491,5 +390,19 @@ export async function disable2FA(req: Request, res: Response, next: NextFunction
 
     await pool.query('UPDATE users SET totp_secret = NULL WHERE id = $1', [userId]);
     res.json({ success: true, message: '2FA disabled' });
+  } catch (err) { next(err); }
+}
+
+export async function getCSRF(_req: Request, res: Response): Promise<void> {
+  res.json({ success: true });
+}
+
+export async function deleteAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    res.clearCookie('access_token',  { path: '/' });
+    res.clearCookie('refresh_token', { path: '/api/auth/refresh' });
+    res.json({ success: true });
   } catch (err) { next(err); }
 }
