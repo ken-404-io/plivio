@@ -1,6 +1,23 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const BUILD_TIME = Date.now().toString();
+
+/** Emit /version.json into the build output so the version-check hook can
+ *  detect when a new deploy has happened and trigger a hard reload. */
+function versionFilePlugin(): Plugin {
+  return {
+    name: 'version-file',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify({ v: BUILD_TIME }),
+      });
+    },
+  };
+}
+
 /**
  * Strip the `crossorigin` attribute from every <script> and <link> tag in
  * index.html at build time.
@@ -83,7 +100,10 @@ function removeCrossOriginPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), removeCrossOriginPlugin()],
+  plugins: [react(), removeCrossOriginPlugin(), versionFilePlugin()],
+  define: {
+    __BUILD_TIME__: JSON.stringify(BUILD_TIME),
+  },
 
   // In dev, proxy /api requests to the local backend so you don't need CORS.
   // Also mirror the Vercel rewrites for the Monetag ad tags so /js/p1.js
