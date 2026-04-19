@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Users, CreditCard, UserCheck, ArrowUpCircle,
   Smartphone, RotateCcw, ShieldCheck, ShieldX, Ban, CheckCircle2,
-  Coins, Star, Mail, Key, Clock,
+  Coins, Star, Mail, Key, Clock, BookOpen,
 } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
@@ -75,7 +75,7 @@ export default function AdminUserDetail() {
 
   if (!details) return null;
 
-  const { user, subscription, invites, withdrawals, device, kyc } = details;
+  const { user, subscription, invites, withdrawals, device, kyc, quiz_stats } = details;
 
   const kycColor: Record<string, string> = {
     approved: 'var(--success)',
@@ -173,6 +173,55 @@ export default function AdminUserDetail() {
                 month: 'long', day: 'numeric', year: 'numeric',
                 hour: '2-digit', minute: '2-digit',
               })}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Quiz Activity ── */}
+      <div className="adm-details-section" style={{ marginBottom: 16 }}>
+        <h4 className="adm-details-section-title"><BookOpen size={13} /> Quiz Activity</h4>
+        <div className="adm-wd-detail-grid">
+          <div className="adm-wd-detail-item">
+            <span className="adm-wd-detail-label">Today — Answered</span>
+            <span className="adm-wd-detail-value">{quiz_stats.today_answered.toLocaleString()}</span>
+          </div>
+          <div className="adm-wd-detail-item">
+            <span className="adm-wd-detail-label">Today — Correct</span>
+            <span className="adm-wd-detail-value">
+              {quiz_stats.today_correct.toLocaleString()}
+              {quiz_stats.today_answered > 0 && (
+                <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 6 }}>
+                  ({Math.round((quiz_stats.today_correct / quiz_stats.today_answered) * 100)}%)
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="adm-wd-detail-item">
+            <span className="adm-wd-detail-label">Today — Earned</span>
+            <span className="adm-wd-detail-value" style={{ color: 'var(--success)', fontWeight: 600 }}>
+              ₱{Number(quiz_stats.today_earned).toFixed(2)}
+            </span>
+          </div>
+          <div className="adm-wd-detail-item">
+            <span className="adm-wd-detail-label">Lifetime — Answered</span>
+            <span className="adm-wd-detail-value">{quiz_stats.total_answered.toLocaleString()}</span>
+          </div>
+          <div className="adm-wd-detail-item">
+            <span className="adm-wd-detail-label">Lifetime — Correct</span>
+            <span className="adm-wd-detail-value">
+              {quiz_stats.total_correct.toLocaleString()}
+              {quiz_stats.total_answered > 0 && (
+                <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 6 }}>
+                  ({Math.round((quiz_stats.total_correct / quiz_stats.total_answered) * 100)}%)
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="adm-wd-detail-item">
+            <span className="adm-wd-detail-label">Lifetime — Earned</span>
+            <span className="adm-wd-detail-value" style={{ color: 'var(--success)', fontWeight: 600 }}>
+              ₱{Number(quiz_stats.total_earned).toFixed(2)}
             </span>
           </div>
         </div>
