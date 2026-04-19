@@ -811,13 +811,41 @@ function UnbanModal({ username, onConfirm, onCancel }: {
 }
 
 // ─── Unsuspend modal ──────────────────────────────────────────────────────────
+const UNSUSPEND_PRESETS = [
+  {
+    label: 'Invite wrong credit',
+    type: 'invite_credit',
+    message: 'Your account was temporarily suspended due to an invite credit issue, which has now been reviewed and resolved.',
+    fixes: 'The invite credit discrepancy was identified and corrected. Your balance has been adjusted accordingly.',
+  },
+  {
+    label: 'Activity cleared',
+    type: 'activity_cleared',
+    message: 'After a thorough review of your account activity, no violations were confirmed and your suspension has been lifted.',
+    fixes: 'The flagged activity was reviewed and cleared. No policy violations were found during the investigation.',
+  },
+  {
+    label: 'Appeal approved',
+    type: 'appeal_approved',
+    message: 'Your appeal has been reviewed and approved. The suspension on your account has been lifted.',
+    fixes: 'Your appeal was carefully reviewed and accepted by our moderation team.',
+  },
+];
+
 function UnsuspendModal({ username, onConfirm, onCancel }: {
   username:  string;
   onConfirm: (restoration_message: string, fixes_made: string) => void;
   onCancel:  () => void;
 }) {
-  const [message, setMessage] = useState('');
-  const [fixes,   setFixes]   = useState('');
+  const [message,        setMessage]        = useState('');
+  const [fixes,          setFixes]          = useState('');
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+
+  function applyPreset(preset: typeof UNSUSPEND_PRESETS[number]) {
+    setSelectedPreset(preset.type);
+    setMessage(`[preset:${preset.type}] ${preset.message}`);
+    setFixes(preset.fixes);
+  }
 
   return (
     <div className="adm-modal-overlay" onClick={onCancel}>
@@ -830,6 +858,23 @@ function UnsuspendModal({ username, onConfirm, onCancel }: {
           The user will be notified and shown a full-screen message explaining why their suspension was lifted. Both fields are optional but recommended.
         </p>
 
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+          Quick presets
+        </label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+          {UNSUSPEND_PRESETS.map((p) => (
+            <button
+              key={p.type}
+              type="button"
+              className={`btn btn-sm ${selectedPreset === p.type ? 'btn-primary' : 'btn-ghost'}`}
+              style={{ fontSize: 11 }}
+              onClick={() => applyPreset(p)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
         <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
           Message to user
         </label>
@@ -837,7 +882,7 @@ function UnsuspendModal({ username, onConfirm, onCancel }: {
           className="form-input adm-modal-textarea"
           placeholder="e.g. After reviewing your account activity, we have lifted the suspension. Thank you for your patience."
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => { setMessage(e.target.value); setSelectedPreset(null); }}
           rows={3}
           autoFocus
         />
