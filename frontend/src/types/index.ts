@@ -298,6 +298,15 @@ export interface AdminUserKyc {
   reviewed_at: string | null;
 }
 
+export interface AdminUserQuizStats {
+  total_answered: number;
+  total_correct:  number;
+  total_earned:   number;
+  today_answered: number;
+  today_correct:  number;
+  today_earned:   number;
+}
+
 export interface AdminUserDetails {
   user: AdminUserProfile;
   subscription: AdminUserSubscription | null;
@@ -305,6 +314,7 @@ export interface AdminUserDetails {
   withdrawals: AdminUserWithdrawal[];
   device: AdminDeviceInfo | null;
   kyc: AdminUserKyc | null;
+  quiz_stats: AdminUserQuizStats;
 }
 
 export interface AdminWithdrawalHistory {

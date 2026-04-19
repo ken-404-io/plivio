@@ -553,7 +553,7 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
   try {
     const { id } = req.params as Record<string, string>;
 
-    const [userResult, subResult, invitesResult, withdrawalsResult, deviceResult, kycResult] = await Promise.all([
+    const [userResult, subResult, invitesResult, withdrawalsResult, deviceResult, kycResult, quizResult] = await Promise.all([
       // Full user profile
       pool.query(
         `SELECT id, username, email, plan, balance, coins, streak_count, last_streak_date,
@@ -612,11 +612,32 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
          FROM kyc_submissions WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 1`,
         [id],
       ),
+      // Quiz stats — lifetime and today (PH time)
+      pool.query(
+        `SELECT
+           COUNT(*)                                                          AS total_answered,
+           COUNT(*) FILTER (WHERE is_correct)                               AS total_correct,
+           COALESCE(SUM(reward_earned), 0)                                  AS total_earned,
+           COUNT(*) FILTER (WHERE answered_at >= (date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila'))
+                                                                            AS today_answered,
+           COUNT(*) FILTER (WHERE is_correct AND answered_at >= (date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila'))
+                                                                            AS today_correct,
+           COALESCE(SUM(reward_earned) FILTER (WHERE answered_at >= (date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila')), 0)
+                                                                            AS today_earned
+         FROM user_question_answers
+         WHERE user_id = $1`,
+        [id],
+      ),
     ]);
 
     if (userResult.rows.length === 0) throw new NotFoundError('User not found');
 
     const deviceRow = deviceResult.rows[0] as { device_fingerprint: string | null; device_name?: string | null; device_registered_at?: string | null } | undefined;
+
+    const qz = quizResult.rows[0] as {
+      total_answered: string; total_correct: string; total_earned: string;
+      today_answered: string; today_correct: string; today_earned: string;
+    };
 
     res.json({
       success:      true,
@@ -630,6 +651,14 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
         registered_at:  deviceRow.device_registered_at ?? null,
       } : null,
       kyc:          kycResult.rows[0] ?? null,
+      quiz_stats: {
+        total_answered: Number(qz.total_answered),
+        total_correct:  Number(qz.total_correct),
+        total_earned:   Number(qz.total_earned),
+        today_answered: Number(qz.today_answered),
+        today_correct:  Number(qz.today_correct),
+        today_earned:   Number(qz.today_earned),
+      },
     });
   } catch (err) { next(err); }
 }
