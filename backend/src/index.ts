@@ -17,6 +17,7 @@ import { sendKycStatusEmail } from './services/email.ts';
 // Cloudinary serves avatars/KYC images — no local AVATARS_DIR needed
 
 import { reconcilePendingCheckouts } from './controllers/subscriptionController.ts';
+import { runPromotionsTick } from './jobs/promotionsScheduler.ts';
 import authRoutes         from './routes/auth.ts';
 import taskRoutes         from './routes/tasks.ts';
 import userRoutes         from './routes/users.ts';
@@ -235,6 +236,13 @@ async function bootstrap() {
   // subscriptions are activated even if the user closed the browser.
   void reconcilePendingCheckouts();
   setInterval(() => { void reconcilePendingCheckouts(); }, 2 * 60 * 1000);
+
+  // Promotions scheduler — runs every minute. Detects start/end transitions
+  // for rows in the promotions table and fires the one-shot side effects
+  // (announcement email + in-app notifications on start; stamp ended_at on
+  // end). Restart-safe thanks to launched_at / ended_at stamps.
+  void runPromotionsTick();
+  setInterval(() => { void runPromotionsTick(); }, 60 * 1000);
 
   app.listen(PORT, () => {
     logger.info({ port: PORT }, `Plivio API running → http://localhost:${PORT}`);
