@@ -16,12 +16,13 @@ import type {
   AdminNotificationLog,
 } from '../../types/index.ts';
 
-const TABS = ['overview', 'users', 'withdrawals', 'referrals', 'notifications', 'kyc', 'online'] as const;
+const TABS = ['overview', 'users', 'restricted', 'withdrawals', 'referrals', 'notifications', 'kyc', 'online'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
   overview:      { label: 'Overview',      Icon: LayoutDashboard },
   users:         { label: 'Users',         Icon: Users           },
+  restricted:    { label: 'Restricted',    Icon: Ban             },
   withdrawals:   { label: 'Withdrawals',   Icon: ArrowUpCircle   },
   referrals:     { label: 'Referrals',     Icon: Link2           },
   notifications: { label: 'Notifications', Icon: Bell            },
@@ -1081,6 +1082,12 @@ export default function AdminDashboard() {
   const [banTarget,        setBanTarget]        = useState<{ id: string; username: string } | null>(null);
   const [unbanTarget,      setUnbanTarget]      = useState<{ id: string; username: string } | null>(null);
   const [unsuspendTarget,  setUnsuspendTarget]  = useState<{ id: string; username: string } | null>(null);
+
+  // Restricted tab (banned + suspended accounts)
+  const [restrictedUsers,   setRestrictedUsers]   = useState<AdminUser[]>([]);
+  const [restrictedLoading, setRestrictedLoading] = useState(false);
+  const [restrictedPage,    setRestrictedPage]    = useState(1);
+  const [restrictedMeta,    setRestrictedMeta]    = useState<{ page: number; total: number; limit: number }>({ page: 1, total: 0, limit: 25 });
   const [broadcasting,  setBroadcasting]  = useState(false);
   const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '' });
   const [emailBroadcasting,  setEmailBroadcasting]  = useState(false);
@@ -1242,6 +1249,28 @@ export default function AdminDashboard() {
   }, [userPage, userPlanFilter, userStatusFilter, userDeviceFilter, userDateFrom, userDateTo, userSearchCommitted]);
 
   useEffect(() => { void loadUsers(); }, [loadUsers]);
+
+  const loadRestricted = useCallback(async () => {
+    setRestrictedLoading(true);
+    try {
+      const { data } = await api.get<{
+        data: AdminUser[];
+        meta: { page: number; total: number; limit: number };
+      }>('/admin/users', { params: { page: restrictedPage, limit: 25, status: 'restricted' } });
+      setRestrictedUsers(data.data);
+      setRestrictedMeta(data.meta);
+    } catch {
+      toast.error('Failed to load restricted accounts.');
+    } finally {
+      setRestrictedLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restrictedPage]);
+
+  useEffect(() => {
+    if (tab === 'restricted') void loadRestricted();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, loadRestricted]);
 
   const loadUserDetails = useCallback(async (userId: string) => {
     if (userDetails[userId] || userDetailsLoad[userId]) return;
@@ -1528,6 +1557,8 @@ export default function AdminDashboard() {
     try {
       await api.post(`/admin/users/${userId}/ban`, { action: 'unban', restoration_message, fixes_made });
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: false } : u));
+      setRestrictedUsers((prev) => prev.filter((u) => u.id !== userId));
+      setRestrictedMeta((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
       setUnbanTarget(null);
       toast.success('Account unbanned. User has been notified.');
     } catch (err: unknown) {
@@ -1560,6 +1591,8 @@ export default function AdminDashboard() {
       setUsers((prev) => prev.map((u) =>
         u.id === userId ? { ...u, is_suspended: false, suspended_until: null } : u,
       ));
+      setRestrictedUsers((prev) => prev.filter((u) => u.id !== userId));
+      setRestrictedMeta((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
       setUnsuspendTarget(null);
       toast.success('Suspension lifted. User has been notified.');
     } catch (err: unknown) {
@@ -3278,6 +3311,140 @@ export default function AdminDashboard() {
             ))}
           </div>
         </>
+      )}
+
+      {/* ── Restricted (banned + suspended) ── */}
+      {tab === 'restricted' && (
+        <div className="adm-section">
+          <div className="adm-section-header" style={{ justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Ban size={15} style={{ color: 'var(--danger)' }} />
+              <h2 className="adm-section-title">
+                Restricted Accounts
+                <span style={{
+                  marginLeft: 8,
+                  background: 'var(--danger)',
+                  color: '#fff',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: '1px 8px',
+                }}>
+                  {restrictedMeta.total}
+                </span>
+              </h2>
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => { void loadRestricted(); }}
+              disabled={restrictedLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <RefreshCw size={13} className={restrictedLoading ? 'spin' : ''} />
+              Refresh
+            </button>
+          </div>
+          <p className="adm-section-hint">Banned or currently-suspended accounts. Use the actions to reinstate.</p>
+
+          {restrictedLoading && restrictedUsers.length === 0 ? (
+            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+              Loading…
+            </div>
+          ) : restrictedUsers.length === 0 ? (
+            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+              No restricted accounts.
+            </div>
+          ) : (
+            <>
+              <div className="adm-table-wrap">
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Status</th>
+                      <th>Reason</th>
+                      <th>Until</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {restrictedUsers.map((u) => {
+                      const suspendedActive = u.is_suspended && u.suspended_until && new Date(u.suspended_until) > new Date();
+                      const until = suspendedActive && u.suspended_until
+                        ? new Date(u.suspended_until).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '—';
+                      const reason = u.is_banned ? (u.ban_reason ?? '—') : (u.suspend_reason ?? '—');
+                      return (
+                        <tr key={u.id}>
+                          <td><strong>{u.username}</strong></td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{u.email}</td>
+                          <td>
+                            {u.is_banned ? (
+                              <span className="adm-status-chip adm-status-chip--banned">
+                                <Ban size={10} /> Banned
+                              </span>
+                            ) : (
+                              <span className="adm-status-chip adm-status-chip--suspended">
+                                <Clock size={10} /> Suspended
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ fontSize: 13, maxWidth: 280, whiteSpace: 'normal' }}>{reason}</td>
+                          <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{until}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <Link to={`/admin/users/${u.id}`} className="btn btn-ghost btn-sm">
+                                <Eye size={13} /> View
+                              </Link>
+                              {u.is_banned ? (
+                                <button
+                                  className="btn btn-success btn-sm"
+                                  onClick={() => setUnbanTarget({ id: u.id, username: u.username })}
+                                >
+                                  <CheckCircle2 size={13} /> Unban
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-success btn-sm"
+                                  onClick={() => setUnsuspendTarget({ id: u.id, username: u.username })}
+                                >
+                                  <CheckCircle2 size={13} /> Unsuspend
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {restrictedMeta.total > restrictedMeta.limit && (
+                <div className="adm-pagination" style={{ marginTop: 12 }}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    disabled={restrictedPage <= 1 || restrictedLoading}
+                    onClick={() => setRestrictedPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft size={13} /> Prev
+                  </button>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Page {restrictedMeta.page} of {Math.max(1, Math.ceil(restrictedMeta.total / restrictedMeta.limit))}
+                  </span>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    disabled={restrictedPage * restrictedMeta.limit >= restrictedMeta.total || restrictedLoading}
+                    onClick={() => setRestrictedPage((p) => p + 1)}
+                  >
+                    Next <ChevronRight size={13} />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {/* ── Online ── */}

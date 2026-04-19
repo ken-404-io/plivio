@@ -232,6 +232,8 @@ export interface AdminUser {
   is_banned: boolean;
   is_suspended: boolean;
   suspended_until: string | null;
+  ban_reason?: string | null;
+  suspend_reason?: string | null;
   is_admin: boolean;
   created_at: string;
 }

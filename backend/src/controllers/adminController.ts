@@ -59,7 +59,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const search = req.query.search ? `%${req.query.search as string}%` : null;
     const planFilter = ['free', 'premium', 'elite'].includes(req.query.plan as string)
       ? (req.query.plan as string) : null;
-    const statusFilter = ['active', 'banned', 'suspended'].includes(req.query.status as string)
+    const statusFilter = ['active', 'banned', 'suspended', 'restricted'].includes(req.query.status as string)
       ? (req.query.status as string) : null;
     const deviceFilter = ['registered', 'unregistered'].includes(req.query.device as string)
       ? (req.query.device as string) : null;
@@ -68,14 +68,16 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
 
     const { rows } = await pool.query(
       `SELECT id, username, email, plan, balance, is_verified, is_banned, is_admin,
-              is_suspended, suspended_until, device_fingerprint, created_at
+              is_suspended, suspended_until, ban_reason, suspend_reason,
+              device_fingerprint, created_at
        FROM users
        WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
          AND ($3::plan_type IS NULL OR plan = $3::plan_type)
          AND ($5::text IS NULL
                OR ($5 = 'banned'     AND is_banned = TRUE)
                OR ($5 = 'active'     AND is_banned = FALSE AND (is_suspended = FALSE OR suspended_until <= NOW()))
-               OR ($5 = 'suspended'  AND is_suspended = TRUE AND suspended_until > NOW()))
+               OR ($5 = 'suspended'  AND is_suspended = TRUE AND suspended_until > NOW())
+               OR ($5 = 'restricted' AND (is_banned = TRUE OR (is_suspended = TRUE AND suspended_until > NOW()))))
          AND ($6::text IS NULL OR ($6 = 'registered' AND device_fingerprint IS NOT NULL) OR ($6 = 'unregistered' AND device_fingerprint IS NULL))
          AND ($7::timestamptz IS NULL OR created_at >= $7::timestamptz)
          AND ($8::timestamptz IS NULL OR created_at <= ($8::timestamptz + INTERVAL '1 day'))
@@ -90,7 +92,8 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
          AND ($3::text IS NULL
                OR ($3 = 'banned'     AND is_banned = TRUE)
                OR ($3 = 'active'     AND is_banned = FALSE AND (is_suspended = FALSE OR suspended_until <= NOW()))
-               OR ($3 = 'suspended'  AND is_suspended = TRUE AND suspended_until > NOW()))
+               OR ($3 = 'suspended'  AND is_suspended = TRUE AND suspended_until > NOW())
+               OR ($3 = 'restricted' AND (is_banned = TRUE OR (is_suspended = TRUE AND suspended_until > NOW()))))
          AND ($4::text IS NULL OR ($4 = 'registered' AND device_fingerprint IS NOT NULL) OR ($4 = 'unregistered' AND device_fingerprint IS NULL))
          AND ($5::timestamptz IS NULL OR created_at >= $5::timestamptz)
          AND ($6::timestamptz IS NULL OR created_at <= ($6::timestamptz + INTERVAL '1 day'))`,
