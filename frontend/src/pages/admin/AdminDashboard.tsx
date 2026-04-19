@@ -753,6 +753,120 @@ function SuspendModal({ username, onConfirm, onCancel }: {
   );
 }
 
+// ─── Unban modal ──────────────────────────────────────────────────────────────
+function UnbanModal({ username, onConfirm, onCancel }: {
+  username:  string;
+  onConfirm: (restoration_message: string, fixes_made: string) => void;
+  onCancel:  () => void;
+}) {
+  const [message, setMessage] = useState('');
+  const [fixes,   setFixes]   = useState('');
+
+  return (
+    <div className="adm-modal-overlay" onClick={onCancel}>
+      <div className="adm-modal adm-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title" style={{ color: 'var(--success)' }}>
+          <CheckCircle2 size={15} style={{ marginRight: 6 }} />
+          Lift Ban — {username}
+        </h3>
+        <p style={{ margin: '-4px 0 12px', fontSize: 12, color: 'var(--text-muted)' }}>
+          The user will be notified and shown a full-screen message explaining why their account was restored. Both fields are optional but recommended.
+        </p>
+
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+          Message to user
+        </label>
+        <textarea
+          className="form-input adm-modal-textarea"
+          placeholder="e.g. After further review, we've determined that your account was banned in error and we sincerely apologise for the inconvenience."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={3}
+          autoFocus
+        />
+
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', margin: '10px 0 4px' }}>
+          What was fixed / resolved
+        </label>
+        <textarea
+          className="form-input adm-modal-textarea"
+          placeholder="e.g. The duplicate account flag was removed after identity verification. Your account is now in good standing."
+          value={fixes}
+          onChange={(e) => setFixes(e.target.value)}
+          rows={3}
+        />
+
+        <div className="adm-modal-actions" style={{ marginTop: 12 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => onConfirm(message.trim(), fixes.trim())}
+          >
+            <CheckCircle2 size={13} /> Lift Ban & Notify
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Unsuspend modal ──────────────────────────────────────────────────────────
+function UnsuspendModal({ username, onConfirm, onCancel }: {
+  username:  string;
+  onConfirm: (restoration_message: string, fixes_made: string) => void;
+  onCancel:  () => void;
+}) {
+  const [message, setMessage] = useState('');
+  const [fixes,   setFixes]   = useState('');
+
+  return (
+    <div className="adm-modal-overlay" onClick={onCancel}>
+      <div className="adm-modal adm-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <h3 className="adm-modal-title" style={{ color: 'var(--success)' }}>
+          <CheckCircle2 size={15} style={{ marginRight: 6 }} />
+          Lift Suspension — {username}
+        </h3>
+        <p style={{ margin: '-4px 0 12px', fontSize: 12, color: 'var(--text-muted)' }}>
+          The user will be notified and shown a full-screen message explaining why their suspension was lifted. Both fields are optional but recommended.
+        </p>
+
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+          Message to user
+        </label>
+        <textarea
+          className="form-input adm-modal-textarea"
+          placeholder="e.g. After reviewing your account activity, we have lifted the suspension. Thank you for your patience."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={3}
+          autoFocus
+        />
+
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', margin: '10px 0 4px' }}>
+          What was fixed / resolved
+        </label>
+        <textarea
+          className="form-input adm-modal-textarea"
+          placeholder="e.g. The suspicious activity was reviewed and cleared. No violations were confirmed during the investigation period."
+          value={fixes}
+          onChange={(e) => setFixes(e.target.value)}
+          rows={3}
+        />
+
+        <div className="adm-modal-actions" style={{ marginTop: 12 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => onConfirm(message.trim(), fixes.trim())}
+          >
+            <CheckCircle2 size={13} /> Lift Suspension & Notify
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── KYC auto-approval countdown ─────────────────────────────────────────────
 const AUTO_APPROVE_HOURS = 32;
 
@@ -920,6 +1034,8 @@ export default function AdminDashboard() {
   const [changePlanTarget, setChangePlanTarget] = useState<{ id: string; username: string; currentPlan: string } | null>(null);
   const [suspendTarget,    setSuspendTarget]    = useState<{ id: string; username: string } | null>(null);
   const [banTarget,        setBanTarget]        = useState<{ id: string; username: string } | null>(null);
+  const [unbanTarget,      setUnbanTarget]      = useState<{ id: string; username: string } | null>(null);
+  const [unsuspendTarget,  setUnsuspendTarget]  = useState<{ id: string; username: string } | null>(null);
   const [broadcasting,  setBroadcasting]  = useState(false);
   const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '' });
   const [emailBroadcasting,  setEmailBroadcasting]  = useState(false);
@@ -1363,11 +1479,12 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleUnban(userId: string) {
+  async function handleUnban(userId: string, restoration_message?: string, fixes_made?: string) {
     try {
-      await api.post(`/admin/users/${userId}/ban`, { action: 'unban' });
+      await api.post(`/admin/users/${userId}/ban`, { action: 'unban', restoration_message, fixes_made });
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: false } : u));
-      toast.success('Account unbanned.');
+      setUnbanTarget(null);
+      toast.success('Account unbanned. User has been notified.');
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
     }
@@ -1392,13 +1509,14 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleUnsuspend(userId: string) {
+  async function handleUnsuspend(userId: string, restoration_message?: string, fixes_made?: string) {
     try {
-      await api.post(`/admin/users/${userId}/suspend`, { action: 'unsuspend' });
+      await api.post(`/admin/users/${userId}/suspend`, { action: 'unsuspend', restoration_message, fixes_made });
       setUsers((prev) => prev.map((u) =>
         u.id === userId ? { ...u, is_suspended: false, suspended_until: null } : u,
       ));
-      toast.success('Suspension lifted.');
+      setUnsuspendTarget(null);
+      toast.success('Suspension lifted. User has been notified.');
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action failed.');
     }
@@ -1620,6 +1738,20 @@ export default function AdminDashboard() {
           username={banTarget.username}
           onConfirm={(reason) => void handleBan(banTarget.id, reason)}
           onCancel={() => setBanTarget(null)}
+        />
+      )}
+      {unbanTarget && (
+        <UnbanModal
+          username={unbanTarget.username}
+          onConfirm={(msg, fixes) => void handleUnban(unbanTarget.id, msg, fixes)}
+          onCancel={() => setUnbanTarget(null)}
+        />
+      )}
+      {unsuspendTarget && (
+        <UnsuspendModal
+          username={unsuspendTarget.username}
+          onConfirm={(msg, fixes) => void handleUnsuspend(unsuspendTarget.id, msg, fixes)}
+          onCancel={() => setUnsuspendTarget(null)}
         />
       )}
 
@@ -1896,7 +2028,7 @@ export default function AdminDashboard() {
                       {u.is_suspended && u.suspended_until && new Date(u.suspended_until) > new Date() ? (
                         <button
                           className="adm-action-btn adm-action-btn--unban"
-                          onClick={() => { void handleUnsuspend(u.id); }}
+                          onClick={() => setUnsuspendTarget({ id: u.id, username: u.username })}
                           title="Lift suspension"
                         >
                           Unsuspend
@@ -1913,7 +2045,7 @@ export default function AdminDashboard() {
                       {u.is_banned ? (
                         <button
                           className="adm-action-btn adm-action-btn--unban"
-                          onClick={() => { void handleUnban(u.id); }}
+                          onClick={() => setUnbanTarget({ id: u.id, username: u.username })}
                           title="Lift permanent ban"
                         >
                           Unban
@@ -2189,6 +2321,14 @@ export default function AdminDashboard() {
       {/* ── Withdrawals ── */}
       {tab === 'withdrawals' && (
         <>
+          {/* Quick info message */}
+          <div className="adm-section-hint adm-info-banner" style={{ marginBottom: 12 }}>
+            <Info size={13} style={{ flexShrink: 0, marginRight: 6 }} />
+            <span>
+              Approve or reject withdrawal requests below. You can also <strong>suspend</strong> or <strong>ban</strong> an account directly from a pending request if you detect suspicious activity.
+            </span>
+          </div>
+
           {/* Sub-tabs: Pending / History */}
           <div className="adm-details-tabs" style={{ marginBottom: 12 }}>
             <button
@@ -2296,6 +2436,21 @@ export default function AdminDashboard() {
                       title="View full payment history for this user"
                     >
                       <History size={13} /> History
+                    </button>
+                    <div className="adm-wd-divider" />
+                    <button
+                      className="adm-action-btn adm-action-btn--suspend"
+                      onClick={() => setSuspendTarget({ id: w.user_id, username: w.username })}
+                      title="Temporarily suspend this user's account"
+                    >
+                      Suspend
+                    </button>
+                    <button
+                      className="adm-action-btn adm-action-btn--ban"
+                      onClick={() => setBanTarget({ id: w.user_id, username: w.username })}
+                      title="Permanently ban this user's account"
+                    >
+                      Ban
                     </button>
                   </div>
                 </div>

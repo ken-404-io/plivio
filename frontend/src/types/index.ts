@@ -31,6 +31,7 @@ export interface User {
   is_suspended: boolean;
   suspended_until: string | null;
   suspend_reason: string | null;
+  restoration_message: string | null;
 }
 
 export interface CoinTransaction {
