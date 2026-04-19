@@ -17,7 +17,7 @@ const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila'))
 // Resets at 12am Philippine time. Free plan users who have exhausted their 100-question lifetime bank are exempt.
 const QUIZ_EARN_GATE_DEFAULT = 60;
 const QUIZ_EARN_GATE_PREMIUM = 90;
-const QUIZ_EARN_GATE_ELITE   = 150;
+const QUIZ_EARN_GATE_ELITE   = 200;
 const FREE_PLAN_LIFETIME_CAP = 100;
 
 const MIN_WITHDRAWAL  = 50;
