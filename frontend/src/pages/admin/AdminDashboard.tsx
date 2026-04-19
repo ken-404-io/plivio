@@ -1545,7 +1545,15 @@ export default function AdminDashboard() {
   async function handleBan(userId: string, reason: string) {
     try {
       await api.post(`/admin/users/${userId}/ban`, { action: 'ban', reason });
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: true } : u));
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: true, ban_reason: reason } : u));
+      setRestrictedUsers((prev) => {
+        const existing = prev.find((u) => u.id === userId);
+        if (existing) {
+          return prev.map((u) => u.id === userId ? { ...u, is_banned: true, ban_reason: reason } : u);
+        }
+        // Row wasn't in the restricted list yet (e.g. banned from Users tab) — tab will refetch on next view
+        return prev;
+      });
       setBanTarget(null);
       toast.success('Account banned.');
     } catch (err: unknown) {
@@ -1573,7 +1581,10 @@ export default function AdminDashboard() {
         { action: 'suspend', duration_days, reason },
       );
       setUsers((prev) => prev.map((u) =>
-        u.id === userId ? { ...u, is_suspended: data.is_suspended, suspended_until: data.suspended_until } : u,
+        u.id === userId ? { ...u, is_suspended: data.is_suspended, suspended_until: data.suspended_until, suspend_reason: reason } : u,
+      ));
+      setRestrictedUsers((prev) => prev.map((u) =>
+        u.id === userId ? { ...u, is_suspended: data.is_suspended, suspended_until: data.suspended_until, suspend_reason: reason } : u,
       ));
       setSuspendTarget(null);
       const until = data.suspended_until
@@ -3393,23 +3404,60 @@ export default function AdminDashboard() {
                           <td style={{ fontSize: 13, maxWidth: 280, whiteSpace: 'normal' }}>{reason}</td>
                           <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{until}</td>
                           <td>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              <Link to={`/admin/users/${u.id}`} className="btn btn-ghost btn-sm">
-                                <Eye size={13} /> View
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <Link
+                                to={`/admin/users/${u.id}`}
+                                className="adm-icon-btn"
+                                title="View all details"
+                              >
+                                <Eye size={14} />
                               </Link>
+                              <button
+                                className="adm-icon-btn"
+                                onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
+                                title="Send in-app notification"
+                              >
+                                <Bell size={14} />
+                              </button>
+                              <button
+                                className="adm-icon-btn"
+                                onClick={() => setEmailTarget({ id: u.id, username: u.username })}
+                                title="Send email"
+                              >
+                                <Mail size={14} />
+                              </button>
                               {u.is_banned ? (
                                 <button
-                                  className="btn btn-success btn-sm"
+                                  className="adm-action-btn adm-action-btn--unban"
                                   onClick={() => setUnbanTarget({ id: u.id, username: u.username })}
+                                  title="Lift permanent ban"
                                 >
-                                  <CheckCircle2 size={13} /> Unban
+                                  Unban
                                 </button>
                               ) : (
                                 <button
-                                  className="btn btn-success btn-sm"
+                                  className="adm-action-btn adm-action-btn--unban"
                                   onClick={() => setUnsuspendTarget({ id: u.id, username: u.username })}
+                                  title="Lift suspension"
                                 >
-                                  <CheckCircle2 size={13} /> Unsuspend
+                                  Unsuspend
+                                </button>
+                              )}
+                              {u.is_banned ? (
+                                <button
+                                  className="adm-action-btn adm-action-btn--suspend"
+                                  onClick={() => setSuspendTarget({ id: u.id, username: u.username })}
+                                  title="Replace ban with a timed suspension"
+                                >
+                                  Suspend
+                                </button>
+                              ) : (
+                                <button
+                                  className="adm-action-btn adm-action-btn--ban"
+                                  onClick={() => setBanTarget({ id: u.id, username: u.username })}
+                                  title="Escalate to a permanent ban"
+                                >
+                                  Ban
                                 </button>
                               )}
                             </div>
