@@ -1,27 +1,49 @@
 import { useEffect } from 'react';
 
-declare const __BUILD_TIME__: string;
+const COOKIE = 'plivio_v';
 
-const POLL_MS = 5 * 60 * 1000; // check every 5 minutes
+function getCookie(name: string): string | null {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function setCookie(name: string, value: string): void {
+  document.cookie =
+    `${name}=${encodeURIComponent(value)}; max-age=31536000; path=/; SameSite=Strict`;
+}
 
 async function checkVersion(): Promise<void> {
   try {
     const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) return;
     const { v } = await res.json() as { v: string };
-    if (v && v !== __BUILD_TIME__) {
-      window.location.reload();
+    if (!v) return;
+
+    const saved = getCookie(COOKIE);
+    if (saved === v) return; // already on the latest version
+
+    // New deploy detected — persist the version then wipe caches and reload
+    setCookie(COOKIE, v);
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
     }
+    window.location.reload();
   } catch { /* network error — skip silently */ }
+}
+
+function handleVisibility(): void {
+  if (document.visibilityState === 'visible') void checkVersion();
 }
 
 export function useVersionCheck(): void {
   useEffect(() => {
     void checkVersion();
 
-    const interval = setInterval(() => { void checkVersion(); }, POLL_MS);
+    // Catch users who keep the tab open without switching away
+    const interval = setInterval(() => { void checkVersion(); }, 2 * 60 * 1000);
 
-    // Re-check whenever the user returns to the tab (works on mobile too)
+    // Catch users returning from another tab / app
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
@@ -29,8 +51,4 @@ export function useVersionCheck(): void {
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
-}
-
-function handleVisibility(): void {
-  if (document.visibilityState === 'visible') void checkVersion();
 }
