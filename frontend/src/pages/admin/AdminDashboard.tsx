@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
 import {
   Users, ArrowUpCircle, ShieldCheck, TrendingUp,
   UserPlus, LayoutDashboard, Bell, Send, Mail,
@@ -1765,6 +1765,230 @@ export default function AdminDashboard() {
     );
   }
 
+  // Shared Manage/Details expanded panel — rendered from both the Users tab
+  // and the Restricted tab so the two tabs expose identical per-user admin
+  // affordances (balance adjustment, plan change, account info, withdrawals,
+  // device reset).
+  function renderUserManagePanel(u: AdminUser) {
+    const draft = adjustDraft[u.id] ?? { delta: '', plan: '' };
+    const activeTab = userDetailsTab[u.id] ?? 'manage';
+    const details   = userDetails[u.id];
+    const detLoading = userDetailsLoad[u.id];
+
+    function switchTab(nextTab: 'manage' | 'details') {
+      setUserDetailsTab((prev) => ({ ...prev, [u.id]: nextTab }));
+      if (nextTab === 'details') void loadUserDetails(u.id);
+    }
+
+    return (
+      <div className="adm-user-manage">
+        <div className="adm-details-tabs">
+          <button
+            className={`adm-details-tab${activeTab === 'manage' ? ' adm-details-tab--active' : ''}`}
+            onClick={() => switchTab('manage')}
+          >
+            <CreditCard size={13} /> Manage
+          </button>
+          <button
+            className={`adm-details-tab${activeTab === 'details' ? ' adm-details-tab--active' : ''}`}
+            onClick={() => switchTab('details')}
+          >
+            <Info size={13} /> Details
+          </button>
+        </div>
+
+        {activeTab === 'manage' && (
+          <>
+            <div className="adm-manage-field">
+              <label className="adm-manage-label">Balance adjustment</label>
+              <div className="adm-manage-input-row">
+                <span className="adm-manage-prefix">₱</span>
+                <input
+                  type="number"
+                  className="form-input adm-manage-input"
+                  placeholder="e.g. 50 or -10"
+                  step="0.01"
+                  value={draft.delta}
+                  onChange={(e) => setAdjustDraft((prev) => ({ ...prev, [u.id]: { ...draft, delta: e.target.value } }))}
+                />
+                <span className="adm-manage-hint">Current: ₱{Number(u.balance).toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="adm-manage-field">
+              <label className="adm-manage-label">Plan</label>
+              <div className="adm-manage-input-row">
+                <span className="adm-manage-hint" style={{ marginLeft: 0 }}>
+                  Current: <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan}</span>
+                </span>
+                <button
+                  className="btn btn-primary btn-sm"
+                  style={{ marginLeft: 'auto' }}
+                  onClick={() => setChangePlanTarget({ id: u.id, username: u.username, currentPlan: u.plan })}
+                >
+                  <CreditCard size={13} /> Change Plan
+                </button>
+              </div>
+            </div>
+            <div className="adm-manage-actions">
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => { setExpandedUser(null); setAdjustDraft((p) => { const n = {...p}; delete n[u.id]; return n; }); }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => { void applyUserAdjustment(u.id); }}
+                disabled={!draft.delta}
+              >
+                Apply changes
+              </button>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'details' && (
+          <div className="adm-details-panel">
+            {detLoading && <p className="adm-details-loading">Loading…</p>}
+            {!detLoading && details && (
+              <>
+                <div className="adm-details-section">
+                  <h4 className="adm-details-section-title">
+                    <Users size={13} /> Account Info
+                  </h4>
+                  <div className="adm-details-sub-card">
+                    <span className="adm-details-sub-expiry">
+                      Joined {new Date(u.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="adm-details-section">
+                  <h4 className="adm-details-section-title">
+                    <CreditCard size={13} /> Subscription
+                  </h4>
+                  {details.subscription ? (
+                    <div className="adm-details-sub-card">
+                      <span className={`plan-badge plan-badge--${details.subscription.plan}`}>
+                        {details.subscription.plan}
+                      </span>
+                      <span className="adm-details-sub-expiry">
+                        Started {new Date(details.subscription.starts_at).toLocaleDateString('en-PH', {
+                          month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                        })}
+                      </span>
+                      <span className="adm-details-sub-expiry">
+                        Expires {new Date(details.subscription.expires_at).toLocaleDateString('en-PH', {
+                          month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="adm-details-empty">
+                      No active subscription — currently on <strong>{u.plan}</strong> plan
+                    </p>
+                  )}
+                </div>
+
+                <div className="adm-details-section">
+                  <h4 className="adm-details-section-title">
+                    <UserCheck size={13} /> Sent Invites ({details.invites.length})
+                  </h4>
+                  {details.invites.length === 0 ? (
+                    <p className="adm-details-empty">No verified invites yet.</p>
+                  ) : (
+                    <div className="adm-details-invites-list">
+                      {details.invites.map((inv) => (
+                        <div key={inv.username} className="adm-details-invite-row">
+                          <div className="adm-details-invite-avatar">
+                            {inv.username[0]?.toUpperCase()}
+                          </div>
+                          <div className="adm-details-invite-info">
+                            <span className="adm-details-invite-name">{inv.username}</span>
+                            <span className="adm-details-invite-email">{inv.email}</span>
+                          </div>
+                          <span className={`plan-badge plan-badge--${inv.plan}`}>{inv.plan}</span>
+                          <span className="adm-details-invite-date">
+                            {new Date(inv.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="adm-details-section">
+                  <h4 className="adm-details-section-title">
+                    <ArrowUpCircle size={13} /> Withdrawal History ({details.withdrawals.length})
+                  </h4>
+                  {details.withdrawals.length === 0 ? (
+                    <p className="adm-details-empty">No withdrawal records.</p>
+                  ) : (
+                    <div className="adm-details-wd-list">
+                      {details.withdrawals.map((wd) => (
+                        <div key={wd.id} className="adm-details-wd-row">
+                          <div className="adm-details-wd-left">
+                            <span className="adm-details-wd-method">{String(wd.method).toUpperCase()}</span>
+                            <span className="adm-details-wd-amount">
+                              ₱{Number(wd.net_amount || wd.amount).toFixed(2)}
+                            </span>
+                            {Number(wd.fee_amount) > 0 && (
+                              <span className="adm-details-wd-gross">
+                                from ₱{Number(wd.amount).toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="adm-details-wd-right">
+                            <span className={`adm-details-wd-status adm-details-wd-status--${wd.status}`}>
+                              {wd.status}
+                            </span>
+                            <span className="adm-details-wd-date">
+                              {new Date(wd.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="adm-details-section">
+                  <h4 className="adm-details-section-title">
+                    <Smartphone size={13} /> Registered Device
+                  </h4>
+                  {details.device ? (
+                    <div className="adm-device-card">
+                      <div className="adm-device-info">
+                        <span className="adm-device-name">{details.device.device_name || 'Unknown device'}</span>
+                        <span className="adm-device-fp">ID: {details.device.fingerprint.slice(0, 16)}…</span>
+                        {details.device.registered_at && (
+                          <span className="adm-device-date">
+                            Registered {new Date(details.device.registered_at).toLocaleDateString('en-PH', {
+                              month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                            })}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => { void resetDevice(u.id); }}
+                        title="Unlink device so user can log in from a new device"
+                      >
+                        <RotateCcw size={12} /> Reset
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="adm-details-empty">No device registered.</p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="page">
 
@@ -2053,7 +2277,6 @@ export default function AdminDashboard() {
               <div className="empty-state"><p>No users found.</p></div>
             ) : users.map((u) => {
               const isExpanded = expandedUser === u.id;
-              const draft = adjustDraft[u.id] ?? { delta: '', plan: '' };
               return (
                 <div key={u.id} className={`adm-user-row${isExpanded ? ' adm-user-row--expanded' : ''}`}>
                   {/* Main row */}
@@ -2151,233 +2374,8 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Expanded panel with tabs */}
-                  {isExpanded && (() => {
-                    const activeTab = userDetailsTab[u.id] ?? 'manage';
-                    const details   = userDetails[u.id];
-                    const detLoading = userDetailsLoad[u.id];
-
-                    function switchTab(tab: 'manage' | 'details') {
-                      setUserDetailsTab((prev) => ({ ...prev, [u.id]: tab }));
-                      if (tab === 'details') void loadUserDetails(u.id);
-                    }
-
-                    return (
-                      <div className="adm-user-manage">
-                        {/* Tab selector */}
-                        <div className="adm-details-tabs">
-                          <button
-                            className={`adm-details-tab${activeTab === 'manage' ? ' adm-details-tab--active' : ''}`}
-                            onClick={() => switchTab('manage')}
-                          >
-                            <CreditCard size={13} /> Manage
-                          </button>
-                          <button
-                            className={`adm-details-tab${activeTab === 'details' ? ' adm-details-tab--active' : ''}`}
-                            onClick={() => switchTab('details')}
-                          >
-                            <Info size={13} /> Details
-                          </button>
-                        </div>
-
-                        {/* ── Manage tab ── */}
-                        {activeTab === 'manage' && (
-                          <>
-                            <div className="adm-manage-field">
-                              <label className="adm-manage-label">Balance adjustment</label>
-                              <div className="adm-manage-input-row">
-                                <span className="adm-manage-prefix">₱</span>
-                                <input
-                                  type="number"
-                                  className="form-input adm-manage-input"
-                                  placeholder="e.g. 50 or -10"
-                                  step="0.01"
-                                  value={draft.delta}
-                                  onChange={(e) => setAdjustDraft((prev) => ({ ...prev, [u.id]: { ...draft, delta: e.target.value } }))}
-                                />
-                                <span className="adm-manage-hint">Current: ₱{Number(u.balance).toFixed(2)}</span>
-                              </div>
-                            </div>
-                            <div className="adm-manage-field">
-                              <label className="adm-manage-label">Plan</label>
-                              <div className="adm-manage-input-row">
-                                <span className="adm-manage-hint" style={{ marginLeft: 0 }}>
-                                  Current: <span className={`plan-badge plan-badge--${u.plan}`}>{u.plan}</span>
-                                </span>
-                                <button
-                                  className="btn btn-primary btn-sm"
-                                  style={{ marginLeft: 'auto' }}
-                                  onClick={() => setChangePlanTarget({ id: u.id, username: u.username, currentPlan: u.plan })}
-                                >
-                                  <CreditCard size={13} /> Change Plan
-                                </button>
-                              </div>
-                            </div>
-                            <div className="adm-manage-actions">
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                onClick={() => { setExpandedUser(null); setAdjustDraft((p) => { const n = {...p}; delete n[u.id]; return n; }); }}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                className="btn btn-primary btn-sm"
-                                onClick={() => { void applyUserAdjustment(u.id); }}
-                                disabled={!draft.delta}
-                              >
-                                Apply changes
-                              </button>
-                            </div>
-                          </>
-                        )}
-
-                        {/* ── Details tab ── */}
-                        {activeTab === 'details' && (
-                          <div className="adm-details-panel">
-                            {detLoading && <p className="adm-details-loading">Loading…</p>}
-                            {!detLoading && details && (
-                              <>
-                                {/* User Info */}
-                                <div className="adm-details-section">
-                                  <h4 className="adm-details-section-title">
-                                    <Users size={13} /> Account Info
-                                  </h4>
-                                  <div className="adm-details-sub-card">
-                                    <span className="adm-details-sub-expiry">
-                                      Joined {new Date(u.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Subscription */}
-                                <div className="adm-details-section">
-                                  <h4 className="adm-details-section-title">
-                                    <CreditCard size={13} /> Subscription
-                                  </h4>
-                                  {details.subscription ? (
-                                    <div className="adm-details-sub-card">
-                                      <span className={`plan-badge plan-badge--${details.subscription.plan}`}>
-                                        {details.subscription.plan}
-                                      </span>
-                                      <span className="adm-details-sub-expiry">
-                                        Started {new Date(details.subscription.starts_at).toLocaleDateString('en-PH', {
-                                          month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                                        })}
-                                      </span>
-                                      <span className="adm-details-sub-expiry">
-                                        Expires {new Date(details.subscription.expires_at).toLocaleDateString('en-PH', {
-                                          month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                                        })}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <p className="adm-details-empty">
-                                      No active subscription — currently on <strong>{u.plan}</strong> plan
-                                    </p>
-                                  )}
-                                </div>
-
-                                {/* Invites */}
-                                <div className="adm-details-section">
-                                  <h4 className="adm-details-section-title">
-                                    <UserCheck size={13} /> Sent Invites ({details.invites.length})
-                                  </h4>
-                                  {details.invites.length === 0 ? (
-                                    <p className="adm-details-empty">No verified invites yet.</p>
-                                  ) : (
-                                    <div className="adm-details-invites-list">
-                                      {details.invites.map((inv) => (
-                                        <div key={inv.username} className="adm-details-invite-row">
-                                          <div className="adm-details-invite-avatar">
-                                            {inv.username[0]?.toUpperCase()}
-                                          </div>
-                                          <div className="adm-details-invite-info">
-                                            <span className="adm-details-invite-name">{inv.username}</span>
-                                            <span className="adm-details-invite-email">{inv.email}</span>
-                                          </div>
-                                          <span className={`plan-badge plan-badge--${inv.plan}`}>{inv.plan}</span>
-                                          <span className="adm-details-invite-date">
-                                            {new Date(inv.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Withdrawals */}
-                                <div className="adm-details-section">
-                                  <h4 className="adm-details-section-title">
-                                    <ArrowUpCircle size={13} /> Withdrawal History ({details.withdrawals.length})
-                                  </h4>
-                                  {details.withdrawals.length === 0 ? (
-                                    <p className="adm-details-empty">No withdrawal records.</p>
-                                  ) : (
-                                    <div className="adm-details-wd-list">
-                                      {details.withdrawals.map((wd) => (
-                                        <div key={wd.id} className="adm-details-wd-row">
-                                          <div className="adm-details-wd-left">
-                                            <span className="adm-details-wd-method">{String(wd.method).toUpperCase()}</span>
-                                            <span className="adm-details-wd-amount">
-                                              ₱{Number(wd.net_amount || wd.amount).toFixed(2)}
-                                            </span>
-                                            {Number(wd.fee_amount) > 0 && (
-                                              <span className="adm-details-wd-gross">
-                                                from ₱{Number(wd.amount).toFixed(2)}
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="adm-details-wd-right">
-                                            <span className={`adm-details-wd-status adm-details-wd-status--${wd.status}`}>
-                                              {wd.status}
-                                            </span>
-                                            <span className="adm-details-wd-date">
-                                              {new Date(wd.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Device Info */}
-                                <div className="adm-details-section">
-                                  <h4 className="adm-details-section-title">
-                                    <Smartphone size={13} /> Registered Device
-                                  </h4>
-                                  {details.device ? (
-                                    <div className="adm-device-card">
-                                      <div className="adm-device-info">
-                                        <span className="adm-device-name">{details.device.device_name || 'Unknown device'}</span>
-                                        <span className="adm-device-fp">ID: {details.device.fingerprint.slice(0, 16)}…</span>
-                                        {details.device.registered_at && (
-                                          <span className="adm-device-date">
-                                            Registered {new Date(details.device.registered_at).toLocaleDateString('en-PH', {
-                                              month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                                            })}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <button
-                                        className="btn btn-danger btn-sm"
-                                        onClick={() => { void resetDevice(u.id); }}
-                                        title="Unlink device so user can log in from a new device"
-                                      >
-                                        <RotateCcw size={12} /> Reset
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <p className="adm-details-empty">No device registered.</p>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  {/* Expanded Manage/Details panel */}
+                  {isExpanded && renderUserManagePanel(u)}
                 </div>
               );
             })}
@@ -3386,83 +3384,100 @@ export default function AdminDashboard() {
                         ? new Date(u.suspended_until).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
                         : '—';
                       const reason = u.is_banned ? (u.ban_reason ?? '—') : (u.suspend_reason ?? '—');
+                      const isExpanded = expandedUser === u.id;
                       return (
-                        <tr key={u.id}>
-                          <td><strong>{u.username}</strong></td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{u.email}</td>
-                          <td>
-                            {u.is_banned ? (
-                              <span className="adm-status-chip adm-status-chip--banned">
-                                <Ban size={10} /> Banned
-                              </span>
-                            ) : (
-                              <span className="adm-status-chip adm-status-chip--suspended">
-                                <Clock size={10} /> Suspended
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ fontSize: 13, maxWidth: 280, whiteSpace: 'normal' }}>{reason}</td>
-                          <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{until}</td>
-                          <td>
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                              <Link
-                                to={`/admin/users/${u.id}`}
-                                className="adm-icon-btn"
-                                title="View all details"
-                              >
-                                <Eye size={14} />
-                              </Link>
-                              <button
-                                className="adm-icon-btn"
-                                onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
-                                title="Send in-app notification"
-                              >
-                                <Bell size={14} />
-                              </button>
-                              <button
-                                className="adm-icon-btn"
-                                onClick={() => setEmailTarget({ id: u.id, username: u.username })}
-                                title="Send email"
-                              >
-                                <Mail size={14} />
-                              </button>
+                        <Fragment key={u.id}>
+                          <tr>
+                            <td><strong>{u.username}</strong></td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{u.email}</td>
+                            <td>
                               {u.is_banned ? (
-                                <button
-                                  className="adm-action-btn adm-action-btn--unban"
-                                  onClick={() => setUnbanTarget({ id: u.id, username: u.username })}
-                                  title="Lift permanent ban"
-                                >
-                                  Unban
-                                </button>
+                                <span className="adm-status-chip adm-status-chip--banned">
+                                  <Ban size={10} /> Banned
+                                </span>
                               ) : (
-                                <button
-                                  className="adm-action-btn adm-action-btn--unban"
-                                  onClick={() => setUnsuspendTarget({ id: u.id, username: u.username })}
-                                  title="Lift suspension"
-                                >
-                                  Unsuspend
-                                </button>
+                                <span className="adm-status-chip adm-status-chip--suspended">
+                                  <Clock size={10} /> Suspended
+                                </span>
                               )}
-                              {u.is_banned ? (
-                                <button
-                                  className="adm-action-btn adm-action-btn--suspend"
-                                  onClick={() => setSuspendTarget({ id: u.id, username: u.username })}
-                                  title="Replace ban with a timed suspension"
+                            </td>
+                            <td style={{ fontSize: 13, maxWidth: 280, whiteSpace: 'normal' }}>{reason}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{until}</td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <Link
+                                  to={`/admin/users/${u.id}`}
+                                  className="adm-icon-btn"
+                                  title="View all details"
                                 >
-                                  Suspend
-                                </button>
-                              ) : (
+                                  <Eye size={14} />
+                                </Link>
                                 <button
-                                  className="adm-action-btn adm-action-btn--ban"
-                                  onClick={() => setBanTarget({ id: u.id, username: u.username })}
-                                  title="Escalate to a permanent ban"
+                                  className="adm-icon-btn"
+                                  onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
+                                  title="Send in-app notification"
                                 >
-                                  Ban
+                                  <Bell size={14} />
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                                <button
+                                  className="adm-icon-btn"
+                                  onClick={() => setEmailTarget({ id: u.id, username: u.username })}
+                                  title="Send email"
+                                >
+                                  <Mail size={14} />
+                                </button>
+                                <button
+                                  className={`adm-icon-btn${isExpanded ? ' adm-icon-btn--active' : ''}`}
+                                  onClick={() => setExpandedUser(isExpanded ? null : u.id)}
+                                  title="Manage user"
+                                >
+                                  <ChevronRight size={14} style={{ transform: isExpanded ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s' }} />
+                                </button>
+                                {u.is_banned ? (
+                                  <button
+                                    className="adm-action-btn adm-action-btn--unban"
+                                    onClick={() => setUnbanTarget({ id: u.id, username: u.username })}
+                                    title="Lift permanent ban"
+                                  >
+                                    Unban
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="adm-action-btn adm-action-btn--unban"
+                                    onClick={() => setUnsuspendTarget({ id: u.id, username: u.username })}
+                                    title="Lift suspension"
+                                  >
+                                    Unsuspend
+                                  </button>
+                                )}
+                                {u.is_banned ? (
+                                  <button
+                                    className="adm-action-btn adm-action-btn--suspend"
+                                    onClick={() => setSuspendTarget({ id: u.id, username: u.username })}
+                                    title="Replace ban with a timed suspension"
+                                  >
+                                    Suspend
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="adm-action-btn adm-action-btn--ban"
+                                    onClick={() => setBanTarget({ id: u.id, username: u.username })}
+                                    title="Escalate to a permanent ban"
+                                  >
+                                    Ban
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={6} style={{ padding: 0, background: 'var(--bg-elevated)' }}>
+                                {renderUserManagePanel(u)}
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </tbody>
