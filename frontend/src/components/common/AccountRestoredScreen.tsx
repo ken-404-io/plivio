@@ -26,13 +26,42 @@ function PlivioMark() {
   );
 }
 
+const PRESET_BULLETS: Record<string, string[]> = {
+  invite_credit: [
+    'Your balance has been adjusted due to an invite credit correction.',
+    'You can resume earning, withdrawing, and using all features.',
+    'Please review our Terms of Service to avoid future restrictions.',
+  ],
+  activity_cleared: [
+    'Your account was cleared after a thorough review — no violations found.',
+    'Your balance, coins, and earnings remain fully intact.',
+    'You can resume earning, withdrawing, and using all features.',
+  ],
+  appeal_approved: [
+    'Your appeal was approved and your account has been fully reinstated.',
+    'Your balance, coins, and earnings are fully intact.',
+    'You can resume earning, withdrawing, and using all features.',
+  ],
+};
+
+const DEFAULT_BULLETS = [
+  'Your balance, coins, and earnings are fully intact.',
+  'You can resume earning, withdrawing, and using all features.',
+  'Please review our Terms of Service to avoid future restrictions.',
+];
+
 export default function AccountRestoredScreen({ restorationMessage }: Props) {
   const { fetchMe } = useAuth();
   const [dismissing, setDismissing] = useState(false);
 
   const messageParts = restorationMessage.split('\n\n');
-  const mainMessage = messageParts[0] ?? '';
+  const rawMain = messageParts[0] ?? '';
   const fixesMade = messageParts[1]?.replace('What was fixed: ', '') ?? null;
+
+  const presetMatch = rawMain.match(/^\[preset:([^\]]+)\]\s*/);
+  const presetType = presetMatch?.[1] ?? null;
+  const mainMessage = rawMain.replace(/^\[preset:[^\]]+\]\s*/, '');
+  const bullets = (presetType != null ? PRESET_BULLETS[presetType] : null) ?? DEFAULT_BULLETS;
 
   async function handleContinue() {
     setDismissing(true);
@@ -87,18 +116,12 @@ export default function AccountRestoredScreen({ restorationMessage }: Props) {
         <div className="blocked-screen-divider" />
 
         <div className="blocked-screen-info">
-          <p className="blocked-screen-info-line">
-            <span className="blocked-screen-info-dot blocked-screen-info-dot--green" />
-            Your balance, coins, and earnings are fully intact.
-          </p>
-          <p className="blocked-screen-info-line">
-            <span className="blocked-screen-info-dot blocked-screen-info-dot--green" />
-            You can resume earning, withdrawing, and using all features.
-          </p>
-          <p className="blocked-screen-info-line">
-            <span className="blocked-screen-info-dot blocked-screen-info-dot--green" />
-            Please review our Terms of Service to avoid future restrictions.
-          </p>
+          {bullets.map((line) => (
+            <p key={line} className="blocked-screen-info-line">
+              <span className="blocked-screen-info-dot blocked-screen-info-dot--green" />
+              {line}
+            </p>
+          ))}
         </div>
 
         <button
