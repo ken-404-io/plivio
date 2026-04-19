@@ -31,14 +31,13 @@ export function useVersionCheck(): boolean {
       const v = await fetchServerVersion();
       if (!v) return;
       const saved = getCookie(COOKIE);
-      if (saved !== v) {
-        setCookie(COOKIE, v);
-        if ('caches' in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map((k) => caches.delete(k)));
-        }
-        setOutdated(true);
+      if (saved === v) return;
+      setCookie(COOKIE, v);
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
       }
+      setOutdated(true);
     }
 
     void check();
