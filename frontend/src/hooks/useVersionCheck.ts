@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 const COOKIE = 'plivio_v';
 
@@ -12,43 +12,45 @@ function setCookie(name: string, value: string): void {
     `${name}=${encodeURIComponent(value)}; max-age=31536000; path=/; SameSite=Strict`;
 }
 
-async function checkVersion(): Promise<void> {
+async function fetchServerVersion(): Promise<string | null> {
   try {
     const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!res.ok) return;
+    if (!res.ok) return null;
     const { v } = await res.json() as { v: string };
-    if (!v) return;
-
-    const saved = getCookie(COOKIE);
-    if (saved === v) return; // already on the latest version
-
-    // New deploy detected — persist the version then wipe caches and reload
-    setCookie(COOKIE, v);
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-    }
-    window.location.reload();
-  } catch { /* network error — skip silently */ }
+    return v || null;
+  } catch {
+    return null;
+  }
 }
 
-function handleVisibility(): void {
-  if (document.visibilityState === 'visible') void checkVersion();
-}
+export function useVersionCheck(): boolean {
+  const [outdated, setOutdated] = useState(false);
 
-export function useVersionCheck(): void {
   useEffect(() => {
-    void checkVersion();
+    async function check(): Promise<void> {
+      const v = await fetchServerVersion();
+      if (!v) return;
+      const saved = getCookie(COOKIE);
+      if (saved !== v) {
+        setCookie(COOKIE, v);
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        setOutdated(true);
+      }
+    }
 
-    // Catch users who keep the tab open without switching away
-    const interval = setInterval(() => { void checkVersion(); }, 2 * 60 * 1000);
-
-    // Catch users returning from another tab / app
-    document.addEventListener('visibilitychange', handleVisibility);
+    void check();
+    const interval = setInterval(() => { void check(); }, 2 * 60 * 1000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void check(); };
+    document.addEventListener('visibilitychange', onVisible);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
+
+  return outdated;
 }
