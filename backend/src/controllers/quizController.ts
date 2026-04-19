@@ -33,7 +33,7 @@ const DAILY_QUESTION_LIMITS: Record<string, number | null> = {
 // Note: referral earnings are NOT counted against this cap.
 const DAILY_EARN_LIMITS: Record<string, number | null> = {
   free:    20,
-  premium: 50,
+  premium: 100,
   elite:   null,
 };
 
