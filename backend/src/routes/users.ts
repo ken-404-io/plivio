@@ -10,6 +10,7 @@ import {
   requestEmailChange,
   confirmEmailChange,
   heartbeat,
+  dismissRestorationMessage,
 } from '../controllers/userController.ts';
 import { avatarUpload } from '../middleware/upload.ts';
 
@@ -42,5 +43,7 @@ router.post('/me/confirm-email-change',
   validateBody({ token: { required: true } }),
   confirmEmailChange
 );
+
+router.post('/me/dismiss-restoration', dismissRestorationMessage);
 
 export default router;

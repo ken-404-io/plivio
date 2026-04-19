@@ -7,6 +7,13 @@ import { sendPushToUser }    from '../controllers/pushController.ts';
 import { listKycSubmissions, reviewKyc } from '../controllers/kycController.ts';
 import { logger } from '../utils/logger.ts';
 
+function buildRestorationNote(message?: string, fixes?: string): string | null {
+  const parts: string[] = [];
+  if (message?.trim()) parts.push(message.trim());
+  if (fixes?.trim()) parts.push(`What was fixed: ${fixes.trim()}`);
+  return parts.length > 0 ? parts.join('\n\n') : null;
+}
+
 interface AdNetworkInput {
   name: string;
   weight: number;
@@ -976,7 +983,12 @@ export async function changePlan(req: Request, res: Response, next: NextFunction
 export async function banUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params as Record<string, string>;
-    const { action, reason } = req.body as { action: 'ban' | 'unban'; reason?: string };
+    const { action, reason, restoration_message, fixes_made } = req.body as {
+      action: 'ban' | 'unban';
+      reason?: string;
+      restoration_message?: string;
+      fixes_made?: string;
+    };
 
     if (!['ban', 'unban'].includes(action)) {
       throw new ValidationError('action must be ban or unban');
@@ -1005,22 +1017,21 @@ export async function banUser(req: Request, res: Response, next: NextFunction): 
       logger.info({ user_id: id, reason: reason.trim(), by: req.user?.id }, '🚫 Admin banned user');
       res.json({ success: true, is_banned: true });
     } else {
+      const restorationNote = buildRestorationNote(restoration_message, fixes_made);
       const { rows } = await pool.query(
         `UPDATE users
-         SET is_banned = FALSE, ban_reason = NULL
+         SET is_banned = FALSE, ban_reason = NULL, restoration_message = $2
          WHERE id = $1
          RETURNING id, username`,
-        [id],
+        [id, restorationNote],
       );
       if (rows.length === 0) throw new NotFoundError('User not found');
 
       const u = rows[0] as { id: string; username: string };
-      void createNotification(
-        u.id,
-        'admin_message',
-        'Account Reinstated',
-        'Your account ban has been lifted. You can now log in and use Plivio normally.',
-      );
+      const notifBody = restorationNote
+        ? `Your account ban has been lifted. ${restorationNote}`
+        : 'Your account ban has been lifted. You can now log in and use Plivio normally.';
+      void createNotification(u.id, 'admin_message', 'Account Reinstated', notifBody);
 
       logger.info({ user_id: id, by: req.user?.id }, '✅ Admin unbanned user');
       res.json({ success: true, is_banned: false });
@@ -1033,7 +1044,13 @@ export async function banUser(req: Request, res: Response, next: NextFunction): 
 export async function suspendUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params as Record<string, string>;
-    const { action, duration_days, reason } = req.body as { action: 'suspend' | 'unsuspend'; duration_days?: number; reason?: string };
+    const { action, duration_days, reason, restoration_message, fixes_made } = req.body as {
+      action: 'suspend' | 'unsuspend';
+      duration_days?: number;
+      reason?: string;
+      restoration_message?: string;
+      fixes_made?: string;
+    };
 
     if (!['suspend', 'unsuspend'].includes(action)) {
       throw new ValidationError('action must be suspend or unsuspend');
@@ -1070,22 +1087,22 @@ export async function suspendUser(req: Request, res: Response, next: NextFunctio
       logger.info({ user_id: id, days, reason: reason.trim(), by: req.user?.id }, '🚫 Admin suspended user');
       res.json({ success: true, is_suspended: true, suspended_until: u.suspended_until });
     } else {
+      const restorationNote = buildRestorationNote(restoration_message, fixes_made);
       const { rows } = await pool.query(
         `UPDATE users
-         SET is_suspended = FALSE, suspended_until = NULL, suspend_reason = NULL
+         SET is_suspended = FALSE, suspended_until = NULL, suspend_reason = NULL,
+             restoration_message = $2
          WHERE id = $1
          RETURNING id, username`,
-        [id],
+        [id, restorationNote],
       );
       if (rows.length === 0) throw new NotFoundError('User not found');
 
       const u = rows[0] as { id: string; username: string };
-      void createNotification(
-        u.id,
-        'admin_message',
-        'Suspension Lifted',
-        'Your account suspension has been lifted. You can now log in and use Plivio normally.',
-      );
+      const notifBody = restorationNote
+        ? `Your account suspension has been lifted. ${restorationNote}`
+        : 'Your account suspension has been lifted. You can now log in and use Plivio normally.';
+      void createNotification(u.id, 'admin_message', 'Suspension Lifted', notifBody);
 
       logger.info({ user_id: id, by: req.user?.id }, '✅ Admin unsuspended user');
       res.json({ success: true, is_suspended: false, suspended_until: null });
