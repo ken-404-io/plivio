@@ -279,8 +279,8 @@ async function activateSubscription(checkout: {
     );
 
     const { rows: subRows } = await client.query(
-      `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at)
-       VALUES ($1, $2::plan_type, NOW(), NOW() + ($3 || ' days')::INTERVAL)
+      `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at, is_active)
+       VALUES ($1, $2::plan_type, NOW(), NOW() + ($3 || ' days')::INTERVAL, TRUE)
        RETURNING expires_at`,
       [checkout.user_id, checkout.plan, checkout.duration_days],
     );
@@ -577,25 +577,29 @@ export async function handleWebhook(
 
       logger.info({ remarks, pmId, sourceId }, '🔍 Webhook: lookup identifiers');
 
+      // sc.id is BIGSERIAL; only match by id when the identifier is numeric
+      // to avoid "invalid input syntax for type bigint" when $1 is a pay_xxx
+      // string (e.g., payment.paid events that don't carry link-level remarks).
+      const lookupIdentifier = remarks || pmId;
       const { rows } = await pool.query(
         `SELECT sc.id, sc.user_id, sc.plan, sc.duration_days, sc.status, sc.amount_php,
                 u.email, u.username
          FROM subscription_checkouts sc
          JOIN users u ON u.id = sc.user_id
          WHERE (
-           sc.id           = $1
+           sc.id::text        = $1
            OR sc.paymongo_ref = $1
            OR sc.paymongo_ref = $2
            OR sc.paymongo_ref = $3
          ) AND sc.status = 'pending'
          LIMIT 1`,
-        [remarks || pmId, pmId, sourceId],
+        [lookupIdentifier, pmId, sourceId],
       );
 
       logger.info({ remarks, pmId, found: rows.length }, '🔍 Webhook: checkout lookup result');
 
       if (rows.length === 0) {
-        logger.warn({ remarks, pmId }, '⚠️ Webhook: no pending checkout found');
+        logger.warn({ remarks, pmId, sourceId }, '⚠️ Webhook: no pending checkout found');
         res.json({ received: true });
         return;
       }
@@ -606,6 +610,11 @@ export async function handleWebhook(
       };
 
       await activateSubscription({ ...checkout, payment_id: webhookPaymentId || undefined });
+      logger.info({
+        checkoutId: checkout.id,
+        userId:     checkout.user_id,
+        plan:       checkout.plan,
+      }, '✅ Webhook: subscription activated');
       res.json({ received: true });
       return;
     }
@@ -804,8 +813,8 @@ export async function subscribe(
     );
 
     const { rows } = await client.query(
-      `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at)
-       VALUES ($1, $2, NOW(), NOW() + ($3 || ' days')::INTERVAL)
+      `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at, is_active)
+       VALUES ($1, $2, NOW(), NOW() + ($3 || ' days')::INTERVAL, TRUE)
        RETURNING id, plan, starts_at, expires_at`,
       [userId, plan, duration_days],
     );

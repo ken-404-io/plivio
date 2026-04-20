@@ -99,8 +99,8 @@ async function activateSubscription(checkout: {
       [checkout.user_id],
     );
     await client.query(
-      `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at)
-       VALUES ($1, $2::plan_type, NOW(), NOW() + ($3 || ' days')::INTERVAL)`,
+      `INSERT INTO subscriptions (user_id, plan, starts_at, expires_at, is_active)
+       VALUES ($1, $2::plan_type, NOW(), NOW() + ($3 || ' days')::INTERVAL, TRUE)`,
       [checkout.user_id, checkout.plan, checkout.duration_days],
     );
     await client.query(
