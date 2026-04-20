@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
   XCircle, Eye, Coins, MessageSquare, Clock,
   CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
-  Download, X, Link2, Wifi, RefreshCw,
+  Download, X, Link2, Wifi, RefreshCw, Copy,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api.ts';
@@ -1104,6 +1104,14 @@ export default function AdminDashboard() {
   const [wdRejectTarget,setWdRejectTarget]= useState<string | null>(null);
   const [selectedKyc,   setSelectedKyc]   = useState<Set<string>>(new Set());
   const [batchRejectMode, setBatchRejectMode] = useState(false);
+
+  const [copiedWdId, setCopiedWdId] = useState<string | null>(null);
+  function copyToClipboard(text: string, id: string) {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopiedWdId(id);
+      setTimeout(() => setCopiedWdId(null), 2000);
+    });
+  }
 
   // Withdrawal history state
   const [wdSubTab,         setWdSubTab]         = useState<'pending' | 'history' | 'paid'>('pending');
@@ -2690,13 +2698,39 @@ export default function AdminDashboard() {
                   <div className="adm-wd-payment">
                     <span className="adm-wd-method">{w.method.toUpperCase()}</span>
                     <span className={`plan-badge plan-badge--${w.user_plan}`}>{w.user_plan}</span>
-                    <div className="adm-wd-account">
-                      <span className="adm-wd-account-name">{w.account_name}</span>
-                      <span className="adm-wd-account-num">{w.account_number}</span>
-                    </div>
                     <span className="adm-wd-date">
                       {new Date(w.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
+                  </div>
+                  {/* GCash / PayPal account info — prominent embed for admin review */}
+                  <div style={{
+                    margin: '6px 0 4px',
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'rgba(0,174,82,0.08)',
+                    border: '1px solid rgba(0,174,82,0.22)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {w.method.toUpperCase()} Account
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{w.account_name}</span>
+                      <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{w.account_number}</span>
+                    </div>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}
+                      onClick={() => copyToClipboard(w.account_number, w.id)}
+                      title="Copy account number"
+                    >
+                      {copiedWdId === w.id
+                        ? <><CheckCircle2 size={13} style={{ color: 'var(--success)' }} /> Copied</>
+                        : <><Copy size={13} /> Copy</>}
+                    </button>
                   </div>
                   <div className="adm-wd-actions">
                     <button

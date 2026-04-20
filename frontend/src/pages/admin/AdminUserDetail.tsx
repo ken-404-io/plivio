@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Users, CreditCard, UserCheck, ArrowUpCircle,
   Smartphone, RotateCcw, ShieldCheck, ShieldX, Ban, CheckCircle2,
-  Coins, Star, Mail, Key, Clock, BookOpen, Pencil, X,
+  Coins, Star, Mail, Key, Clock, BookOpen, Pencil, X, Copy, Wallet,
 } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
-import type { AdminUserDetails, AdminUserWithdrawal, WithdrawalStatus } from '../../types/index.ts';
+import type { AdminUserDetails, AdminUserWithdrawal, AdminPaymentMethod, WithdrawalStatus } from '../../types/index.ts';
 
 export default function AdminUserDetail() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +22,14 @@ export default function AdminUserDetail() {
   const [editStatus, setEditStatus] = useState<WithdrawalStatus>('pending');
   const [editReason, setEditReason] = useState('');
   const [savingWd, setSavingWd] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  function copyToClipboard(text: string, id: string) {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -117,7 +125,7 @@ export default function AdminUserDetail() {
 
   if (!details) return null;
 
-  const { user, subscription, invites, withdrawals, device, kyc, quiz_stats } = details;
+  const { user, subscription, invites, withdrawals, device, kyc, quiz_stats, payment_methods = [] } = details as AdminUserDetails & { payment_methods: AdminPaymentMethod[] };
 
   const kycColor: Record<string, string> = {
     approved: 'var(--success)',
@@ -339,6 +347,50 @@ export default function AdminUserDetail() {
           <p className="adm-details-empty">
             No active subscription — currently on <strong>{user.plan}</strong> plan
           </p>
+        )}
+      </div>
+
+      {/* ── Payment Accounts ── */}
+      <div className="adm-details-section" style={{ marginBottom: 16 }}>
+        <h4 className="adm-details-section-title"><Wallet size={13} /> GCash / PayPal Accounts ({payment_methods.length})</h4>
+        {payment_methods.length === 0 ? (
+          <p className="adm-details-empty">No saved payment accounts.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {payment_methods.map((pm) => (
+              <div key={pm.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', borderRadius: 10, gap: 12,
+                background: pm.method === 'gcash' ? 'rgba(0,174,82,0.08)' : 'rgba(0,112,204,0.08)',
+                border: `1px solid ${pm.method === 'gcash' ? 'rgba(0,174,82,0.25)' : 'rgba(0,112,204,0.25)'}`,
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)' }}>
+                      {pm.method.toUpperCase()}
+                    </span>
+                    {pm.is_default && (
+                      <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--primary)', color: '#fff', borderRadius: 99, padding: '1px 6px' }}>
+                        Default
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>{pm.account_name}</span>
+                  <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{pm.account_number}</span>
+                </div>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}
+                  onClick={() => copyToClipboard(pm.account_number, pm.id)}
+                  title="Copy account number"
+                >
+                  {copiedId === pm.id
+                    ? <><CheckCircle2 size={13} style={{ color: 'var(--success)' }} /> Copied</>
+                    : <><Copy size={13} /> Copy</>}
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
