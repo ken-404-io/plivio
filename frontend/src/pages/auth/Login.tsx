@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
 import api from '../../services/api.ts';
 import type { AxiosError } from 'axios';
@@ -52,7 +52,10 @@ function EyeIcon({ visible }: { visible: boolean }) {
 export default function Login() {
   const { login, transition } = useAuth();
   const navigate  = useNavigate();
+  const location  = useLocation();
   const [searchParams] = useSearchParams();
+
+  const from = (location.state as { from?: { pathname: string; search: string; hash: string } } | null)?.from;
 
   const [form,        setForm]        = useState({ email: '', password: '' });
   const [showPass,    setShowPass]    = useState(false);
@@ -116,9 +119,13 @@ export default function Login() {
     setLoading(true);
     try {
       const result = await login(form.email, form.password);
-      if (result.requires_2fa)  { navigate('/2fa'); }
-      else if (result.is_admin) { navigate('/admin'); }
-      else                      { navigate('/dashboard'); }
+      if (result.requires_2fa) {
+        navigate('/2fa', { state: { from } });
+      } else if (result.is_admin) {
+        navigate(from?.pathname && !from.pathname.startsWith('/login') ? `${from.pathname}${from.search}${from.hash}` : '/admin');
+      } else {
+        navigate(from?.pathname && !from.pathname.startsWith('/login') ? `${from.pathname}${from.search}${from.hash}` : '/dashboard');
+      }
     } catch (err) {
       const axErr = err as AxiosError<{ error: string; code?: string; email?: string; reason?: string; suspended_until?: string }>;
       const data  = axErr.response?.data;

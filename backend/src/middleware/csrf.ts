@@ -7,6 +7,7 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const CSRF_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const CSRF_EXEMPT = new Set([
+  '/api/auth/refresh',
   '/api/auth/verify-email',
   '/api/auth/verify-email/resend',
   '/api/auth/reset-password',

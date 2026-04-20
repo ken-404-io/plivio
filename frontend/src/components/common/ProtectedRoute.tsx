@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/authStore.tsx';
 import AccountBlockedScreen from './AccountBlockedScreen.tsx';
 import AccountRestoredScreen from './AccountRestoredScreen.tsx';
@@ -9,6 +9,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ adminOnly = false }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -18,7 +19,7 @@ export default function ProtectedRoute({ adminOnly = false }: ProtectedRouteProp
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
 
   // Show full-screen blocked UI — no app access at all
   const isSuspendedNow =
