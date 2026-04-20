@@ -404,7 +404,7 @@ export default function AdminUserDetail() {
                     })}
                   </span>
                   {wd.rejection_reason && (
-                    <span style={{ fontSize: 11, color: 'var(--error)' }}>
+                    <span style={{ fontSize: 11, color: wd.status === 'paid' ? 'var(--success)' : 'var(--error)' }}>
                       {wd.rejection_reason}
                     </span>
                   )}
