@@ -41,11 +41,11 @@ export const PLANS: Record<string, PlanInfo> = {
   free: {
     name:        'Free',
     price_php:   0,
-    daily_limit: 60,
+    daily_limit: 500,
     features:    [
-      'Up to 100 quiz questions lifetime',
-      '₱60 daily earning cap',
-      '₱400 minimum payout',
+      'Up to 5,000 quiz questions lifetime',
+      '₱500 daily gate cap (Quizly)',
+      '₱200 minimum & maximum payout',
       '1 lifetime withdrawal',
       'GCash & PayPal withdrawals',
       'Standard support',
@@ -54,10 +54,10 @@ export const PLANS: Record<string, PlanInfo> = {
   premium: {
     name:        'Premium',
     price_php:   449,
-    daily_limit: 90,
+    daily_limit: 400,
     features:    [
-      '1,000 quiz questions per day',
-      '₱90 daily quiz earning cap',
+      '10,000 quiz questions per day',
+      '₱400 daily gate cap (Quizly)',
       '₱500 minimum payout',
       'Earn via referrals (no cap)',
       'All task types unlocked',
@@ -67,10 +67,10 @@ export const PLANS: Record<string, PlanInfo> = {
   elite: {
     name:        'Elite',
     price_php:   1599,
-    daily_limit: null,
+    daily_limit: 1000,
     features:    [
       'Unlimited quiz questions',
-      'No daily earning cap',
+      '₱1,000 daily gate cap (Quizly)',
       '₱1,500 minimum payout',
       'Earn via referrals (no cap)',
       'Early access to new features',

@@ -3,22 +3,22 @@ import pool from '../config/db.ts';
 import { ValidationError, ForbiddenError, NotFoundError } from '../utils/errors.ts';
 
 const FREE_PLAN_WITHDRAWAL_LIMIT    = 1;
-const FREE_PLAN_MIN_AMOUNT          = 400;  // ₱400 minimum payout for Free plan
-const FREE_PLAN_MAX_AMOUNT          = 5000; // no hard cap beyond global max
+const FREE_PLAN_MIN_AMOUNT          = 200;  // ₱200 minimum payout for Free plan
+const FREE_PLAN_MAX_AMOUNT          = 200;  // ₱200 maximum payout for Free plan
 const FREE_PLAN_UPGRADE_CODE        = 'free_plan_limit_reached';
 const PREMIUM_MIN_AMOUNT            = 500;  // ₱500 minimum payout for Premium
-const PREMIUM_DAILY_WITHDRAWAL_MAX  = 5000; // ₱5000 daily cap for Premium
+const PREMIUM_DAILY_WITHDRAWAL_MAX  = 500;  // ₱500 daily cap for Premium
 const ELITE_MIN_AMOUNT              = 1500; // ₱1,500 minimum payout for Elite
-const ELITE_DAILY_WITHDRAWAL_MAX    = 5000; // ₱5000 daily cap for Elite
+const ELITE_DAILY_WITHDRAWAL_MAX    = 5000; // ₱5,000 daily cap for Elite
 // SQL snippet: start of "today" in Philippine Standard Time (UTC+8)
 const SQL_PH_DAY_START = `(date_trunc('day', (NOW() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila')`;
 
 // Minimum quiz earnings (₱) a user must accumulate today before they can withdraw.
-// Resets at 12am Philippine time. Free plan users who have exhausted their 100-question lifetime bank are exempt.
-const QUIZ_EARN_GATE_DEFAULT = 60;
-const QUIZ_EARN_GATE_PREMIUM = 90;
-const QUIZ_EARN_GATE_ELITE   = 200;
-const FREE_PLAN_LIFETIME_CAP = 100;
+// Resets at 12am Philippine time. Free plan users who have exhausted their 5,000-question lifetime bank are exempt.
+const QUIZ_EARN_GATE_DEFAULT = 500;
+const QUIZ_EARN_GATE_PREMIUM = 400;
+const QUIZ_EARN_GATE_ELITE   = 1000;
+const FREE_PLAN_LIFETIME_CAP = 5000;
 
 const MIN_WITHDRAWAL  = 50;
 const MAX_WITHDRAWAL  = 5000;

@@ -3,10 +3,10 @@ import pool from '../config/db.ts';
 
 const REWARD_PER_CORRECT = 0.10;
 
-// Lifetime question cap — Free plan users have a hard ceiling of 100 total
+// Lifetime question cap — Free plan users have a hard ceiling of 5,000 total
 // questions. Premium and Elite users have NO lifetime cap; their counters
 // are daily (reset at 00:00 Philippine Standard Time).
-const FREE_LIFETIME_QUESTIONS = 100;
+const FREE_LIFETIME_QUESTIONS = 5000;
 
 // Cooldown window before a previously-answered question becomes eligible
 // again for the same user. Without this, heavy users — especially Elite,
@@ -25,16 +25,17 @@ const RECYCLE_INTERVAL_SQL  = `INTERVAL '${QUESTION_RECYCLE_DAYS} days'`;
 // Daily question cap (resets 00:00 PST / Asia/Manila). null = unlimited.
 const DAILY_QUESTION_LIMITS: Record<string, number | null> = {
   free:    null,     // Free uses the lifetime cap above
-  premium: 1000,
+  premium: 10000,
   elite:   null,     // Unlimited daily
 };
 
 // Daily earning cap from the quiz bot (₱). null = unlimited.
+// For Free plan, the 5,000 lifetime question cap is the natural limiter.
 // Note: referral earnings are NOT counted against this cap.
 const DAILY_EARN_LIMITS: Record<string, number | null> = {
-  free:    60,
-  premium: 90,
-  elite:   null,
+  free:    null,
+  premium: 400,
+  elite:   1000,
 };
 
 // ─── SQL snippet: "today" in Philippine Standard Time (UTC+8) ──────────────

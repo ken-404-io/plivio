@@ -86,14 +86,15 @@ interface CompareRow {
 }
 
 const COMPARE_ROWS: CompareRow[] = [
-  { label: 'Price/month',         free: 'Free',        premium: '₱449',      elite: '₱1,599'    },
-  { label: 'Quiz daily limit',    free: '₱60',         premium: '₱90',       elite: 'Unlimited' },
-  { label: 'Quiz questions',      free: '500 Overall', premium: '1,000/day', elite: 'Unlimited' },
-  { label: 'Min. payout',         free: '₱400 (1x)',   premium: '₱500',      elite: '₱1,500'    },
-  { label: 'Task types',          free: 'Basic',       premium: 'All',       elite: 'All'       },
-  { label: 'Referral earnings',   free: false,         premium: true,        elite: true        },
-  { label: 'Early access',        free: false,         premium: false,       elite: true        },
-  { label: 'Support',             free: 'Standard',    premium: 'Priority',  elite: 'VIP'       },
+  { label: 'Price/month',         free: 'Free',           premium: '₱449',       elite: '₱1,599'    },
+  { label: 'Quizly gate cap',     free: '₱500/day',       premium: '₱400/day',   elite: '₱1,000/day'},
+  { label: 'Quiz questions',      free: '5,000 Overall',  premium: '10,000/day', elite: 'Unlimited' },
+  { label: 'Min. payout',         free: '₱200 (1x)',      premium: '₱500',       elite: '₱1,500'    },
+  { label: 'Max. payout/day',     free: '₱200',           premium: '₱500',       elite: '₱5,000'    },
+  { label: 'Task types',          free: 'Basic',          premium: 'All',        elite: 'All'       },
+  { label: 'Referral earnings',   free: false,            premium: true,         elite: true        },
+  { label: 'Early access',        free: false,            premium: false,        elite: true        },
+  { label: 'Support',             free: 'Standard',       premium: 'Priority',   elite: 'VIP'       },
 ];
 
 function Cell({ value }: { value: CellVal }) {
