@@ -86,11 +86,11 @@ function ValidationModal({ message, onClose }: { message: string; onClose: () =>
 
 const MIN_AMOUNT                = 50;
 const MAX_AMOUNT                = 5000;
-const FREE_PLAN_MIN_AMOUNT      = 400;
-const FREE_PLAN_MAX_AMOUNT      = 5000;
+const FREE_PLAN_MIN_AMOUNT      = 200;
+const FREE_PLAN_MAX_AMOUNT      = 200;
 const PREMIUM_PLAN_MIN_AMOUNT   = 500;
 const ELITE_PLAN_MIN_AMOUNT     = 1500;
-const QUIZ_EARN_GATE            = 60;
+const QUIZ_EARN_GATE            = 500;
 const DOC_FEE_RATE      = 0.01;
 const HANDLING_FEE_RATE  = 0.04;
 const TOTAL_FEE_RATE    = DOC_FEE_RATE + HANDLING_FEE_RATE;
