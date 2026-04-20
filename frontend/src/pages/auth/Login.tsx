@@ -122,7 +122,8 @@ export default function Login() {
       if (result.requires_2fa) {
         navigate('/2fa', { state: { from } });
       } else if (result.is_admin) {
-        navigate(from?.pathname && !from.pathname.startsWith('/login') ? `${from.pathname}${from.search}${from.hash}` : '/admin');
+        const adminFrom = from?.pathname?.startsWith('/admin') ? `${from.pathname}${from.search}${from.hash}` : null;
+        navigate(adminFrom ?? '/admin');
       } else {
         navigate(from?.pathname && !from.pathname.startsWith('/login') ? `${from.pathname}${from.search}${from.hash}` : '/dashboard');
       }
