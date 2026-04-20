@@ -185,14 +185,24 @@ export default function LandingPage() {
   const [email, setEmail]   = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Already logged in — send straight to the app
-  if (!loading && user) return <Navigate to="/dashboard" replace />;
-
-  // Scroll-reveal refs — each section gets its own observer
+  // All hooks must be called unconditionally before any early returns
   const featuresRef     = useScrollReveal();
   const testimonialsRef = useScrollReveal();
   const plansRef        = useScrollReveal();
   const certsRef        = useScrollReveal();
+
+  // While session is being restored, show a spinner to avoid flashing the
+  // logged-out landing page to users who are already authenticated.
+  if (loading) {
+    return (
+      <div className="screen-center">
+        <div className="spinner" aria-label="Loading…" />
+      </div>
+    );
+  }
+
+  // Already logged in — send straight to the app
+  if (user) return <Navigate to="/dashboard" replace />;
 
   function handleCTA(e: React.FormEvent) {
     e.preventDefault();

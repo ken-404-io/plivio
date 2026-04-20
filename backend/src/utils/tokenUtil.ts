@@ -36,13 +36,13 @@ export const cookieOptions: { access: CookieOptions; refresh: CookieOptions } = 
   access: {
     httpOnly: true,
     secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge:   15 * 60 * 1000,
   },
   refresh: {
     httpOnly: true,
     secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge:   7 * 24 * 60 * 60 * 1000,
     path:     '/api/auth/refresh',
   },
