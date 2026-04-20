@@ -593,7 +593,7 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
   try {
     const { id } = req.params as Record<string, string>;
 
-    const [userResult, subResult, invitesResult, withdrawalsResult, deviceResult, kycResult, quizResult, paymentMethodsResult] = await Promise.all([
+    const [userResult, subResult, invitesResult, withdrawalsResult, deviceResult, kycResult, paymentMethodsResult, quizResult] = await Promise.all([
       // Full user profile
       pool.query(
         `SELECT id, username, email, plan, balance, coins, streak_count, last_streak_date,
