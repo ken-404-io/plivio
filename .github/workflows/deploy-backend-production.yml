@@ -1,0 +1,25 @@
+name: Deploy Backend to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "yes" to confirm production deployment'
+        required: true
+        default: 'no'
+
+jobs:
+  deploy:
+    name: Deploy to Railway Production
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'yes'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Production
+        run: railway up --service=${{ secrets.RAILWAY_SERVICE_ID }} --environment=production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
