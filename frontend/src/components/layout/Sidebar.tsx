@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Wifi,
   Ban,
+  CreditCard,
 } from 'lucide-react';
 
 type LucideIcon = React.ElementType;
@@ -44,9 +45,10 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const ADMIN_TABS = [
-  { tab: 'overview',      label: 'Overview',      Icon: LayoutDashboard },
-  { tab: 'users',         label: 'Users',         Icon: Users           },
-  { tab: 'restricted',    label: 'Restricted',    Icon: Ban             },
+  { tab: 'overview',       label: 'Overview',       Icon: LayoutDashboard },
+  { tab: 'users',          label: 'Users',          Icon: Users           },
+  { tab: 'subscriptions',  label: 'Subscriptions',  Icon: CreditCard      },
+  { tab: 'restricted',     label: 'Restricted',     Icon: Ban             },
   { tab: 'withdrawals',   label: 'Withdrawals',   Icon: ArrowUpCircle   },
   { tab: 'referrals',     label: 'Referrals',     Icon: Link2           },
   { tab: 'notifications', label: 'Notifications', Icon: Bell            },

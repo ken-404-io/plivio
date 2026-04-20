@@ -16,12 +16,13 @@ import type {
   AdminNotificationLog,
 } from '../../types/index.ts';
 
-const TABS = ['overview', 'users', 'restricted', 'withdrawals', 'referrals', 'notifications', 'kyc', 'online'] as const;
+const TABS = ['overview', 'users', 'subscriptions', 'restricted', 'withdrawals', 'referrals', 'notifications', 'kyc', 'online'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
   overview:      { label: 'Overview',      Icon: LayoutDashboard },
   users:         { label: 'Users',         Icon: Users           },
+  subscriptions: { label: 'Subscriptions', Icon: CreditCard      },
   restricted:    { label: 'Restricted',    Icon: Ban             },
   withdrawals:   { label: 'Withdrawals',   Icon: ArrowUpCircle   },
   referrals:     { label: 'Referrals',     Icon: Link2           },
@@ -1173,6 +1174,10 @@ export default function AdminDashboard() {
   const [onlineLastRefreshed, setOnlineLastRefreshed] = useState<Date | null>(null);
   const onlineIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Subscriptions state
+  const [subsList,    setSubsList]    = useState<{ id: number; plan: 'premium' | 'elite'; starts_at: string; expires_at: string; is_active: boolean; user_id: string; username: string; email: string; is_banned: boolean }[]>([]);
+  const [subsLoading, setSubsLoading] = useState(false);
+
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wdSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1221,6 +1226,24 @@ export default function AdminDashboard() {
       if (onlineIntervalRef.current) { clearInterval(onlineIntervalRef.current); onlineIntervalRef.current = null; }
     }
     return () => { if (onlineIntervalRef.current) clearInterval(onlineIntervalRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const loadSubscriptions = useCallback(async () => {
+    setSubsLoading(true);
+    try {
+      const { data } = await api.get<{ subscriptions: typeof subsList }>('/admin/subscriptions');
+      setSubsList(data.subscriptions);
+    } catch {
+      toast.error('Failed to load subscriptions.');
+    } finally {
+      setSubsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'subscriptions') void loadSubscriptions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -2403,6 +2426,178 @@ export default function AdminDashboard() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── Subscriptions ── */}
+      {tab === 'subscriptions' && (
+        <div className="adm-section">
+          <div className="adm-section-header" style={{ justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CreditCard size={15} />
+              <h2 className="adm-section-title">Subscriptions</h2>
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => { void loadSubscriptions(); }}
+              disabled={subsLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <RefreshCw size={13} className={subsLoading ? 'spin' : ''} />
+              Refresh
+            </button>
+          </div>
+          <p className="adm-section-hint">All users who have subscribed, newest to oldest. Separated by plan tier.</p>
+
+          {subsLoading && subsList.length === 0 ? (
+            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+              Loading…
+            </div>
+          ) : (
+            <>
+              {/* Elite */}
+              {(() => {
+                const eliteList = subsList.filter((s) => s.plan === 'elite');
+                return (
+                  <div style={{ marginBottom: 32 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '16px 0 10px' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>Elite Members</span>
+                      <span style={{
+                        background: 'var(--plan-elite, #7c3aed)',
+                        color: '#fff',
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '1px 8px',
+                      }}>
+                        {eliteList.length}
+                      </span>
+                    </div>
+                    {eliteList.length === 0 ? (
+                      <div className="empty-state"><p>No elite subscribers yet.</p></div>
+                    ) : (
+                      <div className="adm-table-wrap">
+                        <table className="adm-table">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Username</th>
+                              <th>Email</th>
+                              <th>Started</th>
+                              <th>Expires</th>
+                              <th>Status</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {eliteList.map((s, i) => (
+                              <tr key={s.id}>
+                                <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{i + 1}</td>
+                                <td>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <strong>{s.username}</strong>
+                                    {s.is_banned && <span className="adm-plan-badge" style={{ background: 'var(--error)', color: '#fff', fontSize: 10 }}>banned</span>}
+                                  </span>
+                                </td>
+                                <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{s.email}</td>
+                                <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                  {new Date(s.starts_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </td>
+                                <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                  {new Date(s.expires_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </td>
+                                <td>
+                                  {s.is_active
+                                    ? <span style={{ color: 'var(--success)', fontSize: 12, fontWeight: 600 }}>Active</span>
+                                    : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Expired</span>}
+                                </td>
+                                <td>
+                                  <Link to={`/admin/users/${s.user_id}`} className="btn btn-ghost btn-sm">
+                                    <Eye size={13} /> View
+                                  </Link>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Premium */}
+              {(() => {
+                const premiumList = subsList.filter((s) => s.plan === 'premium');
+                return (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 10px' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>Premium Members</span>
+                      <span style={{
+                        background: 'var(--plan-premium, #2563eb)',
+                        color: '#fff',
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '1px 8px',
+                      }}>
+                        {premiumList.length}
+                      </span>
+                    </div>
+                    {premiumList.length === 0 ? (
+                      <div className="empty-state"><p>No premium subscribers yet.</p></div>
+                    ) : (
+                      <div className="adm-table-wrap">
+                        <table className="adm-table">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Username</th>
+                              <th>Email</th>
+                              <th>Started</th>
+                              <th>Expires</th>
+                              <th>Status</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {premiumList.map((s, i) => (
+                              <tr key={s.id}>
+                                <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{i + 1}</td>
+                                <td>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <strong>{s.username}</strong>
+                                    {s.is_banned && <span className="adm-plan-badge" style={{ background: 'var(--error)', color: '#fff', fontSize: 10 }}>banned</span>}
+                                  </span>
+                                </td>
+                                <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{s.email}</td>
+                                <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                  {new Date(s.starts_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </td>
+                                <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                  {new Date(s.expires_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </td>
+                                <td>
+                                  {s.is_active
+                                    ? <span style={{ color: 'var(--success)', fontSize: 12, fontWeight: 600 }}>Active</span>
+                                    : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Expired</span>}
+                                </td>
+                                <td>
+                                  <Link to={`/admin/users/${s.user_id}`} className="btn btn-ghost btn-sm">
+                                    <Eye size={13} /> View
+                                  </Link>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </div>
       )}
 
       {/* ── Withdrawals ── */}

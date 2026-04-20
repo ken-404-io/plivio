@@ -1240,6 +1240,28 @@ export async function notifyRejectedFreeWithdrawals(
   } catch (err) { next(err); }
 }
 
+// ─── GET /admin/subscriptions ─────────────────────────────────────────────────
+
+export async function listSubscriptions(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT latest.id, latest.plan, latest.starts_at, latest.expires_at, latest.is_active,
+              latest.user_id, latest.username, latest.email, latest.is_banned
+       FROM (
+         SELECT DISTINCT ON (s.user_id)
+                s.id, s.plan, s.starts_at, s.expires_at, s.is_active,
+                u.id AS user_id, u.username, u.email, u.is_banned
+         FROM subscriptions s
+         JOIN users u ON u.id = s.user_id
+         WHERE s.plan IN ('premium', 'elite')
+         ORDER BY s.user_id, s.starts_at DESC
+       ) latest
+       ORDER BY latest.starts_at DESC`,
+    );
+    res.json({ success: true, subscriptions: rows });
+  } catch (err) { next(err); }
+}
+
 // ─── GET /admin/online ────────────────────────────────────────────────────────
 
 export async function getOnlineUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
