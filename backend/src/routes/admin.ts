@@ -20,6 +20,7 @@ import {
   listPendingWithdrawals,
   listWithdrawalHistory,
   processWithdrawal,
+  editWithdrawal,
   resetUserDevice,
   listReferrals,
   listReferralLeaderboard,
@@ -141,6 +142,11 @@ router.put('/withdrawals/:id',
   validateIntParam('id'),
   validateBody({ action: { required: true, enum: ['approve', 'reject'] } }),
   processWithdrawal,
+);
+router.patch('/withdrawals/:id',
+  validateIntParam('id'),
+  validateBody({ status: { required: true, enum: ['pending', 'processing', 'paid', 'rejected', 'cancelled'] } }),
+  editWithdrawal,
 );
 
 router.get('/referrals/leaderboard', listReferralLeaderboard);

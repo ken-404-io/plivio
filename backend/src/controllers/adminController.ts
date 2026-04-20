@@ -516,6 +516,36 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
   }
 }
 
+// ─── PATCH /admin/withdrawals/:id ────────────────────────────────────────────
+
+export async function editWithdrawal(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params as Record<string, string>;
+    const { status, rejection_reason } = req.body as { status: string; rejection_reason?: string };
+
+    const validStatuses = ['pending', 'processing', 'paid', 'rejected', 'cancelled'];
+    if (!validStatuses.includes(status)) throw new ValidationError('Invalid status');
+
+    const reason = rejection_reason?.trim() || null;
+
+    const { rows } = await pool.query(
+      `UPDATE withdrawals
+         SET status           = $1,
+             rejection_reason = $2,
+             processed_at     = CASE WHEN $1 IN ('paid','rejected','cancelled') THEN COALESCE(processed_at, NOW()) ELSE processed_at END
+       WHERE id = $3
+       RETURNING *`,
+      [status, reason, id],
+    );
+
+    if (rows.length === 0) throw new NotFoundError('Withdrawal not found');
+
+    res.json({ success: true, withdrawal: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ─── GET /admin/users/:id/payment-history ────────────────────────────────────
 
 export async function getUserPaymentHistory(req: Request, res: Response, next: NextFunction): Promise<void> {

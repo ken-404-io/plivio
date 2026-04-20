@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Users, CreditCard, UserCheck, ArrowUpCircle,
   Smartphone, RotateCcw, ShieldCheck, ShieldX, Ban, CheckCircle2,
-  Coins, Star, Mail, Key, Clock, BookOpen,
+  Coins, Star, Mail, Key, Clock, BookOpen, Pencil, X,
 } from 'lucide-react';
 import api from '../../services/api.ts';
 import { useToast } from '../../components/common/Toast.tsx';
-import type { AdminUserDetails } from '../../types/index.ts';
+import type { AdminUserDetails, AdminUserWithdrawal, WithdrawalStatus } from '../../types/index.ts';
 
 export default function AdminUserDetail() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +17,11 @@ export default function AdminUserDetail() {
   const [details, setDetails] = useState<AdminUserDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [resettingDevice, setResettingDevice] = useState(false);
+
+  const [editingWd, setEditingWd] = useState<AdminUserWithdrawal | null>(null);
+  const [editStatus, setEditStatus] = useState<WithdrawalStatus>('pending');
+  const [editReason, setEditReason] = useState('');
+  const [savingWd, setSavingWd] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -53,6 +58,43 @@ export default function AdminUserDetail() {
       );
     } finally {
       setResettingDevice(false);
+    }
+  }
+
+  function openEditWd(wd: AdminUserWithdrawal) {
+    setEditingWd(wd);
+    setEditStatus(wd.status);
+    setEditReason(wd.rejection_reason ?? '');
+  }
+
+  async function handleSaveWd() {
+    if (!editingWd) return;
+    setSavingWd(true);
+    try {
+      await api.patch(`/admin/withdrawals/${editingWd.id}`, {
+        status: editStatus,
+        rejection_reason: editReason,
+      });
+      setDetails((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          withdrawals: prev.withdrawals.map((w) =>
+            w.id === editingWd.id
+              ? { ...w, status: editStatus, rejection_reason: editReason || null }
+              : w,
+          ),
+        };
+      });
+      toast.success('Withdrawal updated.');
+      setEditingWd(null);
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { error?: string } } }).response?.data?.error ??
+          'Failed to update withdrawal.',
+      );
+    } finally {
+      setSavingWd(false);
     }
   }
 
@@ -366,6 +408,13 @@ export default function AdminUserDetail() {
                       {wd.rejection_reason}
                     </span>
                   )}
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ padding: '2px 6px', fontSize: 11, marginTop: 4 }}
+                    onClick={() => openEditWd(wd)}
+                  >
+                    <Pencil size={11} /> Edit
+                  </button>
                 </div>
               </div>
             ))}
@@ -403,6 +452,76 @@ export default function AdminUserDetail() {
           <p className="adm-details-empty">No device registered.</p>
         )}
       </div>
+
+      {/* ── Edit Withdrawal Modal ── */}
+      {editingWd && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditingWd(null); }}
+        >
+          <div style={{
+            background: 'var(--surface)', borderRadius: 12, padding: 24, width: '100%', maxWidth: 420,
+            display: 'flex', flexDirection: 'column', gap: 16,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0, fontSize: 15 }}>Edit Withdrawal #{editingWd.id}</h3>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditingWd(null)}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              <strong>{String(editingWd.method).toUpperCase()}</strong> · ₱{Number(editingWd.net_amount || editingWd.amount).toFixed(2)}
+              {' · '}{editingWd.account_name} {editingWd.account_number}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600 }}>Status</label>
+              <select
+                className="form-input"
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value as WithdrawalStatus)}
+              >
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="paid">Paid</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600 }}>Reason / Note</label>
+              <textarea
+                className="form-input"
+                rows={3}
+                placeholder="Rejection reason or note (optional)"
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                style={{ resize: 'vertical' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditingWd(null)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                disabled={savingWd}
+                onClick={() => { void handleSaveWd(); }}
+              >
+                {savingWd ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
