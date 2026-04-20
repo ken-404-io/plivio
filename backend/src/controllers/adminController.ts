@@ -530,9 +530,9 @@ export async function editWithdrawal(req: Request, res: Response, next: NextFunc
 
     const { rows } = await pool.query(
       `UPDATE withdrawals
-         SET status           = $1,
+         SET status           = $1::withdrawal_status,
              rejection_reason = $2,
-             processed_at     = CASE WHEN $1 IN ('paid','rejected','cancelled') THEN COALESCE(processed_at, NOW()) ELSE processed_at END
+             processed_at     = CASE WHEN $1::text IN ('paid','rejected','cancelled') THEN COALESCE(processed_at, NOW()) ELSE processed_at END
        WHERE id = $3
        RETURNING *`,
       [status, reason, id],
