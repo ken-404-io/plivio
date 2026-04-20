@@ -1,36 +1,4 @@
-import { useEffect } from 'react';
-
-const DEFAULT_IDLE_MS = 10 * 60 * 1000;
-
-export default function useAutoRefreshOnIdle(idleMs: number = DEFAULT_IDLE_MS) {
-  useEffect(() => {
-    let timer: number | undefined;
-
-    const cancel = () => {
-      if (timer !== undefined) {
-        window.clearTimeout(timer);
-        timer = undefined;
-      }
-    };
-
-    const schedule = () => {
-      cancel();
-      timer = window.setTimeout(() => {
-        if (document.hidden) window.location.reload();
-      }, idleMs);
-    };
-
-    const onVisibilityChange = () => {
-      if (document.hidden) schedule();
-      else cancel();
-    };
-
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    if (document.hidden) schedule();
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      cancel();
-    };
-  }, [idleMs]);
-}
+// Idle-based page reloads were removed — they caused unexpected logouts when
+// the access token expired while the tab was in the background.
+// Version updates are now handled by useVersionCheck (silent auto-reload).
+export default function useAutoRefreshOnIdle(_idleMs?: number) {}

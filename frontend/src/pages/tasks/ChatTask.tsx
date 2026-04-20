@@ -91,8 +91,12 @@ export default function ChatTask({ onClose }: Props) {
   const [limitMsg,       setLimitMsg]       = useState('');
   const [doneMode,       setDoneMode]       = useState<DoneMode>('generic');
   const [submitting,     setSubmitting]     = useState(false);
+  const [cooldown,       setCooldown]       = useState(0);
 
   const streakTriggeredRef = useRef(false);
+  const cooldownRef         = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
   const loadStatus = useCallback(async () => {
     const { data } = await api.get<QuizStatus>('/quiz/status');
@@ -258,10 +262,26 @@ export default function ChatTask({ onClose }: Props) {
         setTimeout(() => setPhase('done'), 2500);
       }
     } catch (err: unknown) {
+      const httpStatus = (err as { response?: { status?: number } })?.response?.status;
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setDoneMode('generic');
-      setLimitMsg(msg ?? 'Failed to submit answer.');
-      setPhase('done');
+      if (httpStatus === 429) {
+        // Rate limited — stay on the current question, show a short cooldown
+        setPhase('question');
+        let secs = 8;
+        setCooldown(secs);
+        if (cooldownRef.current) clearInterval(cooldownRef.current);
+        cooldownRef.current = setInterval(() => {
+          secs -= 1;
+          setCooldown(secs);
+          if (secs <= 0) {
+            if (cooldownRef.current) { clearInterval(cooldownRef.current); cooldownRef.current = null; }
+          }
+        }, 1000);
+      } else {
+        setDoneMode('generic');
+        setLimitMsg(msg ?? 'Failed to submit answer.');
+        setPhase('done');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -414,6 +434,18 @@ export default function ChatTask({ onClose }: Props) {
                 </div>
               )}
 
+              {/* Rate-limit cooldown banner */}
+              {cooldown > 0 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, padding: '10px 14px', borderRadius: 10, marginBottom: 8,
+                  background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
+                  color: 'var(--error, #ef4444)', fontSize: 13, fontWeight: 600,
+                }}>
+                  ⏳ Slow down — try again in {cooldown}s
+                </div>
+              )}
+
               {/* 2 Choice buttons */}
               <div className="cq-choices">
                 {question.choices.map((choice, i) => {
@@ -423,7 +455,7 @@ export default function ChatTask({ onClose }: Props) {
                       key={i}
                       className={`cq-choice cq-choice--${state}`}
                       onClick={() => { void handleChoice(choice); }}
-                      disabled={phase === 'feedback' || submitting}
+                      disabled={phase === 'feedback' || submitting || cooldown > 0}
                     >
                       <span className="cq-choice-label">{i === 0 ? 'A' : 'B'}</span>
                       <span className="cq-choice-text">{choice}</span>
