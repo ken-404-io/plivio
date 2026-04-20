@@ -123,8 +123,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data } = await api.get<{ user: User }>('/users/me');
       dispatch({ type: 'SET_USER', payload: data.user });
       return data.user;
-    } catch {
-      dispatch({ type: 'CLEAR_USER' });
+    } catch (err) {
+      // Only clear the session when the server explicitly says the user
+      // is no longer authenticated (401/403). If we're still in the
+      // initial-load state (no user yet) we also clear so the UI exits
+      // the loading spinner and shows the login screen. Transient errors
+      // while already signed in (network down, 5xx) must NOT log the user
+      // out — returning to a backgrounded tab with a flaky connection
+      // previously kicked users to the login page.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const isAuthFailure = status === 401 || status === 403;
+      if (isAuthFailure || !userRef.current) {
+        dispatch({ type: 'CLEAR_USER' });
+      }
       return null;
     }
   }, []);

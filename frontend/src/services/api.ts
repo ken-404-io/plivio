@@ -89,7 +89,15 @@ api.interceptors.response.use(
         return api(original);
       } catch (refreshErr) {
         flushQueue(refreshErr);
-        window.dispatchEvent(new CustomEvent('auth:expired'));
+        // Only force logout when the refresh endpoint explicitly told us the
+        // session is gone (401/403). Transient failures — network down,
+        // 5xx, CORS hiccup, timeout — must NOT log the user out, otherwise
+        // a momentary connectivity blip while returning to a backgrounded
+        // tab kicks them to the login page.
+        const refreshStatus = (refreshErr as { response?: { status?: number } })?.response?.status;
+        if (refreshStatus === 401 || refreshStatus === 403) {
+          window.dispatchEvent(new CustomEvent('auth:expired'));
+        }
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
