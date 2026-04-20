@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 
 const COOKIE = 'plivio_v';
 
@@ -23,9 +23,7 @@ async function fetchServerVersion(): Promise<string | null> {
   }
 }
 
-export function useVersionCheck(): boolean {
-  const [outdated, setOutdated] = useState(false);
-
+export function useVersionCheck(): void {
   useEffect(() => {
     async function check(): Promise<void> {
       const v = await fetchServerVersion();
@@ -37,7 +35,7 @@ export function useVersionCheck(): boolean {
         const keys = await caches.keys();
         await Promise.all(keys.map((k) => caches.delete(k)));
       }
-      setOutdated(true);
+      window.location.reload();
     }
 
     void check();
@@ -50,6 +48,4 @@ export function useVersionCheck(): boolean {
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
-
-  return outdated;
 }

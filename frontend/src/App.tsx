@@ -35,43 +35,10 @@ import AdminUserDetail from './pages/admin/AdminUserDetail.tsx';
 import Settings       from './pages/settings/Settings.tsx';
 
 export default function App() {
-  const outdated = useVersionCheck();
+  useVersionCheck();
   useAutoRefreshOnIdle();
   return (
     <ErrorBoundary>
-      {outdated && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 99999,
-          background: 'rgba(0,0,0,0.85)',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          gap: 16, padding: 24, textAlign: 'center',
-        }}>
-          <div style={{ fontSize: 40 }}>🔄</div>
-          <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 700, margin: 0 }}>
-            A new version of Plivio is available
-          </h2>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, margin: 0, maxWidth: 320 }}>
-            Please open it in a new tab to get the latest version.
-          </p>
-          <button
-            onClick={() => window.open(window.location.href, '_blank')}
-            style={{
-              marginTop: 8,
-              padding: '12px 28px',
-              borderRadius: 10,
-              border: 'none',
-              background: '#1877f2',
-              color: '#fff',
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Open in New Tab
-          </button>
-        </div>
-      )}
       {/* Global ad-blocker gate — rendered outside the router so it
           covers every page, including landing / auth flows */}
       <AdBlockerModal />
