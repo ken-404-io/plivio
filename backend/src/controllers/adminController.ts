@@ -593,7 +593,7 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
   try {
     const { id } = req.params as Record<string, string>;
 
-    const [userResult, subResult, invitesResult, withdrawalsResult, deviceResult, kycResult, quizResult] = await Promise.all([
+    const [userResult, subResult, invitesResult, withdrawalsResult, deviceResult, kycResult, quizResult, paymentMethodsResult] = await Promise.all([
       // Full user profile
       pool.query(
         `SELECT id, username, email, plan, balance, coins, streak_count, last_streak_date,
@@ -652,6 +652,14 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
          FROM kyc_submissions WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 1`,
         [id],
       ),
+      // Saved payment methods (GCash / PayPal)
+      pool.query(
+        `SELECT id, method, account_name, account_number, is_default, created_at
+         FROM payment_methods
+         WHERE user_id = $1
+         ORDER BY is_default DESC, created_at DESC`,
+        [id],
+      ),
       // Quiz stats — lifetime and today (PH time)
       pool.query(
         `SELECT
@@ -690,7 +698,8 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
         device_name:    deviceRow.device_name ?? null,
         registered_at:  deviceRow.device_registered_at ?? null,
       } : null,
-      kyc:          kycResult.rows[0] ?? null,
+      kyc:             kycResult.rows[0] ?? null,
+      payment_methods: paymentMethodsResult.rows,
       quiz_stats: {
         total_answered: Number(qz.total_answered),
         total_correct:  Number(qz.total_correct),

@@ -310,6 +310,15 @@ export interface AdminUserQuizStats {
   today_earned:   number;
 }
 
+export interface AdminPaymentMethod {
+  id: string;
+  method: WithdrawalMethod;
+  account_name: string;
+  account_number: string;
+  is_default: boolean;
+  created_at: string;
+}
+
 export interface AdminUserDetails {
   user: AdminUserProfile;
   subscription: AdminUserSubscription | null;
@@ -318,6 +327,7 @@ export interface AdminUserDetails {
   device: AdminDeviceInfo | null;
   kyc: AdminUserKyc | null;
   quiz_stats: AdminUserQuizStats;
+  payment_methods: AdminPaymentMethod[];
 }
 
 export interface AdminWithdrawalHistory {
