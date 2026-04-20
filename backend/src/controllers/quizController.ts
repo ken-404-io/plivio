@@ -276,13 +276,10 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
     }
 
     // Get next eligible question.
-    // Elite: serve the least-recently-answered question so the bank never
-    // appears exhausted — fulfils the "unlimited questions" promise.
-    // Free/Premium: first try to serve a question the user hasn't answered
-    // within the recycle window. If the bank is smaller than the plan's cap
-    // and that filtered query comes up empty, fall back to the Elite-style
-    // least-recently-answered query so the user can keep going until they
-    // actually hit their plan quota (e.g. 1000/day for Premium).
+    // Always serve the least-recently-answered question across all plans.
+    // This guarantees the bank never appears exhausted — when all questions
+    // have been answered today the one answered longest ago is served again,
+    // providing the best possible variety even on a small question bank.
     const leastRecentSql = `SELECT q.id, q.question, q.answer, q.category
        FROM chat_questions q
        LEFT JOIN (
@@ -293,25 +290,7 @@ export async function getNextQuestion(req: Request, res: Response, next: NextFun
        ORDER BY COALESCE(ua.last_answered, '1970-01-01'::timestamptz) ASC, RANDOM()
        LIMIT 1`;
 
-    let questionRes = effectivePlan === 'elite'
-      ? await pool.query(leastRecentSql, [userId])
-      : await pool.query(
-          `SELECT q.id, q.question, q.answer, q.category
-           FROM chat_questions q
-           WHERE NOT EXISTS (
-             SELECT 1 FROM user_question_answers a
-             WHERE a.user_id = $1
-               AND a.question_id = q.id
-               AND a.answered_at > NOW() - ${RECYCLE_INTERVAL_SQL}
-           )
-           ORDER BY RANDOM()
-           LIMIT 1`,
-          [userId],
-        );
-
-    if (questionRes.rowCount === 0 && effectivePlan !== 'elite') {
-      questionRes = await pool.query(leastRecentSql, [userId]);
-    }
+    const questionRes = await pool.query(leastRecentSql, [userId]);
 
     if (questionRes.rowCount === 0) {
       res.json({
