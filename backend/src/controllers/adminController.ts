@@ -65,6 +65,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
       ? (req.query.device as string) : null;
     const dateFrom = req.query.date_from ? (req.query.date_from as string) : null;
     const dateTo   = req.query.date_to   ? (req.query.date_to as string)   : null;
+    const adBlockFilter = req.query.ad_block === 'blocked' ? 'blocked' : null;
 
     const { rows } = await pool.query(
       `SELECT id, username, email, plan, balance, is_verified, is_banned, is_admin,
@@ -81,8 +82,9 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
          AND ($6::text IS NULL OR ($6 = 'registered' AND device_fingerprint IS NOT NULL) OR ($6 = 'unregistered' AND device_fingerprint IS NULL))
          AND ($7::timestamptz IS NULL OR created_at >= $7::timestamptz)
          AND ($8::timestamptz IS NULL OR created_at <= ($8::timestamptz + INTERVAL '1 day'))
+         AND ($9::text IS NULL OR ad_block_status = $9)
        ORDER BY created_at DESC LIMIT $2 OFFSET $4`,
-      [search, limit, planFilter, offset, statusFilter, deviceFilter, dateFrom, dateTo]
+      [search, limit, planFilter, offset, statusFilter, deviceFilter, dateFrom, dateTo, adBlockFilter]
     );
 
     const countResult = await pool.query(
@@ -96,8 +98,9 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
                OR ($3 = 'restricted' AND (is_banned = TRUE OR (is_suspended = TRUE AND suspended_until > NOW()))))
          AND ($4::text IS NULL OR ($4 = 'registered' AND device_fingerprint IS NOT NULL) OR ($4 = 'unregistered' AND device_fingerprint IS NULL))
          AND ($5::timestamptz IS NULL OR created_at >= $5::timestamptz)
-         AND ($6::timestamptz IS NULL OR created_at <= ($6::timestamptz + INTERVAL '1 day'))`,
-      [search, planFilter, statusFilter, deviceFilter, dateFrom, dateTo]
+         AND ($6::timestamptz IS NULL OR created_at <= ($6::timestamptz + INTERVAL '1 day'))
+         AND ($7::text IS NULL OR ad_block_status = $7)`,
+      [search, planFilter, statusFilter, deviceFilter, dateFrom, dateTo, adBlockFilter]
     );
 
     res.json({
