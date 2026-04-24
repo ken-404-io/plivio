@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 export type AdBlockStatus = 'checking' | 'allowed' | 'blocked';
 
+// Module-level singleton so the heartbeat in authStore can read the latest
+// detection result without prop-drilling or context.
+let _latestAdBlockStatus: 'allowed' | 'blocked' | null = null;
+export function getLatestAdBlockStatus(): 'allowed' | 'blocked' | null {
+  return _latestAdBlockStatus;
+}
+
 const PROBE_TIMEOUT_MS = 5000;
 
 /**
@@ -218,7 +225,9 @@ async function detectOnce(): Promise<boolean> {
 
   // Primary: extension hiding elements on this page.
   // Secondary: network-level filter confirmed by two independent signals.
-  return bait || (script.blocked && dns.blocked);
+  const result = bait || (script.blocked && dns.blocked);
+  _latestAdBlockStatus = result ? 'blocked' : 'allowed';
+  return result;
 }
 
 const AUTO_RECHECK_INTERVAL_MS = 3000;
