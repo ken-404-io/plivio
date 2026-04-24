@@ -47,16 +47,73 @@ const SCRIPT_PROBES: readonly ScriptProbe[] = [
       return !!g && typeof g === 'object';
     },
   },
+  {
+    // Google Tag Manager — on every major filter list (EasyPrivacy,
+    // Fanboy's, AdGuard Tracking, uBlock Privacy). Script loader sets
+    // a global called `google_tag_manager` on the window.
+    url: 'https://www.googletagmanager.com/gtm.js?id=GTM-PLIVIO',
+    expect: () => {
+      const g = (window as unknown as { google_tag_manager?: object }).google_tag_manager;
+      return !!g && typeof g === 'object';
+    },
+  },
 ];
 
 /**
  * DNS / hostname probes — fetch requests to known ad and tracking
  * hosts. Failure (rejection or timeout) signals a DNS-layer block.
+ *
+ * Every host below appears on the default blocklists of Pi-hole,
+ * NextDNS, AdGuard DNS, Cloudflare for Families (malware+adult),
+ * Quad9, Mullvad DNS, and Control D. Real filtering resolvers
+ * sinkhole ALL of these consistently, so the "all must fail" gate
+ * strengthens (not weakens) with more hosts here.
  */
 const DNS_PROBE_HOSTS: readonly string[] = [
   'https://static.doubleclick.net/instream/ad_status.js',
   'https://securepubads.g.doubleclick.net/tag/js/gpt.js',
   'https://www.google-analytics.com/analytics.js',
+  'https://www.googletagmanager.com/gtm.js',
+  'https://adservice.google.com/adsid/integrator.js',
+  'https://pagead2.googlesyndication.com/pagead/show_ads.js',
+];
+
+/**
+ * Tracking pixel probes — 1×1 <img> requests to tracker endpoints.
+ *
+ * This is a complementary transport to fetch(). Some blockers (Brave
+ * Shields "standard" mode, Firefox Enhanced Tracking Protection,
+ * Safari Intelligent Tracking Prevention, DuckDuckGo app browser,
+ * Ghostery, Privacy Badger) allow cross-origin fetch but still
+ * cancel image beacons to known tracker hosts, so the pixel channel
+ * can flag a blocker that slipped past the fetch DNS gate.
+ *
+ * Every host is on the major tracker blocklists (Disconnect, EasyPrivacy,
+ * Peter Lowe's list, AdGuard Tracking Protection).
+ */
+const TRACKER_PIXEL_HOSTS: readonly string[] = [
+  'https://www.google-analytics.com/collect',
+  'https://stats.g.doubleclick.net/dc.js',
+  'https://www.facebook.com/tr/',
+  'https://www.scorecardresearch.com/beacon.js',
+];
+
+/**
+ * Bait class groups — each group is a distinct set of class names
+ * pulled from the element-hiding (cosmetic) sections of the major
+ * filter lists. Different blockers target different names, so we
+ * test multiple groups and treat ANY hidden bait as a positive.
+ *
+ *   Group 1: EasyList generic ad containers
+ *   Group 2: AdGuard / uBlock specialized placement names
+ *   Group 3: Fanboy's Enhanced + newer native-ad / sponsored-content
+ *   Group 4: Brave Shields + mobile-first / stream-ad patterns
+ */
+const BAIT_CLASS_GROUPS: readonly string[] = [
+  'adsbox ad-unit ad-banner ads advertisement ad-placement doubleclick google-ads pub_300x250',
+  'ad-slot banner-ad sponsored promoted-content ad-container textads banner_ad adsbygoogle',
+  'sponsored-post sponsor-content native-ad prebid pub-ad-placeholder ad-header ad-sidebar',
+  'ima-ad-container video-ads stream-ad mobile-ad-slot ad-interstitial ad-wrapper ad-iframe',
 ];
 
 /**
@@ -65,12 +122,18 @@ const DNS_PROBE_HOSTS: readonly string[] = [
  * `fixed` (fixed elements always have offsetParent === null), and
  * we must not set our own opacity/visibility on the element since
  * those are exactly the properties we measure.
+ *
+ * Multi-bait: we inject ONE element per bait group in parallel and
+ * flag the whole check as blocked if ANY bait is hidden. Different
+ * filter lists target different class names, so one group may pass
+ * while another is caught — testing multiple catches more cosmetic
+ * filters (uBlock Origin, AdBlock Plus, AdGuard, Brave Shields,
+ * Ghostery, Privacy Badger, Total AdBlock, AdLock, Stands Fair).
  */
-function baitBlocked(): Promise<boolean> {
+function singleBaitBlocked(className: string): Promise<boolean> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
-    el.className =
-      'adsbox ad-unit ad-banner ads advertisement ad-placement doubleclick google-ads pub_300x250';
+    el.className = className;
     el.setAttribute('data-ad', 'true');
     el.innerHTML = '&nbsp;';
     el.style.cssText =
@@ -92,6 +155,38 @@ function baitBlocked(): Promise<boolean> {
         }, 250);
       });
     });
+  });
+}
+
+async function baitBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
+  const details = await Promise.all(BAIT_CLASS_GROUPS.map(singleBaitBlocked));
+  return { blocked: details.some(Boolean), details };
+}
+
+/**
+ * Tracking pixel probe. Uses Image() rather than fetch() so we catch
+ * blockers that only intercept image-beacon requests (classic filter-
+ * list behaviour) while letting fetch() pass.
+ *
+ * Resolves true when the image fails to load or times out.
+ */
+function pixelFails(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    let resolved = false;
+    const finish = (blocked: boolean) => {
+      if (resolved) return;
+      resolved = true;
+      window.clearTimeout(timer);
+      img.onload = null;
+      img.onerror = null;
+      resolve(blocked);
+    };
+    const timer = window.setTimeout(() => finish(true), PROBE_TIMEOUT_MS);
+    img.onload = () => finish(false);
+    img.onerror = () => finish(true);
+    img.referrerPolicy = 'no-referrer';
+    img.src = `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`;
   });
 }
 
@@ -182,35 +277,55 @@ async function dnsBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
   return { blocked: details.length > 0 && details.every(Boolean), details };
 }
 
+async function pixelBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return { blocked: false, details: [] };
+  }
+  const details = await Promise.all(TRACKER_PIXEL_HOSTS.map(pixelFails));
+  // Same "all must fail" gate as DNS — any single reachable tracker
+  // means the transport isn't being blocked wholesale.
+  return { blocked: details.length > 0 && details.every(Boolean), details };
+}
+
 /**
  * Run one detection pass. Returns true (blocked) when:
  *
- *   • Bait element is hidden — the extension is actively applying
- *     element-hiding rules on this page (uBlock, ABP, Brave Shields).
- *     This is the most reliable signal and the primary gate.
+ *   • Any bait element is hidden — a cosmetic filter is active on
+ *     this page (uBlock Origin, AdBlock Plus, AdGuard, Brave Shields,
+ *     Ghostery, Privacy Badger, Total AdBlock). This is the most
+ *     reliable signal and the primary gate.
  *
  *   OR
  *
- *   • ALL ad script probes fail AND ALL DNS probes fail — two
- *     independent network signals agree, which is the fingerprint
- *     of a DNS-level filter (Pi-hole, NextDNS, AdGuard DNS).
+ *   • At least one ad-network script failed AND either the fetch-
+ *     DNS probes or the image-pixel probes agree at the network
+ *     layer — two independent transports pointing at the same story
+ *     is the fingerprint of a DNS-level / tracking-protection filter
+ *     (Pi-hole, NextDNS, AdGuard DNS, Cloudflare for Families,
+ *     Quad9, Mullvad DNS, Firefox ETP, Safari ITP, DuckDuckGo,
+ *     Brave Shields "standard").
  *
- * A script-only failure (bait visible, DNS passes) is NOT flagged.
- * This handles the common case where an extension is "paused" for
- * this site (element hiding disabled) but still intercepts requests
- * to Google/Doubleclick at the network level globally — the user
- * has made a good-faith effort to allow ads, so we let them through.
+ * A script-only failure with both network transports passing is NOT
+ * flagged. This handles the common case where an extension is
+ * "paused" for this site but still intercepts requests to Google/
+ * Doubleclick globally — the user has made a good-faith effort to
+ * allow ads, so we let them through.
  */
 async function detectOnce(): Promise<boolean> {
-  const [bait, script, dns] = await Promise.all([
+  const [bait, script, dns, pixel] = await Promise.all([
     baitBlocked(),
     adScriptBlocked(),
     dnsBlocked(),
+    pixelBlocked(),
   ]);
 
   // eslint-disable-next-line no-console
   console.debug('[AdBlock] probe', {
-    bait,
+    baitBlocked: bait.blocked,
+    baitGroups: BAIT_CLASS_GROUPS.map((c, i) => ({
+      group: c,
+      blocked: bait.details[i],
+    })),
     scriptBlocked: script.blocked,
     scriptUrls: SCRIPT_PROBES.map((p, i) => ({
       url: p.url,
@@ -221,11 +336,16 @@ async function detectOnce(): Promise<boolean> {
       url: u,
       blocked: dns.details[i],
     })),
+    pixelBlocked: pixel.blocked,
+    pixelHosts: TRACKER_PIXEL_HOSTS.map((u, i) => ({
+      url: u,
+      blocked: pixel.details[i],
+    })),
   });
 
-  // Primary: extension hiding elements on this page.
-  // Secondary: network-level filter confirmed by two independent signals.
-  const result = bait || (script.blocked && dns.blocked);
+  // Primary: cosmetic filter hiding bait elements on this page.
+  // Secondary: network-level filter confirmed by script + any other transport.
+  const result = bait.blocked || (script.blocked && (dns.blocked || pixel.blocked));
   _latestAdBlockStatus = result ? 'blocked' : 'allowed';
   return result;
 }

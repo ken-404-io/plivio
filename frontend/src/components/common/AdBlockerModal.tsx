@@ -51,32 +51,46 @@ export default function AdBlockerModal() {
 
         <p className="adblocker-desc">
           Plivio is a free platform funded by ads. We detected an ad
-          blocker, browser shield, or private DNS filter that is
-          preventing ads from loading. Please disable it to continue.
+          blocker, browser shield, tracking-protection mode, or
+          private DNS filter that is preventing ads from loading.
+          Please disable it to continue.
         </p>
 
         <ol className="adblocker-steps">
           <li>
             <span className="adblocker-step-num">1</span>
             <span>
-              Disable your ad blocker extension{' '}
+              Disable your ad blocker or privacy extension{' '}
               <span className="adblocker-muted">
-                (uBlock&nbsp;Origin, AdBlock Plus, Brave Shields…)
+                (uBlock&nbsp;Origin, AdBlock Plus, AdGuard, Ghostery,
+                Privacy Badger, Total AdBlock, AdLock…)
               </span>
             </span>
           </li>
           <li>
             <span className="adblocker-step-num">2</span>
             <span>
-              If you use a filtering DNS{' '}
+              Turn off your browser&apos;s built-in shield{' '}
               <span className="adblocker-muted">
-                (Pi&#x2011;hole, NextDNS, AdGuard DNS, Cloudflare for Families)
+                (Brave Shields, Firefox Enhanced Tracking Protection,
+                Safari ITP, DuckDuckGo, Edge Tracking Prevention)
               </span>
-              , switch back to your default DNS.
+              .
             </span>
           </li>
           <li>
             <span className="adblocker-step-num">3</span>
+            <span>
+              If you use a filtering DNS{' '}
+              <span className="adblocker-muted">
+                (Pi&#x2011;hole, NextDNS, AdGuard DNS, Cloudflare for
+                Families, Quad9, Mullvad DNS, Control D)
+              </span>
+              , switch back to your default resolver.
+            </span>
+          </li>
+          <li>
+            <span className="adblocker-step-num">4</span>
             <span>
               Click <strong>Check Again</strong> — or just wait, the
               page will unlock automatically.
