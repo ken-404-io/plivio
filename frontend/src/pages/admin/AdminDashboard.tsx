@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, Search, Ban, CheckCircle2,
   XCircle, Eye, Coins, MessageSquare, Clock,
   CreditCard, UserCheck, Info, History, Smartphone, RotateCcw,
-  Download, X, Link2, Wifi, RefreshCw, Copy,
+  Download, X, Link2, Wifi, RefreshCw, Copy, ShieldAlert,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api.ts';
@@ -16,7 +16,7 @@ import type {
   AdminNotificationLog,
 } from '../../types/index.ts';
 
-const TABS = ['overview', 'users', 'subscriptions', 'restricted', 'withdrawals', 'referrals', 'notifications', 'kyc', 'online'] as const;
+const TABS = ['overview', 'users', 'subscriptions', 'restricted', 'adblocks', 'withdrawals', 'referrals', 'notifications', 'kyc', 'online'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
@@ -24,6 +24,7 @@ const TAB_META: Record<Tab, { label: string; Icon: React.ElementType }> = {
   users:         { label: 'Users',         Icon: Users           },
   subscriptions: { label: 'Subscriptions', Icon: CreditCard      },
   restricted:    { label: 'Restricted',    Icon: Ban             },
+  adblocks:      { label: 'Ad Blockers',   Icon: ShieldAlert     },
   withdrawals:   { label: 'Withdrawals',   Icon: ArrowUpCircle   },
   referrals:     { label: 'Referrals',     Icon: Link2           },
   notifications: { label: 'Notifications', Icon: Bell            },
@@ -1089,6 +1090,14 @@ export default function AdminDashboard() {
   const [restrictedLoading, setRestrictedLoading] = useState(false);
   const [restrictedPage,    setRestrictedPage]    = useState(1);
   const [restrictedMeta,    setRestrictedMeta]    = useState<{ page: number; total: number; limit: number }>({ page: 1, total: 0, limit: 25 });
+
+  // Ad Blockers tab
+  const [adBlockUsers,   setAdBlockUsers]   = useState<AdminUser[]>([]);
+  const [adBlockLoading, setAdBlockLoading] = useState(false);
+  const [adBlockPage,    setAdBlockPage]    = useState(1);
+  const [adBlockMeta,    setAdBlockMeta]    = useState<{ page: number; total: number; limit: number }>({ page: 1, total: 0, limit: 25 });
+  const [adBlockSearch,           setAdBlockSearch]           = useState('');
+  const [adBlockSearchCommitted,  setAdBlockSearchCommitted]  = useState('');
   const [broadcasting,  setBroadcasting]  = useState(false);
   const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '' });
   const [emailBroadcasting,  setEmailBroadcasting]  = useState(false);
@@ -1302,6 +1311,30 @@ export default function AdminDashboard() {
     if (tab === 'restricted') void loadRestricted();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, loadRestricted]);
+
+  const loadAdBlockUsers = useCallback(async () => {
+    setAdBlockLoading(true);
+    try {
+      const params: Record<string, string | number> = { page: adBlockPage, limit: 25, ad_block: 'blocked' };
+      if (adBlockSearchCommitted) params.search = adBlockSearchCommitted;
+      const { data } = await api.get<{
+        data: AdminUser[];
+        meta: { page: number; total: number; limit: number };
+      }>('/admin/users', { params });
+      setAdBlockUsers(data.data);
+      setAdBlockMeta(data.meta);
+    } catch {
+      toast.error('Failed to load ad blocker accounts.');
+    } finally {
+      setAdBlockLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adBlockPage, adBlockSearchCommitted]);
+
+  useEffect(() => {
+    if (tab === 'adblocks') void loadAdBlockUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, loadAdBlockUsers]);
 
   const loadUserDetails = useCallback(async (userId: string) => {
     if (userDetails[userId] || userDetailsLoad[userId]) return;
@@ -1582,9 +1615,9 @@ export default function AdminDashboard() {
         if (existing) {
           return prev.map((u) => u.id === userId ? { ...u, is_banned: true, ban_reason: reason } : u);
         }
-        // Row wasn't in the restricted list yet (e.g. banned from Users tab) — tab will refetch on next view
         return prev;
       });
+      setAdBlockUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: true, ban_reason: reason } : u));
       setBanTarget(null);
       toast.success('Account banned.');
     } catch (err: unknown) {
@@ -3766,6 +3799,234 @@ export default function AdminDashboard() {
                     className="btn btn-ghost btn-sm"
                     disabled={restrictedPage * restrictedMeta.limit >= restrictedMeta.total || restrictedLoading}
                     onClick={() => setRestrictedPage((p) => p + 1)}
+                  >
+                    Next <ChevronRight size={13} />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Ad Blockers ── */}
+      {tab === 'adblocks' && (
+        <div className="adm-section">
+          <div className="adm-section-header" style={{ justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ShieldAlert size={15} style={{ color: '#eab308' }} />
+              <h2 className="adm-section-title">
+                Ad Blockers
+                <span style={{
+                  marginLeft: 8,
+                  background: 'rgba(234,179,8,0.15)',
+                  color: '#eab308',
+                  border: '1px solid rgba(234,179,8,0.35)',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: '1px 8px',
+                }}>
+                  {adBlockMeta.total}
+                </span>
+              </h2>
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => { void loadAdBlockUsers(); }}
+              disabled={adBlockLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <RefreshCw size={13} className={adBlockLoading ? 'spin' : ''} />
+              Refresh
+            </button>
+          </div>
+          <p className="adm-section-hint">Users detected using an ad blocker, IP limiter, DNS filter (Pi-hole, NextDNS, AdGuard DNS), or Brave Shields.</p>
+
+          {/* Search */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+              <input
+                className="adm-search-input"
+                style={{ paddingLeft: 32, width: '100%' }}
+                placeholder="Search username or email…"
+                value={adBlockSearch}
+                onChange={(e) => setAdBlockSearch(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { setAdBlockSearchCommitted(adBlockSearch); setAdBlockPage(1); } }}
+              />
+            </div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => { setAdBlockSearchCommitted(adBlockSearch); setAdBlockPage(1); }}
+            >
+              <Search size={13} /> Search
+            </button>
+            {adBlockSearchCommitted && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => { setAdBlockSearch(''); setAdBlockSearchCommitted(''); setAdBlockPage(1); }}
+              >
+                <X size={13} /> Clear
+              </button>
+            )}
+          </div>
+
+          {adBlockLoading && adBlockUsers.length === 0 ? (
+            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+              Loading…
+            </div>
+          ) : adBlockUsers.length === 0 ? (
+            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+              No users with ad blockers detected.
+            </div>
+          ) : (
+            <>
+              <div className="adm-table-wrap">
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Plan</th>
+                      <th>Status</th>
+                      <th>Last Active</th>
+                      <th>Joined</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adBlockUsers.map((u, i) => {
+                      const isExpanded = expandedUser === u.id;
+                      const isOnline = u.last_active_at
+                        ? (Date.now() - new Date(u.last_active_at).getTime()) < 5 * 60 * 1000
+                        : false;
+                      const lastSeen = u.last_active_at
+                        ? new Date(u.last_active_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : 'Never';
+                      return (
+                        <Fragment key={u.id}>
+                          <tr style={{ opacity: u.is_banned ? 0.6 : 1 }}>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{(adBlockPage - 1) * 25 + i + 1}</td>
+                            <td>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span
+                                  title={isOnline ? 'Online now' : `Last seen: ${lastSeen}`}
+                                  style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: isOnline ? '#22c55e' : '#6b7280', boxShadow: isOnline ? '0 0 4px #22c55e' : undefined }}
+                                />
+                                <strong>{u.username}</strong>
+                                <span
+                                  title="Ad blocker or filtering DNS detected"
+                                  style={{
+                                    fontSize: 10, padding: '1px 6px', borderRadius: 10,
+                                    background: 'rgba(234,179,8,0.15)', color: '#eab308',
+                                    border: '1px solid rgba(234,179,8,0.35)', fontWeight: 600,
+                                    flexShrink: 0, whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  Ad Blocker
+                                </span>
+                                {u.is_banned && (
+                                  <span className="adm-status-chip adm-status-chip--banned" style={{ fontSize: 10 }}>
+                                    <Ban size={9} /> Banned
+                                  </span>
+                                )}
+                              </span>
+                            </td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{u.email}</td>
+                            <td><span className={`adm-plan-badge adm-plan-badge--${u.plan}`}>{u.plan}</span></td>
+                            <td>
+                              {u.is_banned ? (
+                                <span className="adm-status-chip adm-status-chip--banned"><Ban size={10} /> Banned</span>
+                              ) : (
+                                <span className="adm-status-chip adm-status-chip--active">Active</span>
+                              )}
+                            </td>
+                            <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{lastSeen}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                              {new Date(u.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <Link
+                                  to={`/admin/users/${u.id}`}
+                                  className="adm-icon-btn"
+                                  title="View all details"
+                                >
+                                  <Eye size={14} />
+                                </Link>
+                                <button
+                                  className="adm-icon-btn"
+                                  onClick={() => setNotifyTarget({ id: u.id, username: u.username })}
+                                  title="Send in-app notification"
+                                >
+                                  <Bell size={14} />
+                                </button>
+                                <button
+                                  className="adm-icon-btn"
+                                  onClick={() => setEmailTarget({ id: u.id, username: u.username })}
+                                  title="Send email"
+                                >
+                                  <Mail size={14} />
+                                </button>
+                                <button
+                                  className={`adm-icon-btn${isExpanded ? ' adm-icon-btn--active' : ''}`}
+                                  onClick={() => setExpandedUser(isExpanded ? null : u.id)}
+                                  title="Manage user"
+                                >
+                                  <ChevronRight size={14} style={{ transform: isExpanded ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s' }} />
+                                </button>
+                                {u.is_banned ? (
+                                  <button
+                                    className="adm-action-btn adm-action-btn--unban"
+                                    onClick={() => setUnbanTarget({ id: u.id, username: u.username })}
+                                    title="Lift permanent ban"
+                                  >
+                                    Unban
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="adm-action-btn adm-action-btn--ban"
+                                    onClick={() => setBanTarget({ id: u.id, username: u.username })}
+                                    title="Permanently ban this account"
+                                  >
+                                    Ban
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={8} style={{ padding: 0, background: 'var(--bg-elevated)' }}>
+                                {renderUserManagePanel(u)}
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {adBlockMeta.total > adBlockMeta.limit && (
+                <div className="adm-pagination" style={{ marginTop: 12 }}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    disabled={adBlockPage <= 1 || adBlockLoading}
+                    onClick={() => setAdBlockPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft size={13} /> Prev
+                  </button>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Page {adBlockMeta.page} of {Math.max(1, Math.ceil(adBlockMeta.total / adBlockMeta.limit))}
+                  </span>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    disabled={adBlockPage * adBlockMeta.limit >= adBlockMeta.total || adBlockLoading}
+                    onClick={() => setAdBlockPage((p) => p + 1)}
                   >
                     Next <ChevronRight size={13} />
                   </button>
