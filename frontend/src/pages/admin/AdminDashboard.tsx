@@ -1177,7 +1177,7 @@ export default function AdminDashboard() {
   const [notifExpanded, setNotifExpanded] = useState<string | null>(null);
 
   // Online users state
-  const [onlineUsers,        setOnlineUsers]        = useState<{ id: string; username: string; email: string; plan: string; last_active_at: string }[]>([]);
+  const [onlineUsers,        setOnlineUsers]        = useState<{ id: string; username: string; email: string; plan: string; last_active_at: string; ad_block_status: 'blocked' | 'allowed' | null }[]>([]);
   const [onlineLoading,      setOnlineLoading]      = useState(false);
   const [onlineLastRefreshed, setOnlineLastRefreshed] = useState<Date | null>(null);
   const onlineIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -2316,7 +2316,44 @@ export default function AdminDashboard() {
                       {u.username[0]?.toUpperCase()}
                     </div>
                     <div className="adm-user-info">
-                      <span className="adm-user-name">{u.username}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                        <span className="adm-user-name">{u.username}</span>
+                        {(() => {
+                          const isOnline = !!u.last_active_at && (Date.now() - new Date(u.last_active_at).getTime()) < 5 * 60 * 1000;
+                          const lastSeenLabel = u.last_active_at
+                            ? (() => {
+                                const secsAgo = Math.floor((Date.now() - new Date(u.last_active_at).getTime()) / 1000);
+                                if (secsAgo < 60) return `${secsAgo}s ago`;
+                                if (secsAgo < 3600) return `${Math.floor(secsAgo / 60)}m ago`;
+                                if (secsAgo < 86400) return `${Math.floor(secsAgo / 3600)}h ago`;
+                                return `${Math.floor(secsAgo / 86400)}d ago`;
+                              })()
+                            : 'Never';
+                          return (
+                            <span
+                              title={isOnline ? 'Online now' : `Last seen: ${lastSeenLabel}`}
+                              style={{
+                                width: 7, height: 7, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
+                                background: isOnline ? '#22c55e' : '#6b7280',
+                                boxShadow: isOnline ? '0 0 4px #22c55e' : undefined,
+                              }}
+                            />
+                          );
+                        })()}
+                        {u.ad_block_status === 'blocked' && (
+                          <span
+                            title="Ad blocker or filtering DNS detected"
+                            style={{
+                              fontSize: 10, padding: '1px 6px', borderRadius: 10,
+                              background: 'rgba(234,179,8,0.15)', color: '#eab308',
+                              border: '1px solid rgba(234,179,8,0.35)', fontWeight: 600,
+                              flexShrink: 0, whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Ad Blocker
+                          </span>
+                        )}
+                      </div>
                       <span className="adm-user-email">{u.email}</span>
                       <span className="adm-user-date">
                         Joined {new Date(u.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -3810,9 +3847,22 @@ export default function AdminDashboard() {
                       <tr key={u.id}>
                         <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{i + 1}</td>
                         <td>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', flexShrink: 0 }} />
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 4px var(--success)', flexShrink: 0 }} />
                             <strong>{u.username}</strong>
+                            {u.ad_block_status === 'blocked' && (
+                              <span
+                                title="Ad blocker or filtering DNS detected"
+                                style={{
+                                  fontSize: 10, padding: '1px 6px', borderRadius: 10,
+                                  background: 'rgba(234,179,8,0.15)', color: '#eab308',
+                                  border: '1px solid rgba(234,179,8,0.35)', fontWeight: 600,
+                                  flexShrink: 0, whiteSpace: 'nowrap',
+                                }}
+                              >
+                                Ad Blocker
+                              </span>
+                            )}
                           </span>
                         </td>
                         <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{u.email}</td>

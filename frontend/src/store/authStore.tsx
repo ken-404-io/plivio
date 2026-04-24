@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
 import api from '../services/api.ts';
 import type { User, AuthContextValue, RegisterPayload, AuthTransition } from '../types/index.ts';
+import { getLatestAdBlockStatus } from '../hooks/useAdBlockDetector.ts';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -219,7 +220,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const ping = () => {
       if (!userRef.current || document.hidden) return;
-      void api.post('/users/me/heartbeat').catch(() => {});
+      const adBlockStatus = getLatestAdBlockStatus();
+      void api.post('/users/me/heartbeat', adBlockStatus ? { ad_block_status: adBlockStatus } : {}).catch(() => {});
     };
     ping(); // immediate ping on login/mount
     const id = setInterval(ping, 30_000);

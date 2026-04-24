@@ -69,7 +69,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const { rows } = await pool.query(
       `SELECT id, username, email, plan, balance, is_verified, is_banned, is_admin,
               is_suspended, suspended_until, ban_reason, suspend_reason,
-              device_fingerprint, created_at
+              device_fingerprint, last_active_at, ad_block_status, created_at
        FROM users
        WHERE ($1::text IS NULL OR username ILIKE $1 OR email ILIKE $1)
          AND ($3::plan_type IS NULL OR plan = $3::plan_type)
@@ -1276,7 +1276,7 @@ export async function listSubscriptions(_req: Request, res: Response, next: Next
 export async function getOnlineUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { rows } = await pool.query(
-      `SELECT id, username, email, plan, last_active_at
+      `SELECT id, username, email, plan, last_active_at, ad_block_status
        FROM users
        WHERE last_active_at >= NOW() - INTERVAL '5 minutes'
          AND is_banned = FALSE

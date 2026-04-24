@@ -42,10 +42,18 @@ export async function getMe(req: Request, res: Response, next: NextFunction): Pr
 
 export async function heartbeat(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await pool.query(
-      'UPDATE users SET last_active_at = NOW() WHERE id = $1',
-      [req.user!.id],
-    );
+    const { ad_block_status } = req.body as { ad_block_status?: string };
+    if (ad_block_status === 'blocked' || ad_block_status === 'allowed') {
+      await pool.query(
+        'UPDATE users SET last_active_at = NOW(), ad_block_status = $2 WHERE id = $1',
+        [req.user!.id, ad_block_status],
+      );
+    } else {
+      await pool.query(
+        'UPDATE users SET last_active_at = NOW() WHERE id = $1',
+        [req.user!.id],
+      );
+    }
     res.json({ success: true });
   } catch (err) { next(err); }
 }

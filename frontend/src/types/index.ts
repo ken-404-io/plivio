@@ -235,6 +235,8 @@ export interface AdminUser {
   ban_reason?: string | null;
   suspend_reason?: string | null;
   is_admin: boolean;
+  last_active_at: string | null;
+  ad_block_status: 'blocked' | 'allowed' | null;
   created_at: string;
 }
 
