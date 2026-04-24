@@ -60,20 +60,25 @@ export default function AdBlockerModal() {
           <li>
             <span className="adblocker-step-num">1</span>
             <span>
-              Disable your ad blocker or privacy extension{' '}
+              Disable your ad blocker, privacy extension, or mobile
+              content blocker{' '}
               <span className="adblocker-muted">
                 (uBlock&nbsp;Origin, AdBlock Plus, AdGuard, Ghostery,
-                Privacy Badger, Total AdBlock, AdLock…)
+                Privacy Badger, Total AdBlock, AdLock, 1Blocker,
+                Wipr, Hush, StopTheMadness…)
               </span>
             </span>
           </li>
           <li>
             <span className="adblocker-step-num">2</span>
             <span>
-              Turn off your browser&apos;s built-in shield{' '}
+              Turn off your browser&apos;s built-in shield or VPN
+              ad-filter{' '}
               <span className="adblocker-muted">
                 (Brave Shields, Firefox Enhanced Tracking Protection,
-                Safari ITP, DuckDuckGo, Edge Tracking Prevention)
+                Safari ITP, DuckDuckGo, Edge Tracking Prevention,
+                Opera built-in blocker, NordVPN Threat Protection,
+                ProtonVPN NetShield, Surfshark CleanWeb)
               </span>
               .
             </span>
