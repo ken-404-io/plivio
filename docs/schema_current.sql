@@ -38,6 +38,11 @@ CREATE TABLE users (
   is_verified          BOOLEAN      DEFAULT FALSE,
   is_banned            BOOLEAN      DEFAULT FALSE,
   is_admin             BOOLEAN      DEFAULT FALSE,
+  is_suspended         BOOLEAN      NOT NULL DEFAULT FALSE,
+  suspended_until      TIMESTAMPTZ,
+  ban_reason           TEXT,
+  suspend_reason       TEXT,
+  restoration_message  TEXT,
   is_email_verified    BOOLEAN      NOT NULL DEFAULT FALSE,
   kyc_status           TEXT         DEFAULT 'none',  -- none | pending | approved | rejected
   avatar_url           TEXT,
@@ -51,14 +56,18 @@ CREATE TABLE users (
   last_streak_date     DATE,
   streak_broken_at     DATE,
   streak_before_break  INTEGER      NOT NULL DEFAULT 0,
+  last_active_at       TIMESTAMPTZ,
+  ad_block_status      VARCHAR(10)  DEFAULT NULL,
   created_at           TIMESTAMPTZ  DEFAULT NOW()
 );
 
-CREATE INDEX idx_users_email       ON users(email);
-CREATE INDEX idx_users_referral_code ON users(referral_code);
-CREATE INDEX idx_users_google_id   ON users(google_id)   WHERE google_id   IS NOT NULL;
-CREATE INDEX idx_users_facebook_id ON users(facebook_id) WHERE facebook_id IS NOT NULL;
-CREATE INDEX idx_users_github_id   ON users(github_id)   WHERE github_id   IS NOT NULL;
+CREATE INDEX idx_users_email         ON users(email);
+CREATE INDEX idx_users_referral_code  ON users(referral_code);
+CREATE INDEX idx_users_google_id      ON users(google_id)      WHERE google_id      IS NOT NULL;
+CREATE INDEX idx_users_facebook_id    ON users(facebook_id)    WHERE facebook_id    IS NOT NULL;
+CREATE INDEX idx_users_github_id      ON users(github_id)      WHERE github_id      IS NOT NULL;
+CREATE INDEX idx_users_suspended      ON users(is_suspended)   WHERE is_suspended   = TRUE;
+CREATE INDEX idx_users_last_active_at ON users(last_active_at DESC) WHERE last_active_at IS NOT NULL;
 
 -- ─── Tasks ────────────────────────────────────────────────────────────────────
 

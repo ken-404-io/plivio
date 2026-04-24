@@ -65,24 +65,39 @@ ALTER TABLE task_completions
 -- ─── 4. users — ensure all columns exist ─────────────────────────────────────
 
 ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS plan             plan_type    NOT NULL DEFAULT 'free',
-  ADD COLUMN IF NOT EXISTS balance          NUMERIC(10,2) NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS streak_count     INT           NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS last_active_date DATE,
-  ADD COLUMN IF NOT EXISTS kyc_status       TEXT          NOT NULL DEFAULT 'none',
-  ADD COLUMN IF NOT EXISTS is_banned        BOOLEAN       NOT NULL DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS is_admin         BOOLEAN       NOT NULL DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS avatar_url       TEXT,
-  ADD COLUMN IF NOT EXISTS coins            INT           NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS referral_code    TEXT          UNIQUE,
-  ADD COLUMN IF NOT EXISTS referred_by      UUID          REFERENCES users(id),
-  ADD COLUMN IF NOT EXISTS totp_secret      TEXT,
-  ADD COLUMN IF NOT EXISTS totp_enabled     BOOLEAN       NOT NULL DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS google_id        TEXT,
-  ADD COLUMN IF NOT EXISTS facebook_id      TEXT,
-  ADD COLUMN IF NOT EXISTS github_id        TEXT,
-  ADD COLUMN IF NOT EXISTS email_verified   BOOLEAN       NOT NULL DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS daily_limit      NUMERIC(10,2);
+  ADD COLUMN IF NOT EXISTS plan                plan_type     NOT NULL DEFAULT 'free',
+  ADD COLUMN IF NOT EXISTS balance             NUMERIC(10,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS streak_count        INT           NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_active_date    DATE,
+  ADD COLUMN IF NOT EXISTS kyc_status          TEXT          NOT NULL DEFAULT 'none',
+  ADD COLUMN IF NOT EXISTS is_banned           BOOLEAN       NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS is_admin            BOOLEAN       NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS is_suspended        BOOLEAN       NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS suspended_until     TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS ban_reason          TEXT,
+  ADD COLUMN IF NOT EXISTS suspend_reason      TEXT,
+  ADD COLUMN IF NOT EXISTS restoration_message TEXT,
+  ADD COLUMN IF NOT EXISTS last_active_at      TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS ad_block_status     VARCHAR(10)   DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS avatar_url          TEXT,
+  ADD COLUMN IF NOT EXISTS coins               INT           NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS referral_code       TEXT          UNIQUE,
+  ADD COLUMN IF NOT EXISTS referred_by         UUID          REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS totp_secret         TEXT,
+  ADD COLUMN IF NOT EXISTS totp_enabled        BOOLEAN       NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS google_id           TEXT,
+  ADD COLUMN IF NOT EXISTS facebook_id         TEXT,
+  ADD COLUMN IF NOT EXISTS github_id           TEXT,
+  ADD COLUMN IF NOT EXISTS email_verified      BOOLEAN       NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS daily_limit         NUMERIC(10,2),
+  ADD COLUMN IF NOT EXISTS device_name         TEXT,
+  ADD COLUMN IF NOT EXISTS device_registered_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_users_suspended
+  ON users (is_suspended) WHERE is_suspended = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_users_last_active_at
+  ON users (last_active_at DESC) WHERE last_active_at IS NOT NULL;
 
 -- ─── 5. Ensure remaining tables exist ────────────────────────────────────────
 
