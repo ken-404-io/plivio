@@ -96,6 +96,25 @@ const TRACKER_PIXEL_HOSTS: readonly string[] = [
   'https://stats.g.doubleclick.net/dc.js',
   'https://www.facebook.com/tr/',
   'https://www.scorecardresearch.com/beacon.js',
+  'https://pixel.quantserve.com/pixel',
+  'https://static.criteo.net/js/ld/ld.js',
+  'https://ib.adnxs.com/ttj',
+  'https://static.hotjar.com/c/hotjar-1.js',
+  'https://cdn.taboola.com/libtrc/unip/loader.js',
+  'https://widgets.outbrain.com/outbrain.js',
+];
+
+/**
+ * Iframe URL probes — blockers often sandbox or neutralise iframes
+ * pointing at ad-server hosts even when the enclosing document's
+ * fetch layer is untouched (AdBlock Plus, AdGuard, and most mobile
+ * content blockers do this). An iframe that fails to load or is
+ * forced into `about:blank` fires an `onerror` or never resolves —
+ * we flag both cases as blocked.
+ */
+const IFRAME_PROBE_URLS: readonly string[] = [
+  'https://tpc.googlesyndication.com/safeframe/1-0-40/html/container.html',
+  'https://s0.2mdn.net/ads/richmedia/studio/pv2/2019081301/enabler.html',
 ];
 
 /**
@@ -117,6 +136,22 @@ const BAIT_CLASS_GROUPS: readonly string[] = [
 ];
 
 /**
+ * Bait ID list — many filter-list entries target elements by ID
+ * rather than class (`###ad-banner`, `###google_ads_iframe`).
+ * uBlock, AdGuard, Fanboy's, and EasyList all maintain separate
+ * ID-based cosmetic rules, so an element-by-class probe can pass
+ * while an element-by-id probe is still hidden.
+ */
+const BAIT_IDS: readonly string[] = [
+  'ad-banner',
+  'google_ads_iframe',
+  'ads-sidebar',
+  'adsense',
+  'ad-placeholder',
+  'advertisement-top',
+];
+
+/**
  * Bait DOM check — extensions hide DIVs whose class names appear
  * on EasyList / uBlock / ABP. Position must be `absolute`, never
  * `fixed` (fixed elements always have offsetParent === null), and
@@ -130,10 +165,11 @@ const BAIT_CLASS_GROUPS: readonly string[] = [
  * filters (uBlock Origin, AdBlock Plus, AdGuard, Brave Shields,
  * Ghostery, Privacy Badger, Total AdBlock, AdLock, Stands Fair).
  */
-function singleBaitBlocked(className: string): Promise<boolean> {
+function singleBaitBlocked(opts: { className?: string; id?: string }): Promise<boolean> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
-    el.className = className;
+    if (opts.className) el.className = opts.className;
+    if (opts.id) el.id = opts.id;
     el.setAttribute('data-ad', 'true');
     el.innerHTML = '&nbsp;';
     el.style.cssText =
@@ -158,9 +194,74 @@ function singleBaitBlocked(className: string): Promise<boolean> {
   });
 }
 
-async function baitBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
-  const details = await Promise.all(BAIT_CLASS_GROUPS.map(singleBaitBlocked));
-  return { blocked: details.some(Boolean), details };
+async function baitBlocked(): Promise<{
+  blocked: boolean;
+  classDetails: boolean[];
+  idDetails: boolean[];
+}> {
+  const [classDetails, idDetails] = await Promise.all([
+    Promise.all(BAIT_CLASS_GROUPS.map((c) => singleBaitBlocked({ className: c }))),
+    Promise.all(BAIT_IDS.map((id) => singleBaitBlocked({ id }))),
+  ]);
+  return {
+    blocked: classDetails.some(Boolean) || idDetails.some(Boolean),
+    classDetails,
+    idDetails,
+  };
+}
+
+/**
+ * Iframe-transport probe. Some content blockers (mobile Safari
+ * content blockers, AdGuard, AdBlock Plus for Chrome) intercept
+ * iframe loads specifically — they let a script or fetch to the
+ * same host succeed but refuse to render the iframe. Detect by
+ * timing how long onload takes; blocked iframes either never load
+ * or resolve to about:blank immediately with no meaningful content.
+ */
+function iframeFails(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const frame = document.createElement('iframe');
+    let resolved = false;
+    const finish = (blocked: boolean) => {
+      if (resolved) return;
+      resolved = true;
+      window.clearTimeout(timer);
+      try { frame.remove(); } catch { /* ignore */ }
+      resolve(blocked);
+    };
+    const timer = window.setTimeout(() => finish(true), PROBE_TIMEOUT_MS);
+    frame.onerror = () => finish(true);
+    frame.onload = () => {
+      // If the iframe "loaded" but is forced to about:blank or has
+      // zero body content, treat as blocked. We cannot read its
+      // cross-origin body, so instead we check src was preserved.
+      try {
+        if (frame.src === 'about:blank' || !frame.src) {
+          finish(true);
+          return;
+        }
+      } catch {
+        finish(true);
+        return;
+      }
+      finish(false);
+    };
+    frame.style.cssText =
+      'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;border:0;';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.src = `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`;
+    document.body.appendChild(frame);
+  });
+}
+
+async function iframeBlocked(): Promise<{ blocked: boolean; details: boolean[] }> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return { blocked: false, details: [] };
+  }
+  const details = await Promise.all(IFRAME_PROBE_URLS.map(iframeFails));
+  // All iframes must fail — single failures happen due to CSP,
+  // geo-restrictions, or short-lived CDN blips.
+  return { blocked: details.length > 0 && details.every(Boolean), details };
 }
 
 /**
@@ -312,19 +413,24 @@ async function pixelBlocked(): Promise<{ blocked: boolean; details: boolean[] }>
  * allow ads, so we let them through.
  */
 async function detectOnce(): Promise<boolean> {
-  const [bait, script, dns, pixel] = await Promise.all([
+  const [bait, script, dns, pixel, iframe] = await Promise.all([
     baitBlocked(),
     adScriptBlocked(),
     dnsBlocked(),
     pixelBlocked(),
+    iframeBlocked(),
   ]);
 
   // eslint-disable-next-line no-console
   console.debug('[AdBlock] probe', {
     baitBlocked: bait.blocked,
-    baitGroups: BAIT_CLASS_GROUPS.map((c, i) => ({
+    baitClassGroups: BAIT_CLASS_GROUPS.map((c, i) => ({
       group: c,
-      blocked: bait.details[i],
+      blocked: bait.classDetails[i],
+    })),
+    baitIds: BAIT_IDS.map((id, i) => ({
+      id,
+      blocked: bait.idDetails[i],
     })),
     scriptBlocked: script.blocked,
     scriptUrls: SCRIPT_PROBES.map((p, i) => ({
@@ -341,11 +447,20 @@ async function detectOnce(): Promise<boolean> {
       url: u,
       blocked: pixel.details[i],
     })),
+    iframeBlocked: iframe.blocked,
+    iframeUrls: IFRAME_PROBE_URLS.map((u, i) => ({
+      url: u,
+      blocked: iframe.details[i],
+    })),
   });
 
   // Primary: cosmetic filter hiding bait elements on this page.
   // Secondary: network-level filter confirmed by script + any other transport.
-  const result = bait.blocked || (script.blocked && (dns.blocked || pixel.blocked));
+  // The secondary gate widens to cover iframe-intercepting content blockers
+  // that let fetch() pass but refuse iframes.
+  const result =
+    bait.blocked ||
+    (script.blocked && (dns.blocked || pixel.blocked || iframe.blocked));
   _latestAdBlockStatus = result ? 'blocked' : 'allowed';
   return result;
 }
